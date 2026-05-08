@@ -85,3 +85,17 @@ It should start with:
 7. no related-party revenue counted as proof.
 
 Strange Company can be publicly visible as a static prototype while still not operating live. The satellite can be commercially active once its own legal, payment, accounting, and support gates are ready.
+
+## Operational Loop
+
+The command center now includes an Operations tab.
+
+That tab is the first functional operating surface:
+
+- customer order intake,
+- invoice packet generation,
+- local invoice and delivery ledger,
+- commercial readiness controls,
+- receipt-chain events for orders and operations state.
+
+The prototype blocks an order from moving from `Sent` to `Paid` until the critical commercial controls are marked clear. This is a software guardrail, not a substitute for actually creating the legal entity, bank route, support inbox, and bookkeeping process.

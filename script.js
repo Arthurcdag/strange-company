@@ -402,7 +402,83 @@ function defaultSatelliteCompany() {
   };
 }
 
+function defaultOperations() {
+  return {
+    operatorName: "Strange Works Studio",
+    supportEmail: "ops@strangeworks.studio",
+    paymentMode: "Manual invoice only",
+    invoicePrefix: "SWS",
+    nextInvoiceNumber: 1001,
+    controls: [
+      {
+        id: "entity",
+        title: "Entity and tax identity ready",
+        detail: "Legal name, tax identity, signer authority, and customer contract path are confirmed.",
+        done: false,
+        critical: true
+      },
+      {
+        id: "payment",
+        title: "Payment route ready",
+        detail: "Bank, processor or manual invoice route, refund path, and failed-payment handling are ready.",
+        done: false,
+        critical: true
+      },
+      {
+        id: "accounting",
+        title: "Bookkeeping lane ready",
+        detail: "Invoice numbers, revenue categories, tax review, and monthly reconciliation are defined.",
+        done: false,
+        critical: true
+      },
+      {
+        id: "support",
+        title: "Support inbox monitored",
+        detail: "The support inbox exists, is monitored, and has an incident escalation path.",
+        done: false,
+        critical: true
+      },
+      {
+        id: "terms",
+        title: "Terms published",
+        detail: "Customer scope, payment terms, cancellation, refund, and service limits are visible.",
+        done: true,
+        critical: true
+      },
+      {
+        id: "privacy",
+        title: "Privacy notice published",
+        detail: "Data handling, local storage, retention, and contact route are visible.",
+        done: true,
+        critical: true
+      },
+      {
+        id: "no-regulated-data",
+        title: "No regulated data in v0",
+        detail: "The first service accepts summaries and document lists, not protected health, payment, or credential data.",
+        done: true,
+        critical: false
+      }
+    ],
+    orders: [
+      {
+        id: "order-clinic-proof-sprint",
+        invoiceNumber: "SWS-1000",
+        customer: "Clinic operator",
+        contact: "buyer@example.com",
+        serviceId: "proof-sprint",
+        serviceTitle: "Compliance proof sprint",
+        need: "Needs a monthly proof packet before renewal.",
+        amount: 750,
+        status: "Draft",
+        createdAt: "2026-05-08T00:00:00.000Z"
+      }
+    ]
+  };
+}
+
 const pilotStages = ["Prospect", "Contacted", "Call booked", "Committed", "Ready to invoice"];
+const operationStages = ["Draft", "Sent", "Paid", "Delivered"];
 
 const gateChecks = [
   {
@@ -453,6 +529,7 @@ const LAUNCH_GATE_KEY = "strange-company-launch-gate";
 const RECEIPT_SEAL_KEY = "strange-company-receipt-seal";
 const REVENUE_PILOT_KEY = "strange-company-revenue-pilot";
 const SATELLITE_COMPANY_KEY = "strange-company-satellite-company";
+const OPERATIONS_KEY = "strange-company-operations";
 
 let activeScenario = "base";
 let loopAnimationId = 0;
@@ -467,6 +544,7 @@ let launchGate = loadLaunchGate();
 let receiptSeal = loadReceiptSeal();
 let revenuePilot = loadRevenuePilot();
 let satelliteCompany = loadSatelliteCompany();
+let operations = loadOperations();
 
 function activateView(target) {
   document.querySelectorAll(".view").forEach((view) => {
@@ -777,6 +855,7 @@ function buildLaunchChecks() {
   const hardeningPackets = executionPackets.filter((packet) => packet.drillId).length;
   const pilotReadiness = buildPilotReadiness();
   const satelliteModel = buildSatelliteCompanyModel();
+  const operationsModel = buildOperationsModel();
 
   return [
     {
@@ -868,6 +947,14 @@ function buildLaunchChecks() {
       fix: "Sell externally"
     },
     {
+      title: "Operations console has intake",
+      phase: "Public beta",
+      passed: operationsModel.orders.length > 0,
+      tone: "amber",
+      evidence: `${operationsModel.orders.length} order${operationsModel.orders.length === 1 ? "" : "s"} in the operating ledger.`,
+      fix: "Add order"
+    },
+    {
       title: "Public trust and legal review complete",
       phase: "Live operation",
       passed: false,
@@ -890,6 +977,14 @@ function buildLaunchChecks() {
       tone: "red",
       evidence: `${satelliteModel.openCriticalControls.length} critical satellite control${satelliteModel.openCriticalControls.length === 1 ? "" : "s"} open.`,
       fix: "Close controls"
+    },
+    {
+      title: "Operations controls closed",
+      phase: "Live operation",
+      passed: operationsModel.openCriticalControls.length === 0,
+      tone: "red",
+      evidence: `${operationsModel.openCriticalControls.length} critical operations control${operationsModel.openCriticalControls.length === 1 ? "" : "s"} open.`,
+      fix: "Close ops"
     }
   ];
 }
@@ -1638,6 +1733,35 @@ function saveSatelliteCompany() {
   }
 }
 
+function loadOperations() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(OPERATIONS_KEY) || "null");
+    if (stored && typeof stored === "object") {
+      const base = defaultOperations();
+      return {
+        operatorName: stored.operatorName || base.operatorName,
+        supportEmail: stored.supportEmail || base.supportEmail,
+        paymentMode: stored.paymentMode || base.paymentMode,
+        invoicePrefix: stored.invoicePrefix || base.invoicePrefix,
+        nextInvoiceNumber: Number(stored.nextInvoiceNumber || base.nextInvoiceNumber),
+        controls: Array.isArray(stored.controls) && stored.controls.length ? stored.controls : base.controls,
+        orders: Array.isArray(stored.orders) ? stored.orders : base.orders
+      };
+    }
+  } catch {
+    // Fall through to the built-in operations state.
+  }
+  return defaultOperations();
+}
+
+function saveOperations() {
+  try {
+    localStorage.setItem(OPERATIONS_KEY, JSON.stringify(operations));
+  } catch {
+    // Local storage can be unavailable in hardened browser contexts.
+  }
+}
+
 function buildPilotReadiness() {
   const blockers = revenuePilot.blockers || [];
   const leads = revenuePilot.leads || [];
@@ -2113,6 +2237,7 @@ function adjustSatelliteService(serviceId, delta) {
   });
   saveSatelliteCompany();
   renderSatelliteCompany();
+  renderOperations();
   renderLogs();
 }
 
@@ -2122,6 +2247,7 @@ function toggleSatelliteService(serviceId) {
   );
   saveSatelliteCompany();
   renderSatelliteCompany();
+  renderOperations();
   renderLogs();
 }
 
@@ -2132,6 +2258,369 @@ function toggleSatelliteControl(controlId, done) {
   saveSatelliteCompany();
   renderSatelliteCompany();
   renderLogs();
+}
+
+function operationServices() {
+  const externalServices = (satelliteCompany.services || []).filter((service) => !service.relatedParty);
+  return externalServices.length ? externalServices : defaultSatelliteCompany().services.filter((service) => !service.relatedParty);
+}
+
+function buildOperationsModel() {
+  const controls = operations.controls || [];
+  const orders = operations.orders || [];
+  const openCriticalControls = controls.filter((control) => control.critical && !control.done);
+  const draftOrders = orders.filter((order) => order.status === "Draft").length;
+  const sentOrders = orders.filter((order) => order.status === "Sent").length;
+  const paidOrders = orders.filter((order) => order.status === "Paid" || order.status === "Delivered");
+  const invoicedMrr = orders
+    .filter((order) => order.status === "Sent" || order.status === "Paid" || order.status === "Delivered")
+    .reduce((total, order) => total + Number(order.amount || 0), 0);
+  const collectedMrr = paidOrders.reduce((total, order) => total + Number(order.amount || 0), 0);
+
+  if (openCriticalControls.length > 0) {
+    return {
+      state: "Setup blocked",
+      tone: "red",
+      headline: "The operations console works, but commercial launch is blocked.",
+      detail: `${openCriticalControls.length} critical control${openCriticalControls.length === 1 ? "" : "s"} must close before invoices can be marked paid.`,
+      controls,
+      orders,
+      openCriticalControls,
+      draftOrders,
+      sentOrders,
+      invoicedMrr,
+      collectedMrr
+    };
+  }
+
+  if (!orders.length) {
+    return {
+      state: "Ready for intake",
+      tone: "amber",
+      headline: "The operating lane is ready to accept the first order.",
+      detail: "Add an external customer order, issue a manual invoice packet, and deliver only the scoped service.",
+      controls,
+      orders,
+      openCriticalControls,
+      draftOrders,
+      sentOrders,
+      invoicedMrr,
+      collectedMrr
+    };
+  }
+
+  if (collectedMrr === 0) {
+    return {
+      state: "Ready to invoice",
+      tone: "amber",
+      headline: "Orders can move through manual invoicing.",
+      detail: "Commercial blockers are clear. Send invoice packets and mark paid only after funds actually settle.",
+      controls,
+      orders,
+      openCriticalControls,
+      draftOrders,
+      sentOrders,
+      invoicedMrr,
+      collectedMrr
+    };
+  }
+
+  return {
+    state: "Operational",
+    tone: "green",
+    headline: "The satellite has a functional order-to-delivery loop.",
+    detail: "Keep every order scoped, invoiced, reconciled, and detached from the sealed Strange Company treasury.",
+    controls,
+    orders,
+    openCriticalControls,
+    draftOrders,
+    sentOrders,
+    invoicedMrr,
+    collectedMrr
+  };
+}
+
+function renderOperations() {
+  const verdict = document.querySelector("#operationsVerdict");
+  const metrics = document.querySelector("#operationsMetrics");
+  const policy = document.querySelector("#operationsPolicy");
+  const serviceSelect = document.querySelector("#orderService");
+  const controlList = document.querySelector("#operationsControlList");
+  const orderList = document.querySelector("#operationsOrderList");
+  if (!verdict || !metrics || !policy || !serviceSelect || !controlList || !orderList) {
+    return;
+  }
+
+  const model = buildOperationsModel();
+  const services = operationServices();
+  const selectedService = serviceSelect.value || services[0]?.id || "";
+  serviceSelect.innerHTML = services
+    .map(
+      (service) => `
+        <option value="${escapeHtml(service.id)}" data-price="${Number(service.price || 0)}">
+          ${escapeHtml(service.title)} / ${money.format(Number(service.price || 0))}
+        </option>
+      `
+    )
+    .join("");
+  if (services.some((service) => service.id === selectedService)) {
+    serviceSelect.value = selectedService;
+  }
+
+  verdict.innerHTML = `
+    <div>
+      <span class="metric-label">${escapeHtml(operations.operatorName)}</span>
+      <h3>${escapeHtml(model.headline)}</h3>
+      <p>${escapeHtml(model.detail)}</p>
+    </div>
+    <div class="ops-mode-card ${model.tone}">
+      <span class="metric-label">Operations mode</span>
+      <strong>${escapeHtml(model.state)}</strong>
+      <span class="state ${model.tone}">${escapeHtml(model.state)}</span>
+    </div>
+  `;
+
+  metrics.innerHTML = `
+    <article class="metric-card">
+      <span class="metric-label">Draft orders</span>
+      <strong>${model.draftOrders}</strong>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Sent invoices</span>
+      <strong>${model.sentOrders}</strong>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Invoiced MRR</span>
+      <strong>${money.format(model.invoicedMrr)}</strong>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Collected MRR</span>
+      <strong>${money.format(model.collectedMrr)}</strong>
+    </article>
+  `;
+
+  policy.innerHTML = `
+    <span class="metric-label">Operating route</span>
+    <h3>${escapeHtml(operations.paymentMode)}</h3>
+    <p>Use manual invoices for the first customers. Mark paid only after settlement, then deliver the accepted proof packet.</p>
+    <div class="ops-link-grid">
+      <a href="TERMS.md" target="_blank" rel="noreferrer">Terms</a>
+      <a href="PRIVACY.md" target="_blank" rel="noreferrer">Privacy</a>
+      <a href="SUPPORT.md" target="_blank" rel="noreferrer">Support</a>
+      <span>${escapeHtml(operations.supportEmail)}</span>
+    </div>
+  `;
+
+  controlList.innerHTML = model.controls
+    .map((control) => {
+      const tone = control.done ? "green" : control.critical ? "red" : "amber";
+      return `
+        <article class="ops-control">
+          <div>
+            <span class="metric-label">${control.critical ? "Critical" : "Support"}</span>
+            <h4>${escapeHtml(control.title)}</h4>
+            <p>${escapeHtml(control.detail)}</p>
+          </div>
+          <span class="state ${tone}">${control.done ? "Clear" : "Open"}</span>
+          <label class="pilot-switch">
+            <input type="checkbox" data-operation-control="${escapeHtml(control.id)}" ${control.done ? "checked" : ""} />
+            <span>Done</span>
+          </label>
+        </article>
+      `;
+    })
+    .join("");
+
+  if (!model.orders.length) {
+    orderList.innerHTML = `
+      <article class="ops-order">
+        <div>
+          <span class="metric-label">Order ledger</span>
+          <h4>No orders yet</h4>
+          <p>Add a customer order to create the first invoice packet.</p>
+        </div>
+        <strong>${money.format(0)}</strong>
+        <span class="state amber">Empty</span>
+        <div class="ops-actions"></div>
+      </article>
+    `;
+  } else {
+    orderList.innerHTML = model.orders
+      .map((order) => {
+        const tone = toneForOperationStatus(order.status);
+        const canAdvance = order.status !== "Delivered";
+        const paymentBlocked = order.status === "Sent" && model.openCriticalControls.length > 0;
+        return `
+          <article class="ops-order">
+            <div>
+              <span class="metric-label">${escapeHtml(order.invoiceNumber || "Draft invoice")}</span>
+              <h4>${escapeHtml(order.customer)}</h4>
+              <p>${escapeHtml(order.serviceTitle)} / ${escapeHtml(order.need || "Need not recorded")}</p>
+            </div>
+            <strong>${money.format(Number(order.amount || 0))}</strong>
+            <span class="state ${tone}">${escapeHtml(order.status)}</span>
+            <div class="ops-actions">
+              <button type="button" data-copy-operation-packet="${escapeHtml(order.id)}">Packet</button>
+              <button type="button" data-advance-operation-order="${escapeHtml(order.id)}" ${canAdvance && !paymentBlocked ? "" : "disabled"}>${nextOperationAction(order.status)}</button>
+              <button type="button" data-remove-operation-order="${escapeHtml(order.id)}">Remove</button>
+            </div>
+          </article>
+        `;
+      })
+      .join("");
+  }
+
+  document.querySelectorAll("[data-operation-control]").forEach((input) => {
+    input.addEventListener("change", () => toggleOperationControl(input.dataset.operationControl, input.checked));
+  });
+  document.querySelectorAll("[data-copy-operation-packet]").forEach((button) => {
+    button.addEventListener("click", () => copyOperationPacket(button.dataset.copyOperationPacket));
+  });
+  document.querySelectorAll("[data-advance-operation-order]").forEach((button) => {
+    button.addEventListener("click", () => advanceOperationOrder(button.dataset.advanceOperationOrder));
+  });
+  document.querySelectorAll("[data-remove-operation-order]").forEach((button) => {
+    button.addEventListener("click", () => removeOperationOrder(button.dataset.removeOperationOrder));
+  });
+}
+
+function toneForOperationStatus(status) {
+  if (status === "Delivered" || status === "Paid") {
+    return "green";
+  }
+  if (status === "Sent") {
+    return "amber";
+  }
+  return "";
+}
+
+function nextOperationAction(status) {
+  if (status === "Draft") {
+    return "Send";
+  }
+  if (status === "Sent") {
+    return "Paid";
+  }
+  if (status === "Paid") {
+    return "Deliver";
+  }
+  return "Done";
+}
+
+function toggleOperationControl(controlId, done) {
+  operations.controls = operations.controls.map((control) =>
+    control.id === controlId ? { ...control, done: Boolean(done), updatedAt: new Date().toISOString() } : control
+  );
+  saveOperations();
+  renderOperations();
+  renderLogs();
+}
+
+function addOperationOrder(form) {
+  const formData = new FormData(form);
+  const customer = String(formData.get("orderCustomer") || "").trim();
+  if (!customer) {
+    return;
+  }
+  const serviceId = String(formData.get("orderService") || "").trim();
+  const service = operationServices().find((item) => item.id === serviceId) || operationServices()[0];
+  const invoiceNumber = `${operations.invoicePrefix}-${operations.nextInvoiceNumber}`;
+  const now = new Date().toISOString();
+  operations.orders.unshift({
+    id: `order-${slugify(customer)}-${Date.now()}`,
+    invoiceNumber,
+    customer,
+    contact: String(formData.get("orderContact") || "").trim(),
+    serviceId: service?.id || "custom",
+    serviceTitle: service?.title || "Custom service",
+    need: String(formData.get("orderNeed") || "Need not recorded").trim(),
+    amount: Number(formData.get("orderAmount") || service?.price || 0),
+    status: "Draft",
+    createdAt: now,
+    updatedAt: now
+  });
+  operations.nextInvoiceNumber = Number(operations.nextInvoiceNumber || 1001) + 1;
+  saveOperations();
+  form.reset();
+  renderOperations();
+  renderLogs();
+}
+
+function advanceOperationOrder(orderId) {
+  const model = buildOperationsModel();
+  operations.orders = operations.orders.map((order) => {
+    if (order.id !== orderId) {
+      return order;
+    }
+    const currentIndex = operationStages.indexOf(order.status);
+    const nextStatus = operationStages[Math.min(currentIndex + 1, operationStages.length - 1)];
+    if (order.status === "Sent" && model.openCriticalControls.length > 0) {
+      return {
+        ...order,
+        blockedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+    }
+    return {
+      ...order,
+      status: nextStatus,
+      updatedAt: new Date().toISOString()
+    };
+  });
+  saveOperations();
+  renderOperations();
+  renderLogs();
+}
+
+function removeOperationOrder(orderId) {
+  operations.orders = operations.orders.filter((order) => order.id !== orderId);
+  saveOperations();
+  renderOperations();
+  renderLogs();
+}
+
+function operationPacket(order) {
+  return [
+    `Invoice: ${order.invoiceNumber || "Draft"}`,
+    `Operator: ${operations.operatorName}`,
+    `Customer: ${order.customer}`,
+    `Contact: ${order.contact || "Not recorded"}`,
+    `Service: ${order.serviceTitle}`,
+    `Monthly amount: ${money.format(Number(order.amount || 0))}`,
+    `Status: ${order.status}`,
+    `Payment route: ${operations.paymentMode}`,
+    "",
+    "Scope:",
+    order.need || "Need not recorded",
+    "",
+    "Acceptance:",
+    "Deliver a monthly compliance proof packet with evidence map, exception notes, and exportable receipt.",
+    "",
+    "Controls:",
+    "Do not request protected health information, payment credentials, passwords, or regulated source documents in v0."
+  ].join("\n");
+}
+
+async function copyOperationPacket(orderId) {
+  const output = document.querySelector("#operationPacketOutput");
+  const order = operations.orders.find((item) => item.id === orderId);
+  if (!output || !order) {
+    return;
+  }
+  const packet = operationPacket(order);
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(packet);
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  output.classList.add("active");
+  output.innerHTML = `
+    <span class="metric-label">${copied ? "Copied invoice packet" : "Invoice packet"}</span>
+    <strong>${escapeHtml(order.invoiceNumber || "Draft invoice")}</strong>
+    <pre>${escapeHtml(packet)}</pre>
+  `;
 }
 
 function canonicalize(value) {
@@ -2236,6 +2725,28 @@ function collectReceiptEvents() {
       revenue: satelliteModel.revenue
     }
   );
+
+  const operationsModel = buildOperationsModel();
+  const operationsTimes = [
+    ...(operations.orders || []).map((order) => order.updatedAt || order.createdAt),
+    ...(operations.controls || []).map((control) => control.updatedAt)
+  ].filter(Boolean);
+  const operationsAt = operationsTimes.sort().pop() || "baseline";
+  push("Operations", "operations-console", operations.operatorName, "Operations console", operationsModel.state, operationsAt, {
+    collectedMrr: operationsModel.collectedMrr,
+    invoicedMrr: operationsModel.invoicedMrr,
+    openCriticalControls: operationsModel.openCriticalControls.length,
+    orderCount: operationsModel.orders.length
+  });
+
+  operations.orders.forEach((order) => {
+    push("Order", order.id, order.customer, "Operations console", order.status, order.updatedAt || order.createdAt, {
+      amount: Number(order.amount || 0),
+      contact: order.contact || "",
+      invoiceNumber: order.invoiceNumber || "",
+      serviceTitle: order.serviceTitle || ""
+    });
+  });
 
   gateRuns.forEach((run, index) => {
     push("Gate", run.id || `gate-${index + 1}`, run.claim, "Effective Boolean Filter", run.recommendation, run.createdAt, {
@@ -2645,6 +3156,14 @@ function renderLogs() {
     satelliteModel.state,
     satelliteModel.tone
   ]];
+  const operationsModel = buildOperationsModel();
+  const operationsRows = [[
+    "Ops",
+    `${operations.operatorName}: ${money.format(operationsModel.collectedMrr)} collected MRR`,
+    "Operations console",
+    operationsModel.state,
+    operationsModel.tone
+  ]];
   const routeRows = autonomousOutcomes
     .filter(
       (outcome) =>
@@ -2714,7 +3233,7 @@ function renderLogs() {
     run.recommendation,
     toneForRecommendation(run.recommendation)
   ]);
-  log.innerHTML = [...receiptRows, ...launchRows, ...pilotRows, ...satelliteRows, ...drillRows, ...routeRows, ...outcomeRows, ...executionRows, ...treasuryRows, ...gateLogRows, ...logs]
+  log.innerHTML = [...receiptRows, ...launchRows, ...pilotRows, ...satelliteRows, ...operationsRows, ...drillRows, ...routeRows, ...outcomeRows, ...executionRows, ...treasuryRows, ...gateLogRows, ...logs]
     .map(
       ([className, entry, owner, state, tone]) => `
         <div class="log-row" role="row">
@@ -2964,6 +3483,38 @@ function setupSatelliteCompany() {
       satelliteCompany = defaultSatelliteCompany();
       saveSatelliteCompany();
       renderSatelliteCompany();
+      renderLogs();
+    });
+  }
+}
+
+function setupOperations() {
+  const form = document.querySelector("#operationOrderForm");
+  const serviceSelect = document.querySelector("#orderService");
+  const amountInput = document.querySelector("#orderAmount");
+  const resetButton = document.querySelector("#resetOperations");
+
+  if (form) {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      addOperationOrder(form);
+    });
+  }
+
+  if (serviceSelect && amountInput) {
+    serviceSelect.addEventListener("change", () => {
+      const service = operationServices().find((item) => item.id === serviceSelect.value);
+      if (service) {
+        amountInput.value = String(Number(service.price || 0));
+      }
+    });
+  }
+
+  if (resetButton) {
+    resetButton.addEventListener("click", () => {
+      operations = defaultOperations();
+      saveOperations();
+      renderOperations();
       renderLogs();
     });
   }
@@ -3564,11 +4115,13 @@ setupResilienceDrills();
 setupLaunchGate();
 setupRevenuePilot();
 setupSatelliteCompany();
+setupOperations();
 setupReceiptChain();
 renderBuckets();
 renderLaunchGate();
 renderRevenuePilot();
 renderSatelliteCompany();
+renderOperations();
 renderReceiptChain();
 renderTreasuryProposals();
 renderCooldownLanes();

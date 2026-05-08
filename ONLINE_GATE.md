@@ -52,7 +52,8 @@ Required:
 - at least one routed outcome,
 - at least one revenue pilot commitment,
 - hardening work in the execution market,
-- satellite profit layer separated from the sealed company.
+- satellite profit layer separated from the sealed company,
+- operations console has at least one customer intake record.
 
 ### Live Operation
 
@@ -66,6 +67,7 @@ Required:
 - incident communication process,
 - payment blockers cleared,
 - satellite transaction controls closed,
+- operations controls closed,
 - payment and data recovery rehearsal.
 
 The current prototype should not claim this phase by itself.

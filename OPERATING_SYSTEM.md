@@ -46,6 +46,14 @@ The satellite may profit from external customers and may later sell services to 
 
 This keeps the sealed company focused on compounding while allowing a second company to earn legitimate operating profit.
 
+The satellite runs through a manual v0 operations loop:
+
+1. record customer order intent,
+2. generate a manual invoice packet,
+3. confirm payment only after settlement,
+4. deliver the scoped proof packet,
+5. record the order state in the receipt chain.
+
 ## Treasury Allocation
 
 All revenue enters the treasury.

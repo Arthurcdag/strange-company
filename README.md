@@ -65,6 +65,10 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [ONLINE_GATE.md](ONLINE_GATE.md): when the company may move from local prototype to private sandbox, public beta, or live operation.
 - [REVENUE_PILOT.md](REVENUE_PILOT.md): how the prototype moves toward the first controlled paid offer.
 - [SATELLITE_COMPANY.md](SATELLITE_COMPANY.md): how a separate for-profit company can net profit without breaking the sealed Strange Company charter.
+- [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md): the manual order, invoice, payment, delivery, and receipt loop for the first functional operator.
+- [TERMS.md](TERMS.md): draft v0 service terms for the satellite company.
+- [PRIVACY.md](PRIVACY.md): draft v0 privacy notice for the static prototype and operating loop.
+- [SUPPORT.md](SUPPORT.md): manual support and incident handling route.
 - [RESEARCH_GATE.md](RESEARCH_GATE.md): how `reactive-research-tools` is used as a decision sanity layer.
 - [TREASURY_OS.md](TREASURY_OS.md): how treasury spend proposals are gated before approval.
 - [EXECUTION_MARKET.md](EXECUTION_MARKET.md): how approved capital becomes external work packets.
@@ -76,7 +80,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 
 - [index.html](index.html): public face plus internal command center.
 - [styles.css](styles.css): interface design for the prototype.
-- [script.js](script.js): treasury allocation, launch readiness, revenue pilot, satellite profit model, execution packets, outcome receipts, capital routing, resilience drills, cooldown lanes, local receipt chain, logs, and operating loop animation.
+- [script.js](script.js): treasury allocation, launch readiness, revenue pilot, satellite profit model, operations console, execution packets, outcome receipts, capital routing, resilience drills, cooldown lanes, local receipt chain, logs, and operating loop animation.
 
 Open `index.html` directly in a browser. No build step is required.
 
