@@ -32,6 +32,10 @@
             <i data-lucide="hand-coins"></i>
             <span>Revenue Pilot</span>
           </button>
+          <button class="nav-button" type="button" data-target="satellite">
+            <i data-lucide="orbit"></i>
+            <span>Satellite Co.</span>
+          </button>
           <button class="nav-button" type="button" data-target="treasury">
             <i data-lucide="circle-dollar-sign"></i>
             <span>Treasury</span>
@@ -242,6 +246,38 @@
             </div>
           </div>
           <div class="pilot-lead-list" id="pilotLeadList"></div>
+        </section>
+
+        <section class="view" id="satellite" aria-labelledby="satellite-title">
+          <div class="view-header">
+            <div>
+              <p class="section-kicker">Clean profit layer</p>
+              <h2 id="satellite-title">Satellite company</h2>
+            </div>
+            <button class="primary-action" id="resetSatelliteCompany" type="button">
+              <i data-lucide="rotate-ccw"></i>
+              <span>Reset model</span>
+            </button>
+          </div>
+
+          <div class="satellite-verdict" id="satelliteVerdict"></div>
+          <div class="satellite-metrics-grid" id="satelliteMetrics"></div>
+
+          <div class="view-header compact-header satellite-section-header">
+            <div>
+              <p class="section-kicker">Service mix</p>
+              <h3>External revenue before related-party work</h3>
+            </div>
+          </div>
+          <div class="satellite-service-list" id="satelliteServiceList"></div>
+
+          <div class="view-header compact-header satellite-section-header">
+            <div>
+              <p class="section-kicker">Transaction controls</p>
+              <h3>Rules that make profit legitimate</h3>
+            </div>
+          </div>
+          <div class="satellite-control-list" id="satelliteControlList"></div>
         </section>
 
         <section class="view" id="treasury" aria-labelledby="treasury-title">

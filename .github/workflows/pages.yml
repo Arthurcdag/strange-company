@@ -1,0 +1,48 @@
+name: Deploy static site to Pages
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build static bundle
+        shell: bash
+        run: |
+          mkdir -p _site/tools
+          cp index.html styles.css script.js _site/
+          cp *.md _site/
+          cp tools/strange_research_gate.py tools/reactive_research_tools_cors.patch _site/tools/
+          touch _site/.nojekyll
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

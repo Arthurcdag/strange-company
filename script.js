@@ -304,6 +304,104 @@ function defaultRevenuePilot() {
   };
 }
 
+function defaultSatelliteCompany() {
+  return {
+    companyName: "Strange Works Studio",
+    purpose: "A normal for-profit vendor that sells compliance proof work, templates, and operations support while Strange Company keeps its treasury sealed.",
+    targetNetProfit: 3500,
+    services: [
+      {
+        id: "proof-sprint",
+        title: "Compliance proof sprint",
+        detail: "Done-for-you evidence cleanup and monthly proof packet for clinics.",
+        price: 750,
+        unitCost: 210,
+        customers: 6,
+        source: "External customers",
+        relatedParty: false,
+        active: true
+      },
+      {
+        id: "template-pack",
+        title: "Compliance template pack",
+        detail: "Downloadable checklists and renewal worksheets sold before SaaS onboarding.",
+        price: 79,
+        unitCost: 8,
+        customers: 12,
+        source: "External customers",
+        relatedParty: false,
+        active: true
+      },
+      {
+        id: "gate-maintenance",
+        title: "Research Gate maintenance",
+        detail: "Optional contracted upkeep for the local claim-checking service after public beta.",
+        price: 1200,
+        unitCost: 360,
+        customers: 0,
+        source: "Related-party contract",
+        relatedParty: true,
+        active: false
+      },
+      {
+        id: "bounty-admin",
+        title: "Bounty admin desk",
+        detail: "Optional work-packet admin, acceptance triage, and vendor coordination.",
+        price: 900,
+        unitCost: 240,
+        customers: 0,
+        source: "Related-party contract",
+        relatedParty: true,
+        active: false
+      }
+    ],
+    controls: [
+      {
+        id: "external-customers",
+        title: "External customer revenue exists",
+        detail: "Profit comes from real third-party buyers before any Strange Company contract is counted.",
+        done: true,
+        critical: true
+      },
+      {
+        id: "market-pricing",
+        title: "Market pricing evidence",
+        detail: "Related-party services use comparable quotes or public rates, not arbitrary extraction.",
+        done: true,
+        critical: true
+      },
+      {
+        id: "written-contracts",
+        title: "Written scope and deliverables",
+        detail: "Every paid service has a scope, acceptance criteria, refund path, and data boundary.",
+        done: false,
+        critical: true
+      },
+      {
+        id: "invoices",
+        title: "Invoices and bookkeeping lane",
+        detail: "Revenue, expenses, taxes, and support obligations are tracked outside the Strange Company treasury.",
+        done: false,
+        critical: true
+      },
+      {
+        id: "conflict-review",
+        title: "Conflict disclosure review",
+        detail: "Any work sold to Strange Company is disclosed and can be rejected by the gate.",
+        done: false,
+        critical: true
+      },
+      {
+        id: "vendor-exit",
+        title: "Replaceable vendor rule",
+        detail: "Strange Company can choose a different vendor if the satellite becomes expensive, weak, or captured.",
+        done: true,
+        critical: false
+      }
+    ]
+  };
+}
+
 const pilotStages = ["Prospect", "Contacted", "Call booked", "Committed", "Ready to invoice"];
 
 const gateChecks = [
@@ -354,6 +452,7 @@ const RESILIENCE_DRILLS_KEY = "strange-company-resilience-drills";
 const LAUNCH_GATE_KEY = "strange-company-launch-gate";
 const RECEIPT_SEAL_KEY = "strange-company-receipt-seal";
 const REVENUE_PILOT_KEY = "strange-company-revenue-pilot";
+const SATELLITE_COMPANY_KEY = "strange-company-satellite-company";
 
 let activeScenario = "base";
 let loopAnimationId = 0;
@@ -367,6 +466,7 @@ let resilienceDrills = loadResilienceDrills();
 let launchGate = loadLaunchGate();
 let receiptSeal = loadReceiptSeal();
 let revenuePilot = loadRevenuePilot();
+let satelliteCompany = loadSatelliteCompany();
 
 function activateView(target) {
   document.querySelectorAll(".view").forEach((view) => {
@@ -676,6 +776,7 @@ function buildLaunchChecks() {
   const gateReceipts = gateRuns.length + treasuryProposals.filter((proposal) => proposal.reportId).length;
   const hardeningPackets = executionPackets.filter((packet) => packet.drillId).length;
   const pilotReadiness = buildPilotReadiness();
+  const satelliteModel = buildSatelliteCompanyModel();
 
   return [
     {
@@ -759,6 +860,14 @@ function buildLaunchChecks() {
       fix: "Issue packet"
     },
     {
+      title: "Satellite profit layer is separated",
+      phase: "Public beta",
+      passed: satelliteModel.externalRevenue > 0,
+      tone: "amber",
+      evidence: `${money.format(satelliteModel.externalRevenue)} external satellite revenue modeled.`,
+      fix: "Sell externally"
+    },
+    {
       title: "Public trust and legal review complete",
       phase: "Live operation",
       passed: false,
@@ -773,6 +882,14 @@ function buildLaunchChecks() {
       tone: "red",
       evidence: `${pilotReadiness.blockers.length} critical payment blocker${pilotReadiness.blockers.length === 1 ? "" : "s"} open.`,
       fix: "Clear blockers"
+    },
+    {
+      title: "Satellite controls closed",
+      phase: "Live operation",
+      passed: satelliteModel.openCriticalControls.length === 0,
+      tone: "red",
+      evidence: `${satelliteModel.openCriticalControls.length} critical satellite control${satelliteModel.openCriticalControls.length === 1 ? "" : "s"} open.`,
+      fix: "Close controls"
     }
   ];
 }
@@ -1494,6 +1611,33 @@ function saveRevenuePilot() {
   }
 }
 
+function loadSatelliteCompany() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(SATELLITE_COMPANY_KEY) || "null");
+    if (stored && typeof stored === "object") {
+      const base = defaultSatelliteCompany();
+      return {
+        companyName: stored.companyName || base.companyName,
+        purpose: stored.purpose || base.purpose,
+        targetNetProfit: Number(stored.targetNetProfit || base.targetNetProfit),
+        services: Array.isArray(stored.services) && stored.services.length ? stored.services : base.services,
+        controls: Array.isArray(stored.controls) && stored.controls.length ? stored.controls : base.controls
+      };
+    }
+  } catch {
+    // Fall through to the built-in satellite model.
+  }
+  return defaultSatelliteCompany();
+}
+
+function saveSatelliteCompany() {
+  try {
+    localStorage.setItem(SATELLITE_COMPANY_KEY, JSON.stringify(satelliteCompany));
+  } catch {
+    // Local storage can be unavailable in hardened browser contexts.
+  }
+}
+
 function buildPilotReadiness() {
   const blockers = revenuePilot.blockers || [];
   const leads = revenuePilot.leads || [];
@@ -1741,6 +1885,255 @@ function addPilotLead(form) {
   renderLogs();
 }
 
+function buildSatelliteCompanyModel() {
+  const services = satelliteCompany.services || [];
+  const controls = satelliteCompany.controls || [];
+  const activeServices = services.filter((service) => service.active);
+  const revenue = activeServices.reduce(
+    (total, service) => total + Number(service.price || 0) * Number(service.customers || 0),
+    0
+  );
+  const costs = activeServices.reduce(
+    (total, service) => total + Number(service.unitCost || 0) * Number(service.customers || 0),
+    0
+  );
+  const netProfit = revenue - costs;
+  const margin = revenue > 0 ? netProfit / revenue : 0;
+  const externalRevenue = activeServices
+    .filter((service) => !service.relatedParty)
+    .reduce((total, service) => total + Number(service.price || 0) * Number(service.customers || 0), 0);
+  const relatedPartyRevenue = activeServices
+    .filter((service) => service.relatedParty)
+    .reduce((total, service) => total + Number(service.price || 0) * Number(service.customers || 0), 0);
+  const openCriticalControls = controls.filter((control) => control.critical && !control.done);
+  const targetNetProfit = Number(satelliteCompany.targetNetProfit || 0);
+  const externalReady = externalRevenue > 0;
+  const controlsReady = openCriticalControls.length === 0;
+  const targetReady = netProfit >= targetNetProfit;
+
+  if (!externalReady) {
+    return {
+      state: "No market proof",
+      tone: "red",
+      headline: "The satellite cannot profit until it has external customers.",
+      detail: "Do not count Strange Company payments as profit proof. The second company must survive on normal market revenue first.",
+      services,
+      controls,
+      openCriticalControls,
+      revenue,
+      costs,
+      netProfit,
+      margin,
+      externalRevenue,
+      relatedPartyRevenue,
+      targetNetProfit
+    };
+  }
+
+  if (!controlsReady) {
+    return {
+      state: "Controls open",
+      tone: "red",
+      headline: "The profit math works, but the transaction controls are not ready.",
+      detail: `${openCriticalControls.length} critical control${openCriticalControls.length === 1 ? "" : "s"} must close before the satellite goes online as a paid operator.`,
+      services,
+      controls,
+      openCriticalControls,
+      revenue,
+      costs,
+      netProfit,
+      margin,
+      externalRevenue,
+      relatedPartyRevenue,
+      targetNetProfit
+    };
+  }
+
+  if (!targetReady) {
+    return {
+      state: "Needs volume",
+      tone: "amber",
+      headline: "The satellite can sell cleanly, but it has not hit the profit target.",
+      detail: "Grow external proof-sprint and template revenue before adding related-party service contracts.",
+      services,
+      controls,
+      openCriticalControls,
+      revenue,
+      costs,
+      netProfit,
+      margin,
+      externalRevenue,
+      relatedPartyRevenue,
+      targetNetProfit
+    };
+  }
+
+  return {
+    state: "Profit-ready",
+    tone: "green",
+    headline: "The satellite can go online as the first profit engine.",
+    detail: "External revenue clears the target and controls are closed. Related-party work may be offered only with market pricing and replaceable-vendor rules.",
+    services,
+    controls,
+    openCriticalControls,
+    revenue,
+    costs,
+    netProfit,
+    margin,
+    externalRevenue,
+    relatedPartyRevenue,
+    targetNetProfit
+  };
+}
+
+function renderSatelliteCompany() {
+  const verdict = document.querySelector("#satelliteVerdict");
+  const metrics = document.querySelector("#satelliteMetrics");
+  const serviceList = document.querySelector("#satelliteServiceList");
+  const controlList = document.querySelector("#satelliteControlList");
+  if (!verdict || !metrics || !serviceList || !controlList) {
+    return;
+  }
+
+  const model = buildSatelliteCompanyModel();
+  const marginPercent = `${Math.round(model.margin * 100)}%`;
+
+  verdict.innerHTML = `
+    <div>
+      <span class="metric-label">${escapeHtml(satelliteCompany.companyName)}</span>
+      <h3>${escapeHtml(model.headline)}</h3>
+      <p>${escapeHtml(model.detail)}</p>
+    </div>
+    <div class="satellite-mode-card ${model.tone}">
+      <span class="metric-label">Satellite mode</span>
+      <strong>${escapeHtml(model.state)}</strong>
+      <span class="state ${model.tone}">${escapeHtml(model.state)}</span>
+    </div>
+  `;
+
+  metrics.innerHTML = `
+    <article class="metric-card">
+      <span class="metric-label">Monthly revenue</span>
+      <strong>${money.format(model.revenue)}</strong>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Net profit</span>
+      <strong>${money.format(model.netProfit)}</strong>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Profit target</span>
+      <strong>${money.format(model.targetNetProfit)}</strong>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Margin</span>
+      <strong>${marginPercent}</strong>
+    </article>
+  `;
+
+  serviceList.innerHTML = model.services
+    .map((service) => {
+      const customers = Number(service.customers || 0);
+      const revenue = Number(service.price || 0) * customers;
+      const profit = revenue - Number(service.unitCost || 0) * customers;
+      const tone = toneForSatelliteService(service, profit);
+      return `
+        <article class="satellite-service">
+          <div>
+            <span class="metric-label">${escapeHtml(service.source)}</span>
+            <h4>${escapeHtml(service.title)}</h4>
+            <p>${escapeHtml(service.detail)}</p>
+          </div>
+          <strong>${money.format(revenue)}</strong>
+          <span class="state ${tone}">${service.active ? `${customers} buyer${customers === 1 ? "" : "s"}` : "Paused"}</span>
+          <div class="satellite-stepper">
+            <button type="button" data-adjust-service="${escapeHtml(service.id)}" data-adjust-delta="-1" ${customers <= 0 ? "disabled" : ""}>-</button>
+            <button type="button" data-adjust-service="${escapeHtml(service.id)}" data-adjust-delta="1">+</button>
+            <button type="button" data-toggle-service="${escapeHtml(service.id)}">${service.active ? "Pause" : "Run"}</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+
+  controlList.innerHTML = model.controls
+    .map((control) => {
+      const tone = control.done ? "green" : control.critical ? "red" : "amber";
+      return `
+        <article class="satellite-control">
+          <div>
+            <span class="metric-label">${control.critical ? "Critical" : "Support"}</span>
+            <h4>${escapeHtml(control.title)}</h4>
+            <p>${escapeHtml(control.detail)}</p>
+          </div>
+          <span class="state ${tone}">${control.done ? "Clear" : "Open"}</span>
+          <label class="pilot-switch">
+            <input type="checkbox" data-satellite-control="${escapeHtml(control.id)}" ${control.done ? "checked" : ""} />
+            <span>Done</span>
+          </label>
+        </article>
+      `;
+    })
+    .join("");
+
+  document.querySelectorAll("[data-adjust-service]").forEach((button) => {
+    button.addEventListener("click", () =>
+      adjustSatelliteService(button.dataset.adjustService, Number(button.dataset.adjustDelta || 0))
+    );
+  });
+  document.querySelectorAll("[data-toggle-service]").forEach((button) => {
+    button.addEventListener("click", () => toggleSatelliteService(button.dataset.toggleService));
+  });
+  document.querySelectorAll("[data-satellite-control]").forEach((input) => {
+    input.addEventListener("change", () => toggleSatelliteControl(input.dataset.satelliteControl, input.checked));
+  });
+}
+
+function toneForSatelliteService(service, profit) {
+  if (!service.active) {
+    return "amber";
+  }
+  if (service.relatedParty) {
+    return "amber";
+  }
+  return profit > 0 ? "green" : "red";
+}
+
+function adjustSatelliteService(serviceId, delta) {
+  satelliteCompany.services = satelliteCompany.services.map((service) => {
+    if (service.id !== serviceId) {
+      return service;
+    }
+    const nextCustomers = Math.max(0, Number(service.customers || 0) + delta);
+    return {
+      ...service,
+      customers: nextCustomers,
+      active: nextCustomers > 0 ? true : service.active,
+      updatedAt: new Date().toISOString()
+    };
+  });
+  saveSatelliteCompany();
+  renderSatelliteCompany();
+  renderLogs();
+}
+
+function toggleSatelliteService(serviceId) {
+  satelliteCompany.services = satelliteCompany.services.map((service) =>
+    service.id === serviceId ? { ...service, active: !service.active, updatedAt: new Date().toISOString() } : service
+  );
+  saveSatelliteCompany();
+  renderSatelliteCompany();
+  renderLogs();
+}
+
+function toggleSatelliteControl(controlId, done) {
+  satelliteCompany.controls = satelliteCompany.controls.map((control) =>
+    control.id === controlId ? { ...control, done: Boolean(done), updatedAt: new Date().toISOString() } : control
+  );
+  saveSatelliteCompany();
+  renderSatelliteCompany();
+  renderLogs();
+}
+
 function canonicalize(value) {
   if (value === undefined) {
     return "null";
@@ -1821,6 +2214,28 @@ function collectReceiptEvents() {
       value: Number(lead.value || 0)
     });
   });
+
+  const satelliteModel = buildSatelliteCompanyModel();
+  const satelliteTimes = [
+    ...(satelliteCompany.services || []).map((service) => service.updatedAt),
+    ...(satelliteCompany.controls || []).map((control) => control.updatedAt)
+  ].filter(Boolean);
+  const satelliteAt = satelliteTimes.sort().pop() || "baseline";
+  push(
+    "Satellite",
+    "satellite-company",
+    satelliteCompany.companyName,
+    "Satellite company",
+    satelliteModel.state,
+    satelliteAt,
+    {
+      externalRevenue: satelliteModel.externalRevenue,
+      netProfit: satelliteModel.netProfit,
+      openCriticalControls: satelliteModel.openCriticalControls.length,
+      relatedPartyRevenue: satelliteModel.relatedPartyRevenue,
+      revenue: satelliteModel.revenue
+    }
+  );
 
   gateRuns.forEach((run, index) => {
     push("Gate", run.id || `gate-${index + 1}`, run.claim, "Effective Boolean Filter", run.recommendation, run.createdAt, {
@@ -2222,6 +2637,14 @@ function renderLogs() {
     pilotReadiness.state,
     pilotReadiness.tone
   ]];
+  const satelliteModel = buildSatelliteCompanyModel();
+  const satelliteRows = [[
+    "Satellite",
+    `${satelliteCompany.companyName}: ${money.format(satelliteModel.netProfit)} net profit model`,
+    "Satellite company",
+    satelliteModel.state,
+    satelliteModel.tone
+  ]];
   const routeRows = autonomousOutcomes
     .filter(
       (outcome) =>
@@ -2291,7 +2714,7 @@ function renderLogs() {
     run.recommendation,
     toneForRecommendation(run.recommendation)
   ]);
-  log.innerHTML = [...receiptRows, ...launchRows, ...pilotRows, ...drillRows, ...routeRows, ...outcomeRows, ...executionRows, ...treasuryRows, ...gateLogRows, ...logs]
+  log.innerHTML = [...receiptRows, ...launchRows, ...pilotRows, ...satelliteRows, ...drillRows, ...routeRows, ...outcomeRows, ...executionRows, ...treasuryRows, ...gateLogRows, ...logs]
     .map(
       ([className, entry, owner, state, tone]) => `
         <div class="log-row" role="row">
@@ -2529,6 +2952,18 @@ function setupRevenuePilot() {
       revenuePilot = defaultRevenuePilot();
       saveRevenuePilot();
       renderRevenuePilot();
+      renderLogs();
+    });
+  }
+}
+
+function setupSatelliteCompany() {
+  const resetButton = document.querySelector("#resetSatelliteCompany");
+  if (resetButton) {
+    resetButton.addEventListener("click", () => {
+      satelliteCompany = defaultSatelliteCompany();
+      saveSatelliteCompany();
+      renderSatelliteCompany();
       renderLogs();
     });
   }
@@ -3128,10 +3563,12 @@ setupAutonomousCycle();
 setupResilienceDrills();
 setupLaunchGate();
 setupRevenuePilot();
+setupSatelliteCompany();
 setupReceiptChain();
 renderBuckets();
 renderLaunchGate();
 renderRevenuePilot();
+renderSatelliteCompany();
 renderReceiptChain();
 renderTreasuryProposals();
 renderCooldownLanes();

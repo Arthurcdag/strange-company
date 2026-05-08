@@ -31,6 +31,21 @@ Recommended v0:
 
 This is not the final form, but it is simple enough to test.
 
+## Satellite Company
+
+Strange Company should not become the personal profit vehicle. A separate satellite company can be created as a normal for-profit vendor.
+
+The satellite may profit from external customers and may later sell services to Strange Company only when:
+
+- external customer revenue exists first,
+- pricing is market-based,
+- work is covered by written scope and invoices,
+- conflicts are disclosed,
+- Strange Company can choose another vendor,
+- related-party revenue is never counted as proof of product-market fit.
+
+This keeps the sealed company focused on compounding while allowing a second company to earn legitimate operating profit.
+
 ## Treasury Allocation
 
 All revenue enters the treasury.
