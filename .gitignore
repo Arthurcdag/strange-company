@@ -1,0 +1,14 @@
+# Generated verification screenshots
+desktop-*.png
+mobile-*.png
+
+# Local caches and dependencies
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+node_modules/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db

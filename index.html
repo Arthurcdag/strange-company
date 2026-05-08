@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Strange Company Command Center</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script src="script.js" defer></script>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar" aria-label="Primary">
+        <a class="brand" href="#public" data-target="public" aria-label="Strange Company">
+          <span class="brand-mark">SC</span>
+          <span>
+            <strong>Strange Company</strong>
+            <small>H.A.T.E. engine</small>
+          </span>
+        </a>
+
+        <nav class="nav" aria-label="Views">
+          <button class="nav-button active" type="button" data-target="public">
+            <i data-lucide="shield"></i>
+            <span>Public</span>
+          </button>
+          <button class="nav-button" type="button" data-target="launch">
+            <i data-lucide="rocket"></i>
+            <span>Online Gate</span>
+          </button>
+          <button class="nav-button" type="button" data-target="pilot">
+            <i data-lucide="hand-coins"></i>
+            <span>Revenue Pilot</span>
+          </button>
+          <button class="nav-button" type="button" data-target="treasury">
+            <i data-lucide="circle-dollar-sign"></i>
+            <span>Treasury</span>
+          </button>
+          <button class="nav-button" type="button" data-target="experiments">
+            <i data-lucide="flask-conical"></i>
+            <span>Experiments</span>
+          </button>
+          <button class="nav-button" type="button" data-target="resilience">
+            <i data-lucide="radar"></i>
+            <span>Resilience</span>
+          </button>
+          <button class="nav-button" type="button" data-target="research">
+            <i data-lucide="brain-circuit"></i>
+            <span>Research Gate</span>
+          </button>
+          <button class="nav-button" type="button" data-target="bounties">
+            <i data-lucide="badge-check"></i>
+            <span>Bounties</span>
+          </button>
+          <button class="nav-button" type="button" data-target="decisions">
+            <i data-lucide="scroll-text"></i>
+            <span>Decisions</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <span class="status-dot"></span>
+          <span>Charter lock active</span>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">No CEO. No employees. No dividends.</p>
+            <h1>Autonomous compounding, under a hard charter.</h1>
+          </div>
+          <div class="topbar-actions">
+            <button class="icon-button" type="button" aria-label="Export report" title="Export report">
+              <i data-lucide="download"></i>
+            </button>
+            <button class="icon-button" type="button" aria-label="Open audit log" title="Open audit log">
+              <i data-lucide="clipboard-list"></i>
+            </button>
+          </div>
+        </header>
+
+        <section class="view active" id="public" aria-labelledby="public-title">
+          <div class="public-layout">
+            <div class="public-copy">
+              <p class="section-kicker">Founding posture</p>
+              <h2 id="public-title">A lawful company that cannot become a monarchy.</h2>
+              <p class="lead">
+                Strange Company is a reinvestment machine: revenue enters the treasury,
+                rules allocate capital, external markets perform work, and every surplus
+                dollar returns to growth, defense, or reserves.
+              </p>
+
+              <div class="principle-grid">
+                <article class="principle">
+                  <i data-lucide="crown"></i>
+                  <h3>No chief</h3>
+                  <p>Authority is narrow, logged, time-limited, and distributed.</p>
+                </article>
+                <article class="principle">
+                  <i data-lucide="users-round"></i>
+                  <h3>No staff</h3>
+                  <p>Execution happens through vendors, agents, bounties, and contracts.</p>
+                </article>
+                <article class="principle">
+                  <i data-lucide="repeat-2"></i>
+                  <h3>No extraction</h3>
+                  <p>Surplus is routed back into compounding capacity.</p>
+                </article>
+                <article class="principle">
+                  <i data-lucide="lock-keyhole"></i>
+                  <h3>No capture</h3>
+                  <p>Single points of failure are treated as design defects.</p>
+                </article>
+              </div>
+            </div>
+
+            <div class="command-visual" aria-label="Operating loop visualization">
+              <canvas id="loopCanvas" width="760" height="620"></canvas>
+              <div class="loop-label label-top">Treasury</div>
+              <div class="loop-label label-right">Products</div>
+              <div class="loop-label label-bottom">Growth</div>
+              <div class="loop-label label-left">Defense</div>
+            </div>
+          </div>
+
+          <div class="summary-strip" aria-label="Current prototype status">
+            <div>
+              <span class="metric-label">Mode</span>
+              <strong>Version 0 design</strong>
+            </div>
+            <div>
+              <span class="metric-label">Legal stance</span>
+              <strong>LLC plus purpose charter</strong>
+            </div>
+            <div>
+              <span class="metric-label">First product</span>
+              <strong>Compliance tracker</strong>
+            </div>
+            <div>
+              <span class="metric-label">Profit policy</span>
+              <strong>100% reinvestment</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="launch" aria-labelledby="launch-title">
+          <div class="view-header">
+            <div>
+              <p class="section-kicker">Online readiness</p>
+              <h2 id="launch-title">Launch gate</h2>
+            </div>
+            <div class="topbar-actions">
+              <button class="primary-action" id="runLaunchCheck" type="button">
+                <i data-lucide="radar"></i>
+                <span>Run check</span>
+              </button>
+              <button class="icon-button" id="draftLaunchPacket" type="button" aria-label="Draft launch packet" title="Draft launch packet">
+                <i data-lucide="package-plus"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="launch-panel" id="launchVerdict"></div>
+          <div class="launch-metrics-grid" id="launchMetrics"></div>
+
+          <div class="view-header compact-header launch-section-header">
+            <div>
+              <p class="section-kicker">Phase ladder</p>
+              <h3>When to turn it online</h3>
+            </div>
+          </div>
+          <div class="launch-phase-list" id="launchPhaseList"></div>
+
+          <div class="view-header compact-header launch-section-header">
+            <div>
+              <p class="section-kicker">Readiness checks</p>
+              <h3>Blockers and evidence</h3>
+            </div>
+          </div>
+          <div class="launch-check-list" id="launchCheckList"></div>
+        </section>
+
+        <section class="view" id="pilot" aria-labelledby="pilot-title">
+          <div class="view-header">
+            <div>
+              <p class="section-kicker">Functional v0</p>
+              <h2 id="pilot-title">Revenue pilot</h2>
+            </div>
+            <button class="primary-action" id="resetRevenuePilot" type="button">
+              <i data-lucide="rotate-ccw"></i>
+              <span>Reset pilot</span>
+            </button>
+          </div>
+
+          <div class="pilot-verdict" id="pilotVerdict"></div>
+          <div class="pilot-metrics-grid" id="pilotMetrics"></div>
+
+          <div class="pilot-layout">
+            <article class="pilot-offer-card" id="pilotOffer"></article>
+
+            <form class="pilot-form" id="pilotLeadForm">
+              <div class="field-row">
+                <div class="field">
+                  <label for="leadName">Lead</label>
+                  <input id="leadName" name="leadName" type="text" value="Clinic operator" />
+                </div>
+                <div class="field">
+                  <label for="leadValue">Monthly value</label>
+                  <input id="leadValue" name="leadValue" type="number" min="0" step="50" value="750" />
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label for="leadSource">Source</label>
+                  <input id="leadSource" name="leadSource" type="text" value="Warm intro" />
+                </div>
+                <div class="field">
+                  <label for="leadNeed">Need</label>
+                  <input id="leadNeed" name="leadNeed" type="text" value="Audit proof before renewal" />
+                </div>
+              </div>
+              <button class="primary-action" type="submit">
+                <i data-lucide="plus"></i>
+                <span>Add lead</span>
+              </button>
+            </form>
+          </div>
+
+          <div class="view-header compact-header pilot-section-header">
+            <div>
+              <p class="section-kicker">Payment gate</p>
+              <h3>Minimum blockers</h3>
+            </div>
+          </div>
+          <div class="pilot-checklist" id="pilotChecklist"></div>
+
+          <div class="view-header compact-header pilot-section-header">
+            <div>
+              <p class="section-kicker">Pipeline</p>
+              <h3>First revenue conversations</h3>
+            </div>
+          </div>
+          <div class="pilot-lead-list" id="pilotLeadList"></div>
+        </section>
+
+        <section class="view" id="treasury" aria-labelledby="treasury-title">
+          <div class="view-header">
+            <div>
+              <p class="section-kicker">Hardened Autonomous Treasury Engine</p>
+              <h2 id="treasury-title">Monthly surplus allocation</h2>
+            </div>
+            <div class="control-cluster" aria-label="Scenario">
+              <button class="segment active" type="button" data-scenario="base">Base</button>
+              <button class="segment" type="button" data-scenario="defense">Defense</button>
+              <button class="segment" type="button" data-scenario="growth">Growth</button>
+            </div>
+          </div>
+
+          <div class="treasury-panel">
+            <div class="surplus-control">
+              <label for="surplusInput">Monthly surplus</label>
+              <div class="money-input">
+                <span>$</span>
+                <input id="surplusInput" type="number" min="0" step="500" value="24000" />
+              </div>
+              <input id="surplusRange" type="range" min="2000" max="120000" step="1000" value="24000" />
+            </div>
+
+            <div class="treasury-total">
+              <span class="metric-label">Allocated this cycle</span>
+              <strong id="allocatedTotal">$24,000</strong>
+            </div>
+          </div>
+
+          <div class="bucket-grid" id="bucketGrid"></div>
+
+          <div class="view-header compact-header treasury-evolution-header">
+            <div>
+              <p class="section-kicker">Treasury law</p>
+              <h3>Spend proposals require gate receipts.</h3>
+            </div>
+            <button class="icon-button" id="resetTreasuryProposals" type="button" aria-label="Reset treasury proposals" title="Reset treasury proposals">
+              <i data-lucide="rotate-ccw"></i>
+            </button>
+          </div>
+
+          <div class="treasury-guard-grid" id="treasuryGuardSummary"></div>
+          <div class="view-header compact-header cooldown-header">
+            <div>
+              <p class="section-kicker">Capital firewall</p>
+              <h3>Cooled spend lanes</h3>
+            </div>
+          </div>
+          <div class="cooldown-list" id="cooldownList"></div>
+          <div class="treasury-proposal-list" id="treasuryProposalList"></div>
+        </section>
+
+        <section class="view" id="experiments" aria-labelledby="experiments-title">
+          <div class="view-header">
+            <div>
+              <p class="section-kicker">Growth loop</p>
+              <h2 id="experiments-title">Experiment portfolio</h2>
+            </div>
+            <button class="primary-action" type="button">
+              <i data-lucide="plus"></i>
+              <span>New experiment</span>
+            </button>
+          </div>
+
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <span class="metric-label">Active tests</span>
+              <strong>7</strong>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Payback target</span>
+              <strong>45 days</strong>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Kill threshold</span>
+              <strong>2 cycles</strong>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Reusable assets</span>
+              <strong>13</strong>
+            </div>
+          </div>
+
+          <div class="view-header compact-header cycle-header">
+            <div>
+              <p class="section-kicker">Autonomous cycle</p>
+              <h3>Outcome ledger</h3>
+            </div>
+            <button class="icon-button" id="resetAutonomousOutcomes" type="button" aria-label="Reset outcome ledger" title="Reset outcome ledger">
+              <i data-lucide="rotate-ccw"></i>
+            </button>
+          </div>
+
+          <div class="cycle-metrics-grid" id="cycleMetrics"></div>
+          <div class="outcome-list" id="outcomeList"></div>
+
+          <div class="view-header compact-header portfolio-header">
+            <div>
+              <p class="section-kicker">Portfolio</p>
+              <h3>Current experiment book</h3>
+            </div>
+          </div>
+
+          <div class="experiment-board" id="experimentBoard"></div>
+        </section>
+
+        <section class="view" id="resilience" aria-labelledby="resilience-title">
+          <div class="view-header">
+            <div>
+              <p class="section-kicker">Attack resistance</p>
+              <h2 id="resilience-title">Resilience scorecard</h2>
+            </div>
+            <div class="topbar-actions">
+              <button class="primary-action" id="runResilienceDrill" type="button">
+                <i data-lucide="rotate-cw"></i>
+                <span>Run drill</span>
+              </button>
+              <button class="icon-button" id="resetResilienceDrills" type="button" aria-label="Reset resilience drills" title="Reset resilience drills">
+                <i data-lucide="rotate-ccw"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="resilience-layout">
+            <div class="score-ring" aria-label="Overall resilience score">
+              <svg viewBox="0 0 160 160" role="img" aria-labelledby="scoreTitle">
+                <title id="scoreTitle">Overall resilience score is 4.1 out of 5</title>
+                <circle class="ring-track" cx="80" cy="80" r="62"></circle>
+                <circle class="ring-value" id="ringValue" cx="80" cy="80" r="62"></circle>
+              </svg>
+              <div>
+                <strong id="resilienceScoreValue">4.1</strong>
+                <span>overall</span>
+              </div>
+            </div>
+            <div class="score-list" id="scoreList"></div>
+          </div>
+
+          <div class="view-header compact-header drill-header">
+            <div>
+              <p class="section-kicker">Immune system</p>
+              <h3>Attack drills</h3>
+            </div>
+          </div>
+
+          <div class="drill-metrics-grid" id="drillMetrics"></div>
+          <div class="drill-list" id="drillList"></div>
+        </section>
+
+        <section class="view" id="research" aria-labelledby="research-title">
+          <div class="view-header">
+            <div>
+              <p class="section-kicker">Reactive research tools</p>
+              <h2 id="research-title">Research Gate</h2>
+            </div>
+            <a class="primary-action" href="http://127.0.0.1:8000/" target="_blank" rel="noreferrer">
+              <i data-lucide="external-link"></i>
+              <span>Open live filter</span>
+            </a>
+          </div>
+
+          <div class="research-grid">
+            <article class="research-card">
+              <span class="metric-label">Source</span>
+              <h3>reactive-research-tools</h3>
+              <p>
+                Cloned into the workspace and wired as the decision sanity layer
+                for experiments, bounties, and treasury claims.
+              </p>
+              <code class="source-path">external/reactive-research-tools</code>
+            </article>
+            <article class="research-card">
+              <span class="metric-label">Active module</span>
+              <h3>Effective Boolean Argument Filter</h3>
+              <p>
+                Checks for untracked polarity shifts, scope jumps, contradiction
+                leakage, and missing reactive probes. It is not a truth oracle.
+              </p>
+            </article>
+            <article class="research-card">
+              <span class="metric-label">Deferred module</span>
+              <h3>Xi-Jensen pipeline</h3>
+              <p>
+                Useful later for numerical certification workflows, but not part
+                of the Strange Company operating core yet.
+              </p>
+            </article>
+          </div>
+
+          <div class="gate-panel">
+            <div>
+              <p class="section-kicker">Current gate behavior</p>
+              <h3>Simulation-to-production claims are blocked for testing.</h3>
+              <p>
+                The filter caught the claim that a pilot working in simulation
+                proves production revenue impact. Strange Company should require
+                a bridge premise before treasury scale-up.
+              </p>
+            </div>
+            <div class="gate-result">
+              <span class="metric-label">Sample verdict</span>
+              <strong>needs_testing</strong>
+              <span class="state amber">unstable</span>
+            </div>
+          </div>
+
+          <div class="gate-console">
+            <form class="gate-form" id="gateForm">
+              <div class="field">
+                <label for="gateClaim">Claim</label>
+                <textarea id="gateClaim" name="claim" rows="3">This experiment improves durable growth</textarea>
+              </div>
+              <div class="field">
+                <label for="gateArgument">Argument</label>
+                <textarea id="gateArgument" name="argument" rows="4">The pilot works in simulation, therefore it will improve production revenue</textarea>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label for="gateContext">Context</label>
+                  <input id="gateContext" name="context" type="text" value="Strange Company growth review" />
+                </div>
+                <div class="field">
+                  <span class="field-label">Strictness</span>
+                  <div class="control-cluster" aria-label="Gate strictness">
+                    <button class="segment" type="button" data-strictness="low">Low</button>
+                    <button class="segment" type="button" data-strictness="medium">Medium</button>
+                    <button class="segment active" type="button" data-strictness="high">High</button>
+                  </div>
+                </div>
+              </div>
+              <button class="primary-action" type="submit">
+                <i data-lucide="scan-search"></i>
+                <span>Run gate</span>
+              </button>
+            </form>
+
+            <aside class="gate-output" aria-live="polite">
+              <span class="metric-label">Gate status</span>
+              <strong id="gateStatus">Ready</strong>
+              <div class="gate-score-grid">
+                <div>
+                  <span class="metric-label">Recommendation</span>
+                  <span id="gateRecommendation">Pending</span>
+                </div>
+                <div>
+                  <span class="metric-label">Polarity</span>
+                  <span id="gatePolarity">Pending</span>
+                </div>
+                <div>
+                  <span class="metric-label">Effectiveness</span>
+                  <span id="gateEffectiveness">0.00</span>
+                </div>
+                <div>
+                  <span class="metric-label">Confidence</span>
+                  <span id="gateConfidence">0.00</span>
+                </div>
+              </div>
+              <div class="gate-lists">
+                <div>
+                  <span class="metric-label">Issues</span>
+                  <ul id="gateIssues"></ul>
+                </div>
+                <div>
+                  <span class="metric-label">Probes</span>
+                  <ul id="gateProbes"></ul>
+                </div>
+              </div>
+            </aside>
+          </div>
+
+          <div class="view-header compact-header">
+            <div>
+              <p class="section-kicker">Recent gate runs</p>
+              <h3>Decision receipts</h3>
+            </div>
+            <button class="icon-button" id="clearGateRuns" type="button" aria-label="Clear gate receipts" title="Clear gate receipts">
+              <i data-lucide="trash-2"></i>
+            </button>
+          </div>
+          <div class="gate-run-list" id="gateRunList"></div>
+
+          <div class="experiment-board" id="gateCheckList"></div>
+        </section>
+
+        <section class="view" id="bounties" aria-labelledby="bounties-title">
+          <div class="view-header">
+            <div>
+              <p class="section-kicker">Execution market</p>
+              <h2 id="bounties-title">Open work packets</h2>
+            </div>
+            <button class="primary-action" id="resetExecutionPackets" type="button">
+              <i data-lucide="rotate-ccw"></i>
+              <span>Reset market</span>
+            </button>
+          </div>
+
+          <div class="execution-metrics-grid" id="executionMetrics"></div>
+          <div class="bounty-list" id="bountyList"></div>
+        </section>
+
+        <section class="view" id="decisions" aria-labelledby="decisions-title">
+          <div class="view-header">
+            <div>
+              <p class="section-kicker">Audit surface</p>
+              <h2 id="decisions-title">Decision and incident log</h2>
+            </div>
+            <button class="primary-action" id="sealReceiptChain" type="button">
+              <i data-lucide="shield-check"></i>
+              <span>Seal chain</span>
+            </button>
+          </div>
+
+          <div class="receipt-summary" id="receiptChainSummary"></div>
+          <div class="receipt-list" id="receiptChainList"></div>
+
+          <div class="log-table" role="table" aria-label="Decision and incident log">
+            <div class="log-row log-head" role="row">
+              <span role="columnheader">Class</span>
+              <span role="columnheader">Entry</span>
+              <span role="columnheader">Owner</span>
+              <span role="columnheader">State</span>
+            </div>
+            <div id="decisionLog"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

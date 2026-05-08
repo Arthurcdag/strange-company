@@ -1,0 +1,102 @@
+# Strange Company
+
+Strange Company is a prototype for a new kind of enterprise:
+
+> A lawful autonomous company with no CEO, no employees, no dividends, and one constitutional objective: survive, grow, and compound.
+
+It is not a normal startup. It is closer to a legal organism, treasury engine, and operating protocol wrapped inside a company.
+
+## Working Names
+
+- **Strange Company**: best public name. Weird, memorable, not cartoonishly hostile.
+- **Nightmare Company**: useful internal myth, but risky as a public brand.
+- **H.A.T.E. Company**: best kept as a system acronym, not a brand.
+
+Recommended internal meaning:
+
+**H.A.T.E. = Hardened Autonomous Treasury Engine**
+
+## Core Thesis
+
+Most companies fail because they depend on fragile human hierarchies, extract profit too early, and concentrate authority in people who can quit, panic, get corrupted, or be attacked.
+
+Strange Company inverts that structure:
+
+- No CEO.
+- No permanent workers.
+- No dividends.
+- No founder control.
+- No single point of failure.
+- No goal except lawful compounding growth.
+
+It turns revenue into experiments, experiments into assets, assets into more revenue, and revenue back into growth.
+
+## What It Does First
+
+Version 0 should be small and real:
+
+**An autonomous micro-SaaS growth engine.**
+
+It finds painful niche workflows, launches tiny paid tools, reinvests all surplus into better tools and distribution, and uses outside contributors through bounties and contracts instead of employees.
+
+## Non-Negotiable Constraints
+
+Strange Company must survive by being legitimate, redundant, and useful.
+
+It does not:
+
+- Commit fraud.
+- Evade taxes.
+- Attack competitors.
+- Hide beneficial ownership from lawful authorities.
+- Abuse users.
+- Use illegal hacking or coercion.
+- Optimize growth by harming people.
+
+The strong version is not lawless. The strong version is difficult to corrupt.
+
+## Founding Documents
+
+- [CHARTER.md](CHARTER.md): the constitutional rules.
+- [OPERATING_SYSTEM.md](OPERATING_SYSTEM.md): how the company makes decisions and executes work.
+- [RESILIENCE_MODEL.md](RESILIENCE_MODEL.md): how the company survives attacks and shocks.
+- [RESILIENCE_DRILLS.md](RESILIENCE_DRILLS.md): how attack drills become receipts and hardening packets.
+- [LAUNCH_PLAN.md](LAUNCH_PLAN.md): practical path to version 0.
+- [ONLINE_GATE.md](ONLINE_GATE.md): when the company may move from local prototype to private sandbox, public beta, or live operation.
+- [REVENUE_PILOT.md](REVENUE_PILOT.md): how the prototype moves toward the first controlled paid offer.
+- [RESEARCH_GATE.md](RESEARCH_GATE.md): how `reactive-research-tools` is used as a decision sanity layer.
+- [TREASURY_OS.md](TREASURY_OS.md): how treasury spend proposals are gated before approval.
+- [EXECUTION_MARKET.md](EXECUTION_MARKET.md): how approved capital becomes external work packets.
+- [AUTONOMOUS_CYCLE.md](AUTONOMOUS_CYCLE.md): how delivered work becomes outcomes, experiment updates, and new capital decisions.
+- [CAPITAL_ROUTER.md](CAPITAL_ROUTER.md): how outcomes draft follow-on proposals or cool down weak spend lanes.
+- [RECEIPT_CHAIN.md](RECEIPT_CHAIN.md): how material state changes become a local tamper-evident proof chain.
+
+## Prototype
+
+- [index.html](index.html): public face plus internal command center.
+- [styles.css](styles.css): interface design for the prototype.
+- [script.js](script.js): treasury allocation, launch readiness, revenue pilot, execution packets, outcome receipts, capital routing, resilience drills, cooldown lanes, local receipt chain, logs, and operating loop animation.
+
+Open `index.html` directly in a browser. No build step is required.
+
+If cloning from GitHub, initialize the research-tool submodule first:
+
+```bash
+git submodule update --init --recursive
+```
+
+The `Research Gate` tab works as a static view by itself. To run live claim checks, start the local filter API:
+
+```bash
+python -m uvicorn effective_boolean_filter.api:app \
+  --app-dir external/reactive-research-tools/projects/effective_boolean_filter/src \
+  --host 127.0.0.1 \
+  --port 8000
+```
+
+For `file://` browser use, the local workspace currently uses the small CORS patch in [tools/reactive_research_tools_cors.patch](tools/reactive_research_tools_cors.patch) against the submodule API.
+
+## External Tooling
+
+- [external/reactive-research-tools](external/reactive-research-tools): cloned research workbench.
+- [tools/strange_research_gate.py](tools/strange_research_gate.py): local adapter for checking Strange Company claims with the Effective Boolean Argument Filter.

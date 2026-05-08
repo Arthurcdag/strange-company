@@ -1,0 +1,4 @@
+[submodule "external/reactive-research-tools"]
+	path = external/reactive-research-tools
+	url = https://github.com/Arthurcdag/reactive-research-tools
+	ignore = dirty

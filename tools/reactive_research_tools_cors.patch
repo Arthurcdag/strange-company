@@ -1,0 +1,25 @@
+diff --git a/projects/effective_boolean_filter/src/effective_boolean_filter/api.py b/projects/effective_boolean_filter/src/effective_boolean_filter/api.py
+index 2f62b3a..7247255 100644
+--- a/projects/effective_boolean_filter/src/effective_boolean_filter/api.py
++++ b/projects/effective_boolean_filter/src/effective_boolean_filter/api.py
+@@ -132,6 +132,7 @@ def create_app(
+     """
+     try:
+         from fastapi import FastAPI, HTTPException
++        from fastapi.middleware.cors import CORSMiddleware
+         from fastapi.responses import HTMLResponse
+     except ImportError as e:  # pragma: no cover
+         raise RuntimeError(
+@@ -150,6 +151,13 @@ def create_app(
+         ),
+     )
+
++    app.add_middleware(
++        CORSMiddleware,
++        allow_origins=["null", "http://127.0.0.1:8000", "http://localhost:8000"],
++        allow_methods=["GET", "POST", "OPTIONS"],
++        allow_headers=["content-type"],
++    )
++
+     reports: ReportStore = store if store is not None else get_store()
+     app.state.report_store = reports
