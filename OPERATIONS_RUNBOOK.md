@@ -8,6 +8,8 @@ The current loop is intentionally boring:
 order intent -> invoice packet -> payment confirmation -> scoped delivery -> receipt
 ```
 
+Public requests can begin in the Order Desk. The Order Desk creates the same draft order and invoice packet used by the internal Operations console, then prepares an email handoff for manual review.
+
 ## Operating Boundary
 
 Strange Company remains sealed and non-distributive.

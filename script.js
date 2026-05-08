@@ -2484,6 +2484,65 @@ function renderOperations() {
   });
 }
 
+function renderOrderDesk() {
+  const verdict = document.querySelector("#orderDeskVerdict");
+  const offer = document.querySelector("#orderDeskOffer");
+  const serviceSelect = document.querySelector("#requestService");
+  if (!verdict || !offer || !serviceSelect) {
+    return;
+  }
+
+  const model = buildOperationsModel();
+  const services = operationServices();
+  const selectedService = serviceSelect.value || services[0]?.id || "";
+  serviceSelect.innerHTML = services
+    .map(
+      (service) => `
+        <option value="${escapeHtml(service.id)}" data-price="${Number(service.price || 0)}">
+          ${escapeHtml(service.title)} / ${money.format(Number(service.price || 0))}
+        </option>
+      `
+    )
+    .join("");
+  if (services.some((service) => service.id === selectedService)) {
+    serviceSelect.value = selectedService;
+  }
+
+  const canRequest = model.openCriticalControls.length === 0;
+  const tone = canRequest ? "green" : "amber";
+  const state = canRequest ? "Invoice requests open" : "Request queue only";
+  const detail = canRequest
+    ? "You can request a manual invoice packet. Payment still happens outside the static site."
+    : "You can draft a request, but the operator must clear legal, payment, bookkeeping, and support controls before accepting money.";
+
+  verdict.innerHTML = `
+    <div>
+      <span class="metric-label">Manual order desk</span>
+      <h3>${canRequest ? "Request a scoped proof packet." : "Draft the request before money moves."}</h3>
+      <p>${escapeHtml(detail)}</p>
+    </div>
+    <div class="order-mode-card ${tone}">
+      <span class="metric-label">Desk mode</span>
+      <strong>${escapeHtml(state)}</strong>
+      <span class="state ${tone}">${escapeHtml(state)}</span>
+    </div>
+  `;
+
+  const firstService = services.find((service) => service.id === serviceSelect.value) || services[0];
+  offer.innerHTML = `
+    <span class="metric-label">${escapeHtml(operations.operatorName)}</span>
+    <h3>${escapeHtml(firstService?.title || "Manual proof service")}</h3>
+    <p>${escapeHtml(firstService?.detail || "A scoped compliance proof packet service for the first operating loop.")}</p>
+    <p>Use this desk for invoice requests only. Do not submit protected health information, payment credentials, passwords, private keys, or regulated source documents.</p>
+    <div class="ops-link-grid">
+      <a href="TERMS.md" target="_blank" rel="noreferrer">Terms</a>
+      <a href="PRIVACY.md" target="_blank" rel="noreferrer">Privacy</a>
+      <a href="SUPPORT.md" target="_blank" rel="noreferrer">Support</a>
+      <span>${escapeHtml(operations.supportEmail)}</span>
+    </div>
+  `;
+}
+
 function toneForOperationStatus(status) {
   if (status === "Delivered" || status === "Paid") {
     return "green";
@@ -2513,36 +2572,54 @@ function toggleOperationControl(controlId, done) {
   );
   saveOperations();
   renderOperations();
+  renderOrderDesk();
   renderLogs();
+}
+
+function createOperationOrder({ customer, contact, serviceId, amount, need, source }) {
+  if (!customer) {
+    return null;
+  }
+  const service = operationServices().find((item) => item.id === serviceId) || operationServices()[0];
+  const invoiceNumber = `${operations.invoicePrefix}-${operations.nextInvoiceNumber}`;
+  const now = new Date().toISOString();
+  const order = {
+    id: `order-${slugify(customer)}-${Date.now()}`,
+    invoiceNumber,
+    customer,
+    contact: contact || "",
+    serviceId: service?.id || "custom",
+    serviceTitle: service?.title || "Custom service",
+    need: need || "Need not recorded",
+    amount: Number(amount || service?.price || 0),
+    status: "Draft",
+    source: source || "Operations console",
+    createdAt: now,
+    updatedAt: now
+  };
+  operations.orders.unshift(order);
+  operations.nextInvoiceNumber = Number(operations.nextInvoiceNumber || 1001) + 1;
+  saveOperations();
+  return order;
 }
 
 function addOperationOrder(form) {
   const formData = new FormData(form);
   const customer = String(formData.get("orderCustomer") || "").trim();
-  if (!customer) {
-    return;
-  }
-  const serviceId = String(formData.get("orderService") || "").trim();
-  const service = operationServices().find((item) => item.id === serviceId) || operationServices()[0];
-  const invoiceNumber = `${operations.invoicePrefix}-${operations.nextInvoiceNumber}`;
-  const now = new Date().toISOString();
-  operations.orders.unshift({
-    id: `order-${slugify(customer)}-${Date.now()}`,
-    invoiceNumber,
+  const order = createOperationOrder({
     customer,
     contact: String(formData.get("orderContact") || "").trim(),
-    serviceId: service?.id || "custom",
-    serviceTitle: service?.title || "Custom service",
+    serviceId: String(formData.get("orderService") || "").trim(),
+    amount: Number(formData.get("orderAmount") || 0),
     need: String(formData.get("orderNeed") || "Need not recorded").trim(),
-    amount: Number(formData.get("orderAmount") || service?.price || 0),
-    status: "Draft",
-    createdAt: now,
-    updatedAt: now
+    source: "Operations console"
   });
-  operations.nextInvoiceNumber = Number(operations.nextInvoiceNumber || 1001) + 1;
-  saveOperations();
+  if (!order) {
+    return;
+  }
   form.reset();
   renderOperations();
+  renderOrderDesk();
   renderLogs();
 }
 
@@ -2569,6 +2646,7 @@ function advanceOperationOrder(orderId) {
   });
   saveOperations();
   renderOperations();
+  renderOrderDesk();
   renderLogs();
 }
 
@@ -2576,6 +2654,7 @@ function removeOperationOrder(orderId) {
   operations.orders = operations.orders.filter((order) => order.id !== orderId);
   saveOperations();
   renderOperations();
+  renderOrderDesk();
   renderLogs();
 }
 
@@ -2588,6 +2667,7 @@ function operationPacket(order) {
     `Service: ${order.serviceTitle}`,
     `Monthly amount: ${money.format(Number(order.amount || 0))}`,
     `Status: ${order.status}`,
+    `Source: ${order.source || "Operations console"}`,
     `Payment route: ${operations.paymentMode}`,
     "",
     "Scope:",
@@ -2599,6 +2679,11 @@ function operationPacket(order) {
     "Controls:",
     "Do not request protected health information, payment credentials, passwords, or regulated source documents in v0."
   ].join("\n");
+}
+
+function orderMailto(order) {
+  const subject = `Invoice request ${order.invoiceNumber || ""} / ${order.customer}`.trim();
+  return `mailto:${encodeURIComponent(operations.supportEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(operationPacket(order))}`;
 }
 
 async function copyOperationPacket(orderId) {
@@ -2619,8 +2704,79 @@ async function copyOperationPacket(orderId) {
   output.innerHTML = `
     <span class="metric-label">${copied ? "Copied invoice packet" : "Invoice packet"}</span>
     <strong>${escapeHtml(order.invoiceNumber || "Draft invoice")}</strong>
+    <div class="order-output-actions">
+      <a href="${orderMailto(order)}">Open email draft</a>
+    </div>
     <pre>${escapeHtml(packet)}</pre>
   `;
+}
+
+function submitOrderRequest(form) {
+  const output = document.querySelector("#orderRequestOutput");
+  const formData = new FormData(form);
+  const customer = String(formData.get("requestCustomer") || "").trim();
+  const contact = String(formData.get("requestContact") || "").trim();
+  const serviceId = String(formData.get("requestService") || "").trim();
+  const amount = Number(formData.get("requestAmount") || 0);
+  const need = String(formData.get("requestNeed") || "").trim();
+  const clean = Boolean(formData.get("requestClean"));
+  const accepted = Boolean(formData.get("requestTerms"));
+
+  if (!output) {
+    return;
+  }
+
+  if (!customer || !contact || !need) {
+    output.classList.add("active");
+    output.innerHTML = `
+      <span class="metric-label">Request blocked</span>
+      <strong>Customer, contact, and need are required.</strong>
+    `;
+    return;
+  }
+
+  if (!clean || !accepted) {
+    output.classList.add("active");
+    output.innerHTML = `
+      <span class="metric-label">Request blocked</span>
+      <strong>Confirm the data boundary and manual invoice acknowledgement first.</strong>
+    `;
+    return;
+  }
+
+  const order = createOperationOrder({
+    customer,
+    contact,
+    serviceId,
+    amount,
+    need,
+    source: "Order Desk"
+  });
+  if (!order) {
+    return;
+  }
+
+  const packet = operationPacket(order);
+  output.classList.add("active");
+  output.innerHTML = `
+    <span class="metric-label">Invoice request created</span>
+    <strong>${escapeHtml(order.invoiceNumber)} / ${escapeHtml(order.customer)}</strong>
+    <div class="order-output-actions">
+      <a href="${orderMailto(order)}">Open email draft</a>
+      <button type="button" data-copy-order-request="${escapeHtml(order.id)}">Copy packet</button>
+    </div>
+    <pre>${escapeHtml(packet)}</pre>
+  `;
+
+  const copyButton = output.querySelector("[data-copy-order-request]");
+  if (copyButton) {
+    copyButton.addEventListener("click", () => copyOperationPacket(order.id));
+  }
+
+  form.reset();
+  renderOrderDesk();
+  renderOperations();
+  renderLogs();
 }
 
 function canonicalize(value) {
@@ -2744,6 +2900,7 @@ function collectReceiptEvents() {
       amount: Number(order.amount || 0),
       contact: order.contact || "",
       invoiceNumber: order.invoiceNumber || "",
+      source: order.source || "",
       serviceTitle: order.serviceTitle || ""
     });
   });
@@ -3520,6 +3677,29 @@ function setupOperations() {
   }
 }
 
+function setupOrderDesk() {
+  const form = document.querySelector("#orderRequestForm");
+  const serviceSelect = document.querySelector("#requestService");
+  const amountInput = document.querySelector("#requestAmount");
+
+  if (form) {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitOrderRequest(form);
+    });
+  }
+
+  if (serviceSelect && amountInput) {
+    serviceSelect.addEventListener("change", () => {
+      const service = operationServices().find((item) => item.id === serviceSelect.value);
+      if (service) {
+        amountInput.value = String(Number(service.price || 0));
+        renderOrderDesk();
+      }
+    });
+  }
+}
+
 function setupReceiptChain() {
   const sealButton = document.querySelector("#sealReceiptChain");
   if (sealButton) {
@@ -4116,8 +4296,10 @@ setupLaunchGate();
 setupRevenuePilot();
 setupSatelliteCompany();
 setupOperations();
+setupOrderDesk();
 setupReceiptChain();
 renderBuckets();
+renderOrderDesk();
 renderLaunchGate();
 renderRevenuePilot();
 renderSatelliteCompany();

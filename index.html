@@ -24,6 +24,10 @@
             <i data-lucide="shield"></i>
             <span>Public</span>
           </button>
+          <button class="nav-button" type="button" data-target="order">
+            <i data-lucide="file-plus-2"></i>
+            <span>Order Desk</span>
+          </button>
           <button class="nav-button" type="button" data-target="launch">
             <i data-lucide="rocket"></i>
             <span>Online Gate</span>
@@ -150,6 +154,66 @@
               <strong>100% reinvestment</strong>
             </div>
           </div>
+        </section>
+
+        <section class="view" id="order" aria-labelledby="order-title">
+          <div class="view-header">
+            <div>
+              <p class="section-kicker">Public intake</p>
+              <h2 id="order-title">Request an invoice packet</h2>
+            </div>
+            <a class="primary-action" href="TERMS.md" target="_blank" rel="noreferrer">
+              <i data-lucide="file-text"></i>
+              <span>Read terms</span>
+            </a>
+          </div>
+
+          <div class="order-verdict" id="orderDeskVerdict"></div>
+
+          <div class="order-layout">
+            <form class="order-form" id="orderRequestForm">
+              <div class="field-row">
+                <div class="field">
+                  <label for="requestCustomer">Customer</label>
+                  <input id="requestCustomer" name="requestCustomer" type="text" value="Clinic operator" />
+                </div>
+                <div class="field">
+                  <label for="requestContact">Contact</label>
+                  <input id="requestContact" name="requestContact" type="text" value="buyer@example.com" />
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label for="requestService">Service</label>
+                  <select id="requestService" name="requestService"></select>
+                </div>
+                <div class="field">
+                  <label for="requestAmount">Monthly amount</label>
+                  <input id="requestAmount" name="requestAmount" type="number" min="0" step="50" value="750" />
+                </div>
+              </div>
+              <div class="field">
+                <label for="requestNeed">Need</label>
+                <textarea id="requestNeed" name="requestNeed" rows="4">I need a monthly proof packet before renewal.</textarea>
+              </div>
+              <label class="order-check">
+                <input id="requestClean" name="requestClean" type="checkbox" checked />
+                <span>No protected health information, passwords, payment credentials, private keys, or regulated source documents are included.</span>
+              </label>
+              <label class="order-check">
+                <input id="requestTerms" name="requestTerms" type="checkbox" />
+                <span>I understand this creates a manual invoice request, not an automatic payment or guaranteed acceptance.</span>
+              </label>
+              <button class="primary-action" type="submit">
+                <i data-lucide="send"></i>
+                <span>Create request</span>
+              </button>
+            </form>
+
+            <article class="order-offer-card" id="orderDeskOffer"></article>
+          </div>
+
+          <div class="order-output" id="orderRequestOutput" aria-live="polite"></div>
         </section>
 
         <section class="view" id="launch" aria-labelledby="launch-title">
