@@ -2,6 +2,11 @@ const DEFAULT_PUBLIC_ORDER_CONFIG = {
   operatorName: "Strange Works Studio",
   supportEmail: "ops@strangeworks.studio",
   googleFormUrl: "",
+  supportInboxVerified: false,
+  googleFormVerified: false,
+  termsReviewedAt: "",
+  privacyReviewedAt: "",
+  liveMode: false,
   services: [
     {
       id: "proof-sprint",
@@ -74,6 +79,55 @@ function selectedService(serviceId) {
   return PUBLIC_ORDER_CONFIG.services.find((service) => service.id === serviceId) || PUBLIC_ORDER_CONFIG.services[0];
 }
 
+function publicReadinessModel() {
+  const formUrl = safeGoogleFormUrl(PUBLIC_ORDER_CONFIG.googleFormUrl);
+  const supportReady = Boolean(PUBLIC_ORDER_CONFIG.supportEmail && PUBLIC_ORDER_CONFIG.supportInboxVerified);
+  const formReady = Boolean(formUrl && PUBLIC_ORDER_CONFIG.googleFormVerified);
+  const termsReady = Boolean(PUBLIC_ORDER_CONFIG.termsReviewedAt);
+  const privacyReady = Boolean(PUBLIC_ORDER_CONFIG.privacyReviewedAt);
+  const liveReady = Boolean(PUBLIC_ORDER_CONFIG.liveMode && supportReady && formReady && termsReady && privacyReady);
+  const blockers = [];
+  if (!supportReady) blockers.push("support inbox");
+  if (!formReady) blockers.push("Google intake");
+  if (!termsReady) blockers.push("terms review");
+  if (!privacyReady) blockers.push("privacy review");
+  if (!PUBLIC_ORDER_CONFIG.liveMode) blockers.push("live-mode flag");
+  return {
+    formUrl,
+    supportReady,
+    formReady,
+    termsReady,
+    privacyReady,
+    liveReady,
+    blockers
+  };
+}
+
+function renderReadiness() {
+  const target = document.querySelector("#publicReadiness");
+  if (!target) {
+    return;
+  }
+  const model = publicReadinessModel();
+  const tone = model.liveReady ? "green" : "amber";
+  target.innerHTML = `
+    <div>
+      <span class="metric-label">Public intake status</span>
+      <h2>${model.liveReady ? "Live intake configured" : "Packet-only mode"}</h2>
+      <p>${model.liveReady
+        ? "Support, Google intake, terms, and privacy review are configured for manual pilot intake."
+        : `Still waiting on: ${escapeHtml(model.blockers.join(", "))}. Requests can be packaged, but the operator must review them manually.`}</p>
+    </div>
+    <div class="readiness-pill ${tone}">${model.liveReady ? "Ready" : "Manual"}</div>
+    <div class="readiness-checks">
+      <span class="state ${model.supportReady ? "green" : "amber"}">Support</span>
+      <span class="state ${model.formReady ? "green" : "amber"}">Google intake</span>
+      <span class="state ${model.termsReady ? "green" : "amber"}">Terms</span>
+      <span class="state ${model.privacyReady ? "green" : "amber"}">Privacy</span>
+    </div>
+  `;
+}
+
 function requestPacket(order) {
   return [
     `Request ID: ${order.id}`,
@@ -111,15 +165,15 @@ function renderBlocked(message) {
 function renderPacket(order) {
   const output = document.querySelector("#publicOrderOutput");
   const packet = requestPacket(order);
-  const formUrl = safeGoogleFormUrl(PUBLIC_ORDER_CONFIG.googleFormUrl);
+  const readiness = publicReadinessModel();
   output.classList.add("active");
   output.innerHTML = `
     <span class="metric-label">Request packet created</span>
     <strong>${escapeHtml(order.id)} / ${escapeHtml(order.customer)}</strong>
-    <p>Send this packet to the operator. If the Google Form is configured, open it and paste the packet there.</p>
+    <p>${readiness.formReady ? "Open the verified Google intake and paste the packet there." : "Forward this packet manually until the Google intake is verified."}</p>
     <div class="order-output-actions">
       <a href="${mailtoUrl(order)}">Open email draft</a>
-      ${formUrl ? `<a href="${escapeHtml(formUrl)}" target="_blank" rel="noreferrer">Open Google intake</a>` : ""}
+      ${readiness.formReady ? `<a href="${escapeHtml(readiness.formUrl)}" target="_blank" rel="noreferrer">Open Google intake</a>` : ""}
       <button type="button" id="copyPublicPacket">Copy packet</button>
     </div>
     <pre>${escapeHtml(packet)}</pre>
@@ -192,6 +246,7 @@ function setupForm() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  renderReadiness();
   setupForm();
   if (window.lucide) {
     window.lucide.createIcons();

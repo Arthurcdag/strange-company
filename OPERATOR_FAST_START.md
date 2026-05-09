@@ -9,10 +9,15 @@ Use this when the external setup is ready and the public Order Desk needs to poi
 3. Edit `public-config.js`:
    - set `supportEmail`,
    - set `googleFormUrl`,
+   - set `supportInboxVerified: true` after sending and receiving a test email,
+   - set `googleFormVerified: true` after a test response lands in the Sheet,
+   - set `termsReviewedAt` and `privacyReviewedAt`,
+   - set `liveMode: true` only after the stop rule is clear,
    - adjust service names and prices if the offer changed.
-4. Open `public.html` locally and submit a safe test packet.
-5. Confirm the email draft uses the real inbox.
-6. Open the Google Form from the public packet output and paste the packet.
+4. Open `public.html` locally and confirm the readiness banner says `Live intake configured`.
+5. Submit a safe test packet.
+6. Confirm the email draft uses the real inbox.
+7. Open the Google Form from the public packet output and paste the packet.
 
 ## Live Smoke
 
