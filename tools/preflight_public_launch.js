@@ -84,6 +84,8 @@ function checkPublicSurface() {
     ["private Operations label", /\bOperations\b/],
     ["private Treasury label", /\bTreasury\b/],
     ["private Decisions label", /\bDecisions\b/],
+    ["private External Signals console", /\bExternal Signals\b/],
+    ["plugin workflow UI", /\b(Alpaca|Binance|Zotero|Life Science Research|GitHub signal)\b/],
     ["automatic network submit", /\bfetch\s*\(/]
   ];
 

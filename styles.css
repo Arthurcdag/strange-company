@@ -1732,6 +1732,139 @@ input[type="range"] {
   line-height: 1.4;
 }
 
+.signal-policy-grid,
+.signal-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.signal-policy-grid article,
+.signal-output,
+.signal-empty,
+.signal-card {
+  padding: 18px;
+}
+
+.signal-policy-grid h3,
+.signal-policy-grid p,
+.signal-output p,
+.signal-empty h3,
+.signal-empty p,
+.signal-card h4,
+.signal-card p {
+  margin: 0;
+}
+
+.signal-policy-grid h3,
+.signal-empty h3 {
+  margin-top: 4px;
+  font-size: 18px;
+}
+
+.signal-policy-grid p,
+.signal-output p,
+.signal-empty p,
+.signal-card p {
+  color: var(--muted);
+  line-height: 1.46;
+}
+
+.signal-policy-grid p,
+.signal-empty p,
+.signal-card p {
+  margin-top: 8px;
+}
+
+.signal-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.signal-form {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.signal-output {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  box-shadow: none;
+}
+
+.signal-output strong {
+  font-size: 24px;
+  overflow-wrap: anywhere;
+}
+
+.signal-list {
+  display: grid;
+  gap: 12px;
+}
+
+.signal-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px 140px 130px;
+  gap: 14px;
+  align-items: center;
+}
+
+.signal-card h4 {
+  font-size: 16px;
+}
+
+.signal-card code {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 10px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #f3efe8;
+  color: var(--ink);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.signal-note {
+  color: var(--blue) !important;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.signal-status-select {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.signal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.signal-actions button {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 11px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 800;
+}
+
 .experiment-card {
   display: grid;
   gap: 14px;
@@ -2117,6 +2250,7 @@ input[type="range"] {
   .pilot-layout,
   .ops-verdict,
   .ops-layout,
+  .signal-layout,
   .treasury-panel,
   .resilience-layout,
   .gate-panel,
@@ -2135,6 +2269,8 @@ input[type="range"] {
   .pilot-metrics-grid,
   .satellite-metrics-grid,
   .ops-metrics-grid,
+  .signal-policy-grid,
+  .signal-metrics-grid,
   .receipt-summary,
   .experiment-board,
   .research-grid {
@@ -2177,6 +2313,8 @@ input[type="range"] {
   .pilot-metrics-grid,
   .satellite-metrics-grid,
   .ops-metrics-grid,
+  .signal-policy-grid,
+  .signal-metrics-grid,
   .receipt-summary,
   .experiment-board,
   .research-grid {
@@ -2193,6 +2331,7 @@ input[type="range"] {
   .ops-control,
   .ops-order,
   .ops-launch-item,
+  .signal-card,
   .launch-phase,
   .launch-check,
   .cooldown-card,
