@@ -2324,3 +2324,186 @@ input[type="range"] {
     grid-template-columns: 1fr;
   }
 }
+
+.public-site {
+  background:
+    linear-gradient(180deg, rgba(247, 248, 244, 0.96), rgba(238, 243, 241, 0.98)),
+    var(--background);
+}
+
+.public-main {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 22px 0 48px;
+}
+
+.public-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 0 24px;
+}
+
+.public-topbar .brand {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.public-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.public-links a,
+.public-output a,
+.public-output button {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 12px;
+  color: var(--ink);
+  background: var(--surface);
+  text-decoration: none;
+  font: inherit;
+}
+
+.public-order-surface {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(360px, 1.1fr);
+  gap: 24px;
+  align-items: start;
+  padding: 28px 0;
+}
+
+.public-order-copy h1 {
+  margin: 0;
+  max-width: 720px;
+  font-size: clamp(36px, 7vw, 72px);
+  line-height: 0.95;
+}
+
+.public-order-copy .lead {
+  max-width: 640px;
+}
+
+.public-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.public-status-grid article {
+  display: grid;
+  gap: 10px;
+  align-content: center;
+  min-height: 92px;
+  padding: 14px;
+}
+
+.public-status-grid svg {
+  width: 20px;
+  height: 20px;
+  color: var(--green);
+}
+
+.public-order-form,
+.public-output,
+.public-band article,
+.public-status-grid article {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: var(--shadow);
+}
+
+.public-order-form {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.public-order-form .field {
+  display: grid;
+  gap: 6px;
+}
+
+.public-order-form input,
+.public-order-form select,
+.public-order-form textarea {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.public-output {
+  display: none;
+  gap: 12px;
+  padding: 18px;
+  margin: 8px 0 24px;
+}
+
+.public-output.active {
+  display: grid;
+}
+
+.public-output pre {
+  overflow: auto;
+  max-height: 340px;
+  margin: 0;
+  padding: 14px;
+  border-radius: 6px;
+  background: #101614;
+  color: #f5f8f0;
+  white-space: pre-wrap;
+}
+
+.public-band {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding-top: 8px;
+}
+
+.public-band article {
+  padding: 18px;
+}
+
+.public-band h2 {
+  margin: 4px 0 8px;
+  font-size: 20px;
+}
+
+.public-band p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+@media (max-width: 860px) {
+  .public-topbar,
+  .public-order-surface,
+  .public-band {
+    grid-template-columns: 1fr;
+  }
+
+  .public-topbar {
+    display: grid;
+  }
+
+  .public-links {
+    justify-content: start;
+  }
+}
+
+@media (max-width: 620px) {
+  .public-status-grid,
+  .public-order-form .field-row {
+    grid-template-columns: 1fr;
+  }
+}

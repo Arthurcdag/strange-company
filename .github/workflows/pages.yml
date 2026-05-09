@@ -33,9 +33,11 @@ jobs:
         shell: bash
         run: |
           mkdir -p _site/tools
-          cp index.html styles.css script.js _site/
+          cp public.html _site/index.html
+          cp public.js styles.css _site/
           cp *.md _site/
           cp tools/strange_research_gate.py tools/reactive_research_tools_cors.patch _site/tools/
+          cp tools/google_apps_script_order_intake.gs _site/tools/
           touch _site/.nojekyll
 
       - name: Upload artifact

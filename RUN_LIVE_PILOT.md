@@ -10,19 +10,21 @@ It applies to the satellite operator (Strange Works Studio), not to Strange Comp
 - Money flows through a US LLC bank account.
 - Invoices are sent through Stripe Hosted Invoice Page, created manually.
 - The single source of truth for orders is the Google Sheet ledger.
-- The static site is a packet builder and operator console, not a payment system.
+- The public static site is a packet builder, not a payment system or private operator console.
+- The private command center remains local/private until the Online Gate clears it.
 
 ## One-Time Setup
 
 Complete every line in the **Operational launch** checklist before sending the first invoice:
 
 - [ ] **US LLC formed.** Articles of organization filed in the chosen state. See [SBA business registration](https://www.sba.gov/business-guide/launch-your-business/register-your-business).
+- [ ] **Responsible party identified.** The IRS requires a human responsible party for EIN control; a nominee or sealed autonomous system is not enough. See [IRS responsible parties](https://www.irs.gov/businesses/small-businesses-self-employed/responsible-parties-and-nominees).
 - [ ] **EIN issued.** Apply through the IRS after entity formation: [IRS EIN](https://www.irs.gov/businesses/employer-identification-number).
 - [ ] **Business bank account open.** Account is in the LLC name. Stripe payouts route here.
 - [ ] **Stripe account active.** Verified for the LLC. Payouts wired. See [Stripe no-code payments](https://docs.stripe.com/payments/no-code) and [Stripe Hosted Invoice Page](https://docs.stripe.com/invoicing/hosted-invoice-page).
 - [ ] **Support inbox monitored.** A real monitored inbox (`ops@strangeworks.studio` or replacement) checked daily.
 - [ ] **Google Sheet ledger live.** Tabs: `Requests`, `Invoices`, `Customers`, `Delivery`, `Incidents`. Required columns on every tab: `created_at`, `source`, `invoice_id`, `customer`, `contact`, `service`, `amount`, `status`, `stripe_invoice_url`, `delivery_due`, `notes`.
-- [ ] **Intake route configured.** Either a Google Form bound to the Sheet or an [Apps Script web app](https://developers.google.com/apps-script/guides/web) that appends rows via the [Sheets append API](https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values/append).
+- [ ] **Intake route configured.** Use a Google Form bound to the Sheet for the first public route. Use an [Apps Script web app](https://developers.google.com/apps-script/guides/web) only for internal/sandbox append tests.
 - [ ] **Terms reviewed.** Date stamped in the Operations integration config.
 - [ ] **Privacy notice reviewed.** Date stamped in the Operations integration config.
 - [ ] **Integration config saved.** Support email, Sheet URL, Form URL or Apps Script URL, Stripe dashboard URL, prefix all set in the Operations console.
@@ -69,7 +71,7 @@ Run this once per workday until the pilot is on rails.
 - This produces a tamper-evident local receipt for the day's state changes.
 
 ### 7. Log incidents (if any)
-- Anything off-script — failed payment, scope dispute, data boundary breach, missing delivery — gets a row in the Sheet `Incidents` tab with `created_at`, severity, customer, summary, response.
+- Anything off-script - failed payment, scope dispute, data boundary breach, missing delivery - gets a row in the Sheet `Incidents` tab with `created_at`, severity, customer, summary, response.
 
 ## Weekly Review
 
@@ -81,7 +83,7 @@ Run this once per workday until the pilot is on rails.
 ## What Stays Manual In V0
 
 - Stripe invoices are not auto-created.
-- Sheet rows are written either by the operator or by the Apps Script web app handoff. The static site never holds payment data.
+- Sheet rows are written either by the operator or by the Google Form intake. Apps Script remains internal/sandbox until reviewed. The static site never holds payment data.
 - Delivery is a human action.
 - Refunds, disputes, and incidents are routed through the support inbox.
 
@@ -100,6 +102,7 @@ Resume only after the offending item is recorded as an incident, fixed, and revi
 ## References
 
 - [SBA business registration](https://www.sba.gov/business-guide/launch-your-business/register-your-business)
+- [IRS responsible parties](https://www.irs.gov/businesses/small-businesses-self-employed/responsible-parties-and-nominees)
 - [IRS EIN](https://www.irs.gov/businesses/employer-identification-number)
 - [Stripe no-code payments](https://docs.stripe.com/payments/no-code)
 - [Stripe Hosted Invoice Page](https://docs.stripe.com/invoicing/hosted-invoice-page)

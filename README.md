@@ -68,6 +68,8 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [ORDER_DESK.md](ORDER_DESK.md): how public invoice requests become manual order packets.
 - [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md): the manual order, invoice, payment, delivery, and receipt loop for the first functional operator.
 - [RUN_LIVE_PILOT.md](RUN_LIVE_PILOT.md): operational v1 daily loop for the real US manual paid pilot (LLC, EIN, bank, Stripe, Sheet ledger).
+- [GOOGLE_SHEET_LEDGER.md](GOOGLE_SHEET_LEDGER.md): Google Sheet tabs, columns, and first public intake route.
+- [TOOLING_POLICY.md](TOOLING_POLICY.md): how market data, research, Zotero, and GitHub tools are allowed in v1.
 - [TERMS.md](TERMS.md): draft v0 service terms for the satellite company.
 - [PRIVACY.md](PRIVACY.md): draft v0 privacy notice for the static prototype and operating loop.
 - [SUPPORT.md](SUPPORT.md): manual support and incident handling route.
@@ -80,13 +82,15 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 
 ## Prototype
 
-- [index.html](index.html): public face plus internal command center.
+- [public.html](public.html): public GitHub Pages Order Desk and documentation surface.
+- [public.js](public.js): payment-safe public request packet builder.
+- [index.html](index.html): private/local command center for Operations, Treasury, Decisions, and Research Gate.
 - [styles.css](styles.css): interface design for the prototype.
-- [script.js](script.js): treasury allocation, launch readiness, public order requests, revenue pilot, satellite profit model, operations console, execution packets, outcome receipts, capital routing, resilience drills, cooldown lanes, local receipt chain, logs, and operating loop animation.
+- [script.js](script.js): treasury allocation, launch readiness, private order requests, revenue pilot, satellite profit model, operations console, execution packets, outcome receipts, capital routing, resilience drills, cooldown lanes, local receipt chain, logs, and operating loop animation.
 
-Open `index.html` directly in a browser. No build step is required.
+Open `index.html` directly in a browser for private/local operation. Open `public.html` to test the public request surface. No build step is required.
 
-The GitHub repository deploys the static command center to GitHub Pages from `main`. That public page is a prototype and documentation surface, not live autonomous business operation.
+The GitHub repository deploys `public.html` as the GitHub Pages homepage from `main`. The private command center is not the public homepage and should not be treated as live autonomous business operation.
 
 If cloning from GitHub, initialize the research-tool submodule first:
 
@@ -109,3 +113,4 @@ For `file://` browser use, the local workspace currently uses the small CORS pat
 
 - [external/reactive-research-tools](external/reactive-research-tools): cloned research workbench.
 - [tools/strange_research_gate.py](tools/strange_research_gate.py): local adapter for checking Strange Company claims with the Effective Boolean Argument Filter.
+- [tools/google_apps_script_order_intake.gs](tools/google_apps_script_order_intake.gs): internal/sandbox Apps Script template for appending sanitized request rows to the Sheet ledger.

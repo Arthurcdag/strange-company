@@ -14,6 +14,8 @@ Exception:
 A static public prototype may be published for inspection if it accepts no payments, signs no customers, and makes no live-operation claim.
 ```
 
+Operational V1.1 narrows that exception: GitHub Pages publishes the public Order Desk and documents only. The private command center is not the public homepage.
+
 ## Launch Phases
 
 ### Offline Prototype
@@ -80,4 +82,4 @@ It can draft a private sandbox launch packet. That packet must move through the 
 
 The Decisions view records Online Gate checks.
 
-GitHub Pages deployment is allowed only for the static prototype surface. It does not mean the company is commercially live.
+GitHub Pages deployment is allowed only for the public request and documentation surface. It does not mean the company is commercially live, and it must not expose the private Operations, Treasury, or Decisions console as the homepage.
