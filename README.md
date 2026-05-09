@@ -86,11 +86,18 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [public.html](public.html): public GitHub Pages Order Desk and documentation surface.
 - [public-config.js](public-config.js): public support inbox, Google Form URL, service names, and prices.
 - [public.js](public.js): payment-safe public request packet builder.
+- [tools/preflight_public_launch.js](tools/preflight_public_launch.js): launch preflight for public/private separation, URL allowlists, live-mode config, and sensitive-data guard coverage.
 - [index.html](index.html): private/local command center for Operations, Treasury, Decisions, and Research Gate.
 - [styles.css](styles.css): interface design for the prototype.
 - [script.js](script.js): treasury allocation, launch readiness, private order requests, revenue pilot, satellite profit model, operations console, execution packets, outcome receipts, capital routing, resilience drills, cooldown lanes, local receipt chain, logs, and operating loop animation.
 
 Open `index.html` directly in a browser for private/local operation. Open `public.html` to test the public request surface. No build step is required.
+
+Before turning on `liveMode` or merging public config changes, run:
+
+```bash
+node tools/preflight_public_launch.js
+```
 
 The GitHub repository deploys `public.html` as the GitHub Pages homepage from `main`. The private command center is not the public homepage and should not be treated as live autonomous business operation.
 
