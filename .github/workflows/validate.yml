@@ -1,0 +1,30 @@
+name: Validate static site
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check public-config.js
+          node --check public.js
+          node --check script.js
+          node --check tools/preflight_public_launch.js
+
+      - name: Run public launch preflight
+        run: node tools/preflight_public_launch.js
