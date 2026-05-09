@@ -1,0 +1,30 @@
+# Operator Fast Start
+
+Use this when the external setup is ready and the public Order Desk needs to point at the real operating routes.
+
+## 30 Minute Config Pass
+
+1. Confirm the monitored support inbox exists.
+2. Create the Google Form linked to the ledger Sheet.
+3. Edit `public-config.js`:
+   - set `supportEmail`,
+   - set `googleFormUrl`,
+   - adjust service names and prices if the offer changed.
+4. Open `public.html` locally and submit a safe test packet.
+5. Confirm the email draft uses the real inbox.
+6. Open the Google Form from the public packet output and paste the packet.
+
+## Live Smoke
+
+1. Merge the config change.
+2. Wait for GitHub Pages deploy.
+3. Open the live public page.
+4. Submit one test request with no sensitive data.
+5. Confirm the request arrives in the support inbox or Google Form response Sheet.
+6. Create one Stripe test invoice manually.
+7. Paste the hosted invoice URL into the private Operations console.
+8. Advance the private order through `Sent`, `Paid`, and `Delivered`.
+
+## Stop Rule
+
+Do not use the public page for real customers if the support inbox, Google Form, ledger Sheet, terms review, privacy review, Stripe account, or business bank account is missing.
