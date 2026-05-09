@@ -25,6 +25,7 @@ Complete every line in the **Operational launch** checklist before sending the f
 - [ ] **Support inbox monitored.** A real monitored inbox (`ops@strangeworks.studio` or replacement) checked daily.
 - [ ] **Google Sheet ledger live.** Tabs: `Requests`, `Invoices`, `Customers`, `Delivery`, `Incidents`. Required columns on every tab: `created_at`, `source`, `invoice_id`, `customer`, `contact`, `service`, `amount`, `status`, `stripe_invoice_url`, `delivery_due`, `notes`.
 - [ ] **Intake route configured.** Use a Google Form bound to the Sheet for the first public route. Use an [Apps Script web app](https://developers.google.com/apps-script/guides/web) only for internal/sandbox append tests.
+- [ ] **Public config updated.** `public-config.js` contains the real support inbox and Google Form URL.
 - [ ] **Terms reviewed.** Date stamped in the Operations integration config.
 - [ ] **Privacy notice reviewed.** Date stamped in the Operations integration config.
 - [ ] **Integration config saved.** Support email, Sheet URL, Form URL or Apps Script URL, Stripe dashboard URL, prefix all set in the Operations console.

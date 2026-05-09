@@ -68,6 +68,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [ORDER_DESK.md](ORDER_DESK.md): how public invoice requests become manual order packets.
 - [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md): the manual order, invoice, payment, delivery, and receipt loop for the first functional operator.
 - [RUN_LIVE_PILOT.md](RUN_LIVE_PILOT.md): operational v1 daily loop for the real US manual paid pilot (LLC, EIN, bank, Stripe, Sheet ledger).
+- [OPERATOR_FAST_START.md](OPERATOR_FAST_START.md): the quick config and smoke-test path for turning the public desk toward real routes.
 - [GOOGLE_SHEET_LEDGER.md](GOOGLE_SHEET_LEDGER.md): Google Sheet tabs, columns, and first public intake route.
 - [TOOLING_POLICY.md](TOOLING_POLICY.md): how market data, research, Zotero, and GitHub tools are allowed in v1.
 - [TERMS.md](TERMS.md): draft v0 service terms for the satellite company.
@@ -83,6 +84,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 ## Prototype
 
 - [public.html](public.html): public GitHub Pages Order Desk and documentation surface.
+- [public-config.js](public-config.js): public support inbox, Google Form URL, service names, and prices.
 - [public.js](public.js): payment-safe public request packet builder.
 - [index.html](index.html): private/local command center for Operations, Treasury, Decisions, and Research Gate.
 - [styles.css](styles.css): interface design for the prototype.

@@ -1,4 +1,4 @@
-const PUBLIC_ORDER_CONFIG = {
+const DEFAULT_PUBLIC_ORDER_CONFIG = {
   operatorName: "Strange Works Studio",
   supportEmail: "ops@strangeworks.studio",
   googleFormUrl: "",
@@ -16,6 +16,14 @@ const PUBLIC_ORDER_CONFIG = {
       price: 79
     }
   ]
+};
+
+const PUBLIC_ORDER_CONFIG = {
+  ...DEFAULT_PUBLIC_ORDER_CONFIG,
+  ...(window.PUBLIC_ORDER_CONFIG || {}),
+  services: Array.isArray(window.PUBLIC_ORDER_CONFIG?.services) && window.PUBLIC_ORDER_CONFIG.services.length
+    ? window.PUBLIC_ORDER_CONFIG.services
+    : DEFAULT_PUBLIC_ORDER_CONFIG.services
 };
 
 const money = new Intl.NumberFormat("en-US", {
