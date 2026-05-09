@@ -60,6 +60,10 @@
             <i data-lucide="brain-circuit"></i>
             <span>Research Gate</span>
           </button>
+          <button class="nav-button" type="button" data-target="signals">
+            <i data-lucide="radio-tower"></i>
+            <span>External Signals</span>
+          </button>
           <button class="nav-button" type="button" data-target="bounties">
             <i data-lucide="badge-check"></i>
             <span>Bounties</span>
@@ -772,6 +776,94 @@
           <div class="gate-run-list" id="gateRunList"></div>
 
           <div class="experiment-board" id="gateCheckList"></div>
+        </section>
+
+        <section class="view" id="signals" aria-labelledby="signals-title">
+          <div class="view-header">
+            <div>
+              <p class="section-kicker">Read-only evidence intake</p>
+              <h2 id="signals-title">External Signals</h2>
+            </div>
+            <button class="primary-action" id="resetExternalSignals" type="button">
+              <i data-lucide="rotate-ccw"></i>
+              <span>Reset signals</span>
+            </button>
+          </div>
+
+          <div class="signal-policy-grid" aria-label="External signal boundaries">
+            <article>
+              <span class="metric-label">Alpaca / Binance</span>
+              <h3>Market observatory</h3>
+              <p>Read-only snapshots for treasury-risk context. No trading, custody, or allocation authority.</p>
+            </article>
+            <article>
+              <span class="metric-label">Zotero</span>
+              <h3>Citation library</h3>
+              <p>Public references and citation keys only. No order packets, support mail, PHI, or credentials.</p>
+            </article>
+            <article>
+              <span class="metric-label">Life Science Research</span>
+              <h3>Public evidence</h3>
+              <p>Clinic workflow vocabulary and public research context only. Never customer medical records.</p>
+            </article>
+            <article>
+              <span class="metric-label">GitHub</span>
+              <h3>Delivery receipts</h3>
+              <p>PR, deploy, issue, and validation status receipts for implementation evidence.</p>
+            </article>
+          </div>
+
+          <div class="signal-metrics-grid" id="signalMetrics"></div>
+
+          <div class="signal-layout">
+            <form class="signal-form" id="signalForm">
+              <div class="field-row">
+                <div class="field">
+                  <label for="signalSource">Source</label>
+                  <select id="signalSource" name="source"></select>
+                </div>
+                <div class="field">
+                  <label for="signalObservedAt">Observed at</label>
+                  <input id="signalObservedAt" name="observed_at" type="datetime-local" />
+                </div>
+              </div>
+              <div class="field">
+                <label for="signalSubject">Subject</label>
+                <input id="signalSubject" name="subject" type="text" placeholder="BTC funding context, PR deploy status, citation key..." required />
+              </div>
+              <div class="field">
+                <label for="signalEvidence">Evidence reference</label>
+                <input id="signalEvidence" name="evidence_reference" type="text" placeholder="Ticker snapshot, DOI, citation key, PR URL, run URL..." required />
+              </div>
+              <div class="field">
+                <label for="signalSummary">Summary</label>
+                <textarea id="signalSummary" name="summary" rows="4" required></textarea>
+              </div>
+              <div class="field">
+                <label for="signalNote">Operator note</label>
+                <textarea id="signalNote" name="operator_note" rows="3"></textarea>
+              </div>
+              <label class="order-check">
+                <input name="boundary_confirmed" type="checkbox" required />
+                <span>This is read-only public/operator evidence. It contains no customer-private records, PHI, credentials, payment data, private keys, or API keys.</span>
+              </label>
+              <button class="primary-action" type="submit">
+                <i data-lucide="file-check-2"></i>
+                <span>Create signal packet</span>
+              </button>
+            </form>
+
+            <aside class="signal-output" id="signalOutput" aria-live="polite">
+              <span class="metric-label">Signal boundary</span>
+              <strong>Evidence can inform questions, not decisions.</strong>
+              <p>
+                A signal may become a Research Gate prompt. It cannot approve spend,
+                trade assets, invoice customers, or move public Order Desk data.
+              </p>
+            </aside>
+          </div>
+
+          <div class="signal-list" id="signalList"></div>
         </section>
 
         <section class="view" id="bounties" aria-labelledby="bounties-title">

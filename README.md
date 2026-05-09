@@ -71,6 +71,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [OPERATOR_FAST_START.md](OPERATOR_FAST_START.md): the quick config and smoke-test path for turning the public desk toward real routes.
 - [GOOGLE_SHEET_LEDGER.md](GOOGLE_SHEET_LEDGER.md): Google Sheet tabs, columns, and first public intake route.
 - [TOOLING_POLICY.md](TOOLING_POLICY.md): how market data, research, Zotero, and GitHub tools are allowed in v1.
+- [EXTERNAL_SIGNALS.md](EXTERNAL_SIGNALS.md): private read-only signal packets from market, citation, research, and GitHub evidence tools.
 - [TERMS.md](TERMS.md): draft v0 service terms for the satellite company.
 - [PRIVACY.md](PRIVACY.md): draft v0 privacy notice for the static prototype and operating loop.
 - [SUPPORT.md](SUPPORT.md): manual support and incident handling route.
@@ -89,7 +90,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [tools/preflight_public_launch.js](tools/preflight_public_launch.js): launch preflight for public/private separation, URL allowlists, live-mode config, and sensitive-data guard coverage.
 - [index.html](index.html): private/local command center for Operations, Treasury, Decisions, and Research Gate.
 - [styles.css](styles.css): interface design for the prototype.
-- [script.js](script.js): treasury allocation, launch readiness, private order requests, revenue pilot, satellite profit model, operations console, execution packets, outcome receipts, capital routing, resilience drills, cooldown lanes, local receipt chain, logs, and operating loop animation.
+- [script.js](script.js): treasury allocation, launch readiness, private order requests, revenue pilot, satellite profit model, operations console, external signals, execution packets, outcome receipts, capital routing, resilience drills, cooldown lanes, local receipt chain, logs, and operating loop animation.
 
 Open `index.html` directly in a browser for private/local operation. Open `public.html` to test the public request surface. No build step is required.
 

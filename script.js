@@ -550,8 +550,14 @@ function defaultOperations() {
   };
 }
 
+function defaultExternalSignals() {
+  return [];
+}
+
 const pilotStages = ["Prospect", "Contacted", "Call booked", "Committed", "Ready to invoice"];
 const operationStages = ["Draft", "Sent", "Paid", "Delivered"];
+const signalSources = ["Alpaca", "Binance", "Zotero", "Life Science Research", "GitHub"];
+const signalStatuses = ["observed", "triaged", "routed", "rejected"];
 
 const gateChecks = [
   {
@@ -603,6 +609,7 @@ const RECEIPT_SEAL_KEY = "strange-company-receipt-seal";
 const REVENUE_PILOT_KEY = "strange-company-revenue-pilot";
 const SATELLITE_COMPANY_KEY = "strange-company-satellite-company";
 const OPERATIONS_KEY = "strange-company-operations";
+const EXTERNAL_SIGNALS_KEY = "strange-company-external-signals";
 
 let activeScenario = "base";
 let loopAnimationId = 0;
@@ -618,6 +625,7 @@ let receiptSeal = loadReceiptSeal();
 let revenuePilot = loadRevenuePilot();
 let satelliteCompany = loadSatelliteCompany();
 let operations = loadOperations();
+let externalSignals = loadExternalSignals();
 
 function activateView(target) {
   document.querySelectorAll(".view").forEach((view) => {
@@ -1547,6 +1555,8 @@ function findSensitiveData(text) {
     ["protected health information", /\b(PHI|patient|diagnosis|medical record|MRN|health record|treatment|prescription)\b/i],
     ["payment card data", /\b(?:\d[ -]*?){13,19}\b/],
     ["social security number", /\b\d{3}-\d{2}-\d{4}\b/],
+    ["customer-private records", /\b(customer record|customer file|client record|support transcript|private customer|non-public customer)\b/i],
+    ["API key material", /\b(sk_live_[A-Za-z0-9]+|pk_live_[A-Za-z0-9]+|ghp_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]+)\b/],
     ["password or secret", /\b(password|passcode|secret|private key|api[_ -]?key|access token|bearer token)\b/i],
     ["private key material", /-----BEGIN [A-Z ]*PRIVATE KEY-----/i]
   ];
@@ -1920,6 +1930,66 @@ function saveOperations() {
   } catch {
     // Local storage can be unavailable in hardened browser contexts.
   }
+}
+
+function loadExternalSignals() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(EXTERNAL_SIGNALS_KEY) || "null");
+    if (Array.isArray(stored)) {
+      return stored.map((signal) => normalizeExternalSignal(signal)).filter(Boolean);
+    }
+  } catch {
+    // Fall through to the built-in signal state.
+  }
+  return defaultExternalSignals();
+}
+
+function saveExternalSignals() {
+  try {
+    localStorage.setItem(EXTERNAL_SIGNALS_KEY, JSON.stringify(externalSignals.slice(0, 50)));
+  } catch {
+    // Local storage can be unavailable in hardened browser contexts.
+  }
+}
+
+function normalizeExternalSignal(signal) {
+  if (!signal || typeof signal !== "object") {
+    return null;
+  }
+  const source = signalSources.includes(signal.source) ? signal.source : signalSources[0];
+  const status = signalStatuses.includes(signal.status) ? signal.status : "observed";
+  const observedAt = signal.observed_at || signal.observedAt || signal.createdAt || new Date().toISOString();
+  return {
+    id: signal.id || `signal-${Date.now().toString(36)}`,
+    source,
+    observed_at: observedAt,
+    subject: String(signal.subject || "").slice(0, 160),
+    summary: String(signal.summary || "").slice(0, 1200),
+    evidence_reference: String(signal.evidence_reference || signal.evidenceReference || "").slice(0, 280),
+    operator_note: String(signal.operator_note || signal.operatorNote || "").slice(0, 700),
+    status,
+    boundary_confirmed: Boolean(signal.boundary_confirmed || signal.boundaryConfirmed),
+    createdAt: signal.createdAt || new Date().toISOString(),
+    updatedAt: signal.updatedAt || observedAt
+  };
+}
+
+function signalSensitiveFindings(signal) {
+  return findSensitiveData([
+    signal.subject,
+    signal.summary,
+    signal.evidence_reference,
+    signal.operator_note
+  ].join("\n"));
+}
+
+function localDateTimeValue(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.valueOf())) {
+    return "";
+  }
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
 }
 
 function buildPilotReadiness() {
@@ -3397,6 +3467,16 @@ function collectReceiptEvents() {
     });
   });
 
+  externalSignals.forEach((signal) => {
+    push("Signal", signal.id, signal.subject, signal.source, signalLabel(signal.status), signal.updatedAt || signal.observed_at, {
+      boundary_confirmed: Boolean(signal.boundary_confirmed),
+      evidence_reference: signal.evidence_reference,
+      observed_at: signal.observed_at,
+      source: signal.source,
+      status: signal.status
+    });
+  });
+
   gateRuns.forEach((run, index) => {
     push("Gate", run.id || `gate-${index + 1}`, run.claim, "Effective Boolean Filter", run.recommendation, run.createdAt, {
       argument: run.argument,
@@ -3766,6 +3846,230 @@ function renderGateChecks() {
     .join("");
 }
 
+function renderExternalSignals() {
+  const metrics = document.querySelector("#signalMetrics");
+  const list = document.querySelector("#signalList");
+  if (!metrics || !list) {
+    return;
+  }
+
+  const total = externalSignals.length;
+  const routed = externalSignals.filter((signal) => signal.status === "routed").length;
+  const rejected = externalSignals.filter((signal) => signal.status === "rejected").length;
+  const confirmed = externalSignals.filter((signal) => signal.boundary_confirmed).length;
+
+  metrics.innerHTML = `
+    <article class="metric-card">
+      <span class="metric-label">Signals</span>
+      <strong>${total}</strong>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Boundary confirmed</span>
+      <strong>${confirmed}</strong>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Routed to gate</span>
+      <strong>${routed}</strong>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Rejected</span>
+      <strong>${rejected}</strong>
+    </article>
+  `;
+
+  if (!externalSignals.length) {
+    list.innerHTML = `
+      <article class="signal-empty">
+        <span class="metric-label">No signal packets</span>
+        <h3>Add the first read-only evidence snapshot.</h3>
+        <p>Use plugin output or operator review notes as public, sanitized evidence. The packet stays private and local.</p>
+      </article>
+    `;
+    return;
+  }
+
+  list.innerHTML = externalSignals
+    .map((signal) => {
+      const tone = toneForSignal(signal);
+      return `
+        <article class="signal-card" data-signal-id="${escapeHtml(signal.id)}">
+          <div>
+            <span class="metric-label">${escapeHtml(signal.source)} / ${escapeHtml(formatDate(signal.observed_at))}</span>
+            <h4>${escapeHtml(signal.subject)}</h4>
+            <p>${escapeHtml(signal.summary)}</p>
+            <code>${escapeHtml(signal.evidence_reference)}</code>
+            ${signal.operator_note ? `<p class="signal-note">${escapeHtml(signal.operator_note)}</p>` : ""}
+          </div>
+          <span class="state ${tone}">${escapeHtml(signalLabel(signal.status))}</span>
+          <select class="signal-status-select" data-signal-status="${escapeHtml(signal.id)}" aria-label="Signal status">
+            ${signalStatuses
+              .map((status) => `<option value="${escapeHtml(status)}" ${status === signal.status ? "selected" : ""}>${escapeHtml(signalLabel(status))}</option>`)
+              .join("")}
+          </select>
+          <div class="signal-actions">
+            <button type="button" data-copy-signal-gate="${escapeHtml(signal.id)}">Gate prompt</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+
+  document.querySelectorAll("[data-signal-status]").forEach((select) => {
+    select.addEventListener("change", () => updateExternalSignalStatus(select.dataset.signalStatus, select.value));
+  });
+
+  document.querySelectorAll("[data-copy-signal-gate]").forEach((button) => {
+    button.addEventListener("click", () => copyExternalSignalGatePrompt(button.dataset.copySignalGate, button));
+  });
+}
+
+function toneForSignal(signal) {
+  if (signal.status === "routed") {
+    return "green";
+  }
+  if (signal.status === "rejected") {
+    return "red";
+  }
+  return "amber";
+}
+
+function signalLabel(status) {
+  return String(status || "observed")
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) {
+    return "not dated";
+  }
+  return date.toISOString().slice(0, 10);
+}
+
+function addExternalSignal(form) {
+  const output = document.querySelector("#signalOutput");
+  const formData = new FormData(form);
+  const candidate = normalizeExternalSignal({
+    id: `SIG-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Date.now().toString(36).toUpperCase()}`,
+    source: String(formData.get("source") || ""),
+    observed_at: formData.get("observed_at")
+      ? new Date(String(formData.get("observed_at"))).toISOString()
+      : new Date().toISOString(),
+    subject: String(formData.get("subject") || "").trim(),
+    summary: String(formData.get("summary") || "").trim(),
+    evidence_reference: String(formData.get("evidence_reference") || "").trim(),
+    operator_note: String(formData.get("operator_note") || "").trim(),
+    status: "observed",
+    boundary_confirmed: Boolean(formData.get("boundary_confirmed")),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
+
+  if (!candidate || !candidate.subject || !candidate.summary || !candidate.evidence_reference) {
+    renderSignalOutput("Signal blocked", "Source, subject, summary, and evidence reference are required.", "red");
+    return;
+  }
+
+  if (!candidate.boundary_confirmed) {
+    renderSignalOutput("Signal blocked", "Confirm the read-only evidence boundary first.", "red");
+    return;
+  }
+
+  const sensitiveFindings = signalSensitiveFindings(candidate);
+  if (sensitiveFindings.length) {
+    renderSignalOutput("Signal blocked", `Remove ${sensitiveFindings.join(", ")} before creating a signal packet.`, "red");
+    return;
+  }
+
+  externalSignals.unshift(candidate);
+  saveExternalSignals();
+  renderExternalSignals();
+  renderLogs();
+  form.reset();
+  setSignalObservedDefault();
+  renderSignalOutput("Signal packet created", `${candidate.source} / ${candidate.subject}`, "green");
+  if (output) {
+    output.dataset.lastSignalId = candidate.id;
+  }
+}
+
+function renderSignalOutput(label, message, tone) {
+  const output = document.querySelector("#signalOutput");
+  if (!output) {
+    return;
+  }
+  output.innerHTML = `
+    <span class="metric-label">${escapeHtml(label)}</span>
+    <strong>${escapeHtml(message)}</strong>
+    <span class="state ${tone}">Private only</span>
+    <p>External signals can draft Research Gate prompts, but they cannot approve spend, touch money, or alter public intake.</p>
+  `;
+}
+
+function updateExternalSignalStatus(signalId, status) {
+  if (!signalStatuses.includes(status)) {
+    return;
+  }
+  externalSignals = externalSignals.map((signal) =>
+    signal.id === signalId
+      ? {
+          ...signal,
+          status,
+          updatedAt: new Date().toISOString()
+        }
+      : signal
+  );
+  saveExternalSignals();
+  renderExternalSignals();
+  renderLogs();
+}
+
+function externalSignalGatePrompt(signal) {
+  return [
+    "Claim:",
+    `The ${signal.source} signal about "${signal.subject}" is sufficient to draft a Strange Company research question.`,
+    "",
+    "Argument:",
+    `Read-only public/operator evidence summary: ${signal.summary}`,
+    `Evidence reference: ${signal.evidence_reference}`,
+    "",
+    "Context:",
+    "External Signals console. This signal may inform a Research Gate question only. It cannot approve treasury spend, trade assets, invoice customers, process customer data, or change the public Order Desk.",
+    "",
+    "Strictness:",
+    "high"
+  ].join("\n");
+}
+
+async function copyExternalSignalGatePrompt(signalId, button) {
+  const signal = externalSignals.find((item) => item.id === signalId);
+  if (!signal) {
+    return;
+  }
+  const prompt = externalSignalGatePrompt(signal);
+  try {
+    await navigator.clipboard.writeText(prompt);
+    if (button) {
+      button.textContent = "Copied";
+    }
+    renderSignalOutput("Gate prompt copied", `${signal.source} / ${signal.subject}`, "green");
+  } catch {
+    if (button) {
+      button.textContent = "Copy unavailable";
+    }
+    renderSignalOutput("Copy unavailable", "Use the signal summary to manually draft the gate prompt.", "amber");
+  }
+}
+
+function setSignalObservedDefault() {
+  const input = document.querySelector("#signalObservedAt");
+  if (input) {
+    input.value = localDateTimeValue(new Date().toISOString());
+  }
+}
+
 function renderLogs() {
   const log = document.querySelector("#decisionLog");
   renderLaunchGate();
@@ -3813,6 +4117,13 @@ function renderLogs() {
     operationsModel.state,
     operationsModel.tone
   ]];
+  const signalRows = externalSignals.slice(0, 4).map((signal) => [
+    "Signal",
+    `${signal.source}: ${signal.subject}`,
+    "External Signals",
+    signalLabel(signal.status),
+    toneForSignal(signal)
+  ]);
   const routeRows = autonomousOutcomes
     .filter(
       (outcome) =>
@@ -3882,7 +4193,7 @@ function renderLogs() {
     run.recommendation,
     toneForRecommendation(run.recommendation)
   ]);
-  log.innerHTML = [...receiptRows, ...launchRows, ...pilotRows, ...satelliteRows, ...operationsRows, ...drillRows, ...routeRows, ...outcomeRows, ...executionRows, ...treasuryRows, ...gateLogRows, ...logs]
+  log.innerHTML = [...receiptRows, ...launchRows, ...pilotRows, ...satelliteRows, ...operationsRows, ...signalRows, ...drillRows, ...routeRows, ...outcomeRows, ...executionRows, ...treasuryRows, ...gateLogRows, ...logs]
     .map(
       ([className, entry, owner, state, tone]) => `
         <div class="log-row" role="row">
@@ -4197,6 +4508,36 @@ function setupOrderDesk() {
         amountInput.value = String(Number(service.price || 0));
         renderOrderDesk();
       }
+    });
+  }
+}
+
+function setupExternalSignals() {
+  const form = document.querySelector("#signalForm");
+  const sourceSelect = document.querySelector("#signalSource");
+  const resetButton = document.querySelector("#resetExternalSignals");
+
+  if (sourceSelect) {
+    sourceSelect.innerHTML = signalSources
+      .map((source) => `<option value="${escapeHtml(source)}">${escapeHtml(source)}</option>`)
+      .join("");
+  }
+  setSignalObservedDefault();
+
+  if (form) {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      addExternalSignal(form);
+    });
+  }
+
+  if (resetButton) {
+    resetButton.addEventListener("click", () => {
+      externalSignals = defaultExternalSignals();
+      saveExternalSignals();
+      renderExternalSignals();
+      renderLogs();
+      renderSignalOutput("Signals reset", "External signal packets cleared from local storage.", "amber");
     });
   }
 }
@@ -4798,6 +5139,7 @@ setupRevenuePilot();
 setupSatelliteCompany();
 setupOperations();
 setupOrderDesk();
+setupExternalSignals();
 setupReceiptChain();
 renderBuckets();
 renderOrderDesk();
@@ -4805,6 +5147,7 @@ renderLaunchGate();
 renderRevenuePilot();
 renderSatelliteCompany();
 renderOperations();
+renderExternalSignals();
 renderReceiptChain();
 renderTreasuryProposals();
 renderCooldownLanes();
