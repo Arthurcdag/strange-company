@@ -214,6 +214,14 @@
           </div>
 
           <div class="order-output" id="orderRequestOutput" aria-live="polite"></div>
+
+          <div class="view-header compact-header ops-section-header">
+            <div>
+              <p class="section-kicker">Handoff route</p>
+              <h3>Where requests actually go</h3>
+            </div>
+          </div>
+          <div class="order-handoff" id="orderDeskHandoff"></div>
         </section>
 
         <section class="view" id="launch" aria-labelledby="launch-title">
@@ -389,6 +397,10 @@
                 <label for="orderNeed">Need</label>
                 <textarea id="orderNeed" name="orderNeed" rows="3">Needs a monthly proof packet before renewal.</textarea>
               </div>
+              <div class="field">
+                <label for="orderDeliveryDue">Delivery due</label>
+                <input id="orderDeliveryDue" name="orderDeliveryDue" type="date" />
+              </div>
               <button class="primary-action" type="submit">
                 <i data-lucide="plus"></i>
                 <span>Add order</span>
@@ -399,6 +411,67 @@
           </div>
 
           <div class="ops-packet-output" id="operationPacketOutput" aria-live="polite"></div>
+
+          <div class="view-header compact-header ops-section-header">
+            <div>
+              <p class="section-kicker">Operational launch</p>
+              <h3>Real US manual paid pilot checklist</h3>
+            </div>
+          </div>
+          <div class="ops-launch-list" id="operationsLaunchList"></div>
+
+          <div class="view-header compact-header ops-section-header">
+            <div>
+              <p class="section-kicker">Integration config</p>
+              <h3>External handoff routes</h3>
+            </div>
+          </div>
+          <form class="ops-config-form" id="operationsConfigForm">
+            <div class="field-row">
+              <div class="field">
+                <label for="cfgSupportEmail">Support email</label>
+                <input id="cfgSupportEmail" name="supportEmail" type="email" placeholder="ops@strangeworks.studio" />
+              </div>
+              <div class="field">
+                <label for="cfgStripeDashboard">Stripe dashboard URL</label>
+                <input id="cfgStripeDashboard" name="stripeDashboardUrl" type="url" placeholder="https://dashboard.stripe.com/invoices" />
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="cfgSheetUrl">Google Sheet ledger URL</label>
+                <input id="cfgSheetUrl" name="googleSheetUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/..." />
+              </div>
+              <div class="field">
+                <label for="cfgFormUrl">Google Form intake URL</label>
+                <input id="cfgFormUrl" name="googleFormUrl" type="url" placeholder="https://docs.google.com/forms/d/.../viewform" />
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="cfgAppsScriptUrl">Apps Script web app endpoint</label>
+                <input id="cfgAppsScriptUrl" name="appsScriptUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec" />
+              </div>
+              <div class="field">
+                <label for="cfgInvoicePrefix">Invoice prefix</label>
+                <input id="cfgInvoicePrefix" name="invoicePrefix" type="text" placeholder="SWS" />
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="cfgTermsReviewed">Terms reviewed on</label>
+                <input id="cfgTermsReviewed" name="termsReviewedAt" type="date" />
+              </div>
+              <div class="field">
+                <label for="cfgPrivacyReviewed">Privacy reviewed on</label>
+                <input id="cfgPrivacyReviewed" name="privacyReviewedAt" type="date" />
+              </div>
+            </div>
+            <button class="primary-action" type="submit">
+              <i data-lucide="save"></i>
+              <span>Save config</span>
+            </button>
+          </form>
 
           <div class="view-header compact-header ops-section-header">
             <div>

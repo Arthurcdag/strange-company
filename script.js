@@ -409,6 +409,79 @@ function defaultOperations() {
     paymentMode: "Manual invoice only",
     invoicePrefix: "SWS",
     nextInvoiceNumber: 1001,
+    integration: {
+      googleSheetUrl: "",
+      googleFormUrl: "",
+      appsScriptUrl: "",
+      stripeDashboardUrl: "",
+      termsReviewedAt: "",
+      privacyReviewedAt: ""
+    },
+    launchChecklist: [
+      {
+        id: "llc-formed",
+        title: "US LLC formed",
+        detail: "Articles of organization are filed in the chosen state. SBA: sba.gov/business-guide/launch-your-business/register-your-business.",
+        done: false,
+        completedAt: ""
+      },
+      {
+        id: "ein-issued",
+        title: "EIN issued",
+        detail: "Federal Employer Identification Number obtained from the IRS after entity formation.",
+        done: false,
+        completedAt: ""
+      },
+      {
+        id: "bank-open",
+        title: "Business bank account open",
+        detail: "Operating account opened in the LLC name. Used for receiving Stripe payouts and paying expenses.",
+        done: false,
+        completedAt: ""
+      },
+      {
+        id: "stripe-active",
+        title: "Stripe account active",
+        detail: "Stripe account verified for the LLC, payouts wired to the business bank, invoicing enabled.",
+        done: false,
+        completedAt: ""
+      },
+      {
+        id: "support-inbox",
+        title: "Support inbox monitored",
+        detail: "Real monitored support inbox is reachable and the operator checks it daily.",
+        done: false,
+        completedAt: ""
+      },
+      {
+        id: "sheet-ledger",
+        title: "Google Sheet ledger live",
+        detail: "Sheet has Requests, Invoices, Customers, Delivery, Incidents tabs with the required columns.",
+        done: false,
+        completedAt: ""
+      },
+      {
+        id: "terms-reviewed",
+        title: "Terms reviewed",
+        detail: "Customer-facing terms reviewed before taking the first payment.",
+        done: false,
+        completedAt: ""
+      },
+      {
+        id: "privacy-reviewed",
+        title: "Privacy notice reviewed",
+        detail: "Privacy notice reviewed before taking the first payment.",
+        done: false,
+        completedAt: ""
+      },
+      {
+        id: "first-invoice-sent",
+        title: "First customer invoice sent",
+        detail: "At least one real Stripe Hosted Invoice has been sent to a real customer.",
+        done: false,
+        completedAt: ""
+      }
+    ],
     controls: [
       {
         id: "entity",
@@ -1738,12 +1811,16 @@ function loadOperations() {
     const stored = JSON.parse(localStorage.getItem(OPERATIONS_KEY) || "null");
     if (stored && typeof stored === "object") {
       const base = defaultOperations();
+      const integration = { ...base.integration, ...(stored.integration || {}) };
+      const launchChecklist = mergeChecklist(base.launchChecklist, stored.launchChecklist);
       return {
         operatorName: stored.operatorName || base.operatorName,
         supportEmail: stored.supportEmail || base.supportEmail,
         paymentMode: stored.paymentMode || base.paymentMode,
         invoicePrefix: stored.invoicePrefix || base.invoicePrefix,
         nextInvoiceNumber: Number(stored.nextInvoiceNumber || base.nextInvoiceNumber),
+        integration,
+        launchChecklist,
         controls: Array.isArray(stored.controls) && stored.controls.length ? stored.controls : base.controls,
         orders: Array.isArray(stored.orders) ? stored.orders : base.orders
       };
@@ -1752,6 +1829,23 @@ function loadOperations() {
     // Fall through to the built-in operations state.
   }
   return defaultOperations();
+}
+
+function mergeChecklist(baseList, storedList) {
+  if (!Array.isArray(storedList) || !storedList.length) {
+    return baseList;
+  }
+  return baseList.map((item) => {
+    const match = storedList.find((entry) => entry && entry.id === item.id);
+    if (!match) {
+      return item;
+    }
+    return {
+      ...item,
+      done: Boolean(match.done),
+      completedAt: typeof match.completedAt === "string" ? match.completedAt : ""
+    };
+  });
 }
 
 function saveOperations() {
@@ -2268,7 +2362,11 @@ function operationServices() {
 function buildOperationsModel() {
   const controls = operations.controls || [];
   const orders = operations.orders || [];
+  const launchChecklist = operations.launchChecklist || [];
+  const integration = operations.integration || {};
   const openCriticalControls = controls.filter((control) => control.critical && !control.done);
+  const openLaunchItems = launchChecklist.filter((item) => !item.done);
+  const launchDone = launchChecklist.length - openLaunchItems.length;
   const draftOrders = orders.filter((order) => order.status === "Draft").length;
   const sentOrders = orders.filter((order) => order.status === "Sent").length;
   const paidOrders = orders.filter((order) => order.status === "Paid" || order.status === "Delivered");
@@ -2276,67 +2374,94 @@ function buildOperationsModel() {
     .filter((order) => order.status === "Sent" || order.status === "Paid" || order.status === "Delivered")
     .reduce((total, order) => total + Number(order.amount || 0), 0);
   const collectedMrr = paidOrders.reduce((total, order) => total + Number(order.amount || 0), 0);
+  const sheetReady = Boolean(integration.googleSheetUrl);
+  const intakeReady = Boolean(integration.googleFormUrl || integration.appsScriptUrl);
+  const stripeReady = Boolean(integration.stripeDashboardUrl);
+  const termsReviewed = Boolean(integration.termsReviewedAt);
+  const privacyReviewed = Boolean(integration.privacyReviewedAt);
+  const integrationGaps = [];
+  if (!sheetReady) integrationGaps.push("Google Sheet ledger");
+  if (!intakeReady) integrationGaps.push("Google Form or Apps Script intake");
+  if (!stripeReady) integrationGaps.push("Stripe dashboard link");
+  if (!termsReviewed) integrationGaps.push("terms reviewed date");
+  if (!privacyReviewed) integrationGaps.push("privacy reviewed date");
+
+  const baseModel = {
+    controls,
+    orders,
+    launchChecklist,
+    integration,
+    openCriticalControls,
+    openLaunchItems,
+    launchDone,
+    draftOrders,
+    sentOrders,
+    invoicedMrr,
+    collectedMrr,
+    sheetReady,
+    intakeReady,
+    stripeReady,
+    termsReviewed,
+    privacyReviewed,
+    integrationGaps
+  };
 
   if (openCriticalControls.length > 0) {
     return {
+      ...baseModel,
       state: "Setup blocked",
       tone: "red",
       headline: "The operations console works, but commercial launch is blocked.",
-      detail: `${openCriticalControls.length} critical control${openCriticalControls.length === 1 ? "" : "s"} must close before invoices can be marked paid.`,
-      controls,
-      orders,
-      openCriticalControls,
-      draftOrders,
-      sentOrders,
-      invoicedMrr,
-      collectedMrr
+      detail: `${openCriticalControls.length} critical control${openCriticalControls.length === 1 ? "" : "s"} must close before invoices can be marked paid.`
+    };
+  }
+
+  if (openLaunchItems.length > 0) {
+    return {
+      ...baseModel,
+      state: "Launch incomplete",
+      tone: "amber",
+      headline: "Operating console is wired, but the manual paid pilot is not yet live.",
+      detail: `${openLaunchItems.length} launch item${openLaunchItems.length === 1 ? "" : "s"} still open: ${openLaunchItems.map((item) => item.title).join(", ")}.`
+    };
+  }
+
+  if (integrationGaps.length > 0) {
+    return {
+      ...baseModel,
+      state: "Integration incomplete",
+      tone: "amber",
+      headline: "Launch checklist is clear; integration config is not.",
+      detail: `Fill in: ${integrationGaps.join(", ")}.`
     };
   }
 
   if (!orders.length) {
     return {
+      ...baseModel,
       state: "Ready for intake",
       tone: "amber",
       headline: "The operating lane is ready to accept the first order.",
-      detail: "Add an external customer order, issue a manual invoice packet, and deliver only the scoped service.",
-      controls,
-      orders,
-      openCriticalControls,
-      draftOrders,
-      sentOrders,
-      invoicedMrr,
-      collectedMrr
+      detail: "Add an external customer order, issue a manual Stripe invoice, and deliver only the scoped service."
     };
   }
 
   if (collectedMrr === 0) {
     return {
+      ...baseModel,
       state: "Ready to invoice",
       tone: "amber",
-      headline: "Orders can move through manual invoicing.",
-      detail: "Commercial blockers are clear. Send invoice packets and mark paid only after funds actually settle.",
-      controls,
-      orders,
-      openCriticalControls,
-      draftOrders,
-      sentOrders,
-      invoicedMrr,
-      collectedMrr
+      headline: "Orders can move through manual Stripe invoicing.",
+      detail: "Create the Stripe invoice, paste the hosted URL into the order, and mark Paid only after funds settle."
     };
   }
 
   return {
+    ...baseModel,
     state: "Operational",
     tone: "green",
     headline: "The satellite has a functional order-to-delivery loop.",
-    detail: "Keep every order scoped, invoiced, reconciled, and detached from the sealed Strange Company treasury.",
-    controls,
-    orders,
-    openCriticalControls,
-    draftOrders,
-    sentOrders,
-    invoicedMrr,
-    collectedMrr
+    detail: "Keep every order scoped, invoiced through Stripe, recorded in the Sheet ledger, and detached from the sealed Strange Company treasury."
   };
 }
 
@@ -2347,9 +2472,11 @@ function renderOperations() {
   const serviceSelect = document.querySelector("#orderService");
   const controlList = document.querySelector("#operationsControlList");
   const orderList = document.querySelector("#operationsOrderList");
+  const launchList = document.querySelector("#operationsLaunchList");
   if (!verdict || !metrics || !policy || !serviceSelect || !controlList || !orderList) {
     return;
   }
+  syncOperationsConfigForm();
 
   const model = buildOperationsModel();
   const services = operationServices();
@@ -2399,17 +2526,58 @@ function renderOperations() {
     </article>
   `;
 
+  const integration = operations.integration || {};
+  const sheetLink = integration.googleSheetUrl
+    ? `<a href="${escapeHtml(integration.googleSheetUrl)}" target="_blank" rel="noreferrer">Sheet ledger</a>`
+    : `<span class="state amber">Sheet not set</span>`;
+  const stripeLink = integration.stripeDashboardUrl
+    ? `<a href="${escapeHtml(integration.stripeDashboardUrl)}" target="_blank" rel="noreferrer">Stripe</a>`
+    : `<span class="state amber">Stripe not set</span>`;
+  const intakeLink = integration.googleFormUrl
+    ? `<a href="${escapeHtml(integration.googleFormUrl)}" target="_blank" rel="noreferrer">Form intake</a>`
+    : integration.appsScriptUrl
+      ? `<a href="${escapeHtml(integration.appsScriptUrl)}" target="_blank" rel="noreferrer">Apps Script</a>`
+      : `<span class="state amber">Intake not set</span>`;
+
   policy.innerHTML = `
     <span class="metric-label">Operating route</span>
     <h3>${escapeHtml(operations.paymentMode)}</h3>
-    <p>Use manual invoices for the first customers. Mark paid only after settlement, then deliver the accepted proof packet.</p>
+    <p>Stripe Hosted Invoices are created manually. The static site never collects payment data. Each row is mirrored to the Sheet ledger.</p>
     <div class="ops-link-grid">
       <a href="TERMS.md" target="_blank" rel="noreferrer">Terms</a>
       <a href="PRIVACY.md" target="_blank" rel="noreferrer">Privacy</a>
       <a href="SUPPORT.md" target="_blank" rel="noreferrer">Support</a>
+      <a href="RUN_LIVE_PILOT.md" target="_blank" rel="noreferrer">Live pilot</a>
       <span>${escapeHtml(operations.supportEmail)}</span>
+      ${sheetLink}
+      ${stripeLink}
+      ${intakeLink}
     </div>
   `;
+
+  if (launchList) {
+    launchList.innerHTML = (model.launchChecklist || [])
+      .map((item) => {
+        const tone = item.done ? "green" : "red";
+        const stamp = item.completedAt ? formatLaunchDate(item.completedAt) : "Not yet";
+        return `
+          <article class="ops-launch-item">
+            <div>
+              <span class="metric-label">${item.done ? "Cleared" : "Open"}</span>
+              <h4>${escapeHtml(item.title)}</h4>
+              <p>${escapeHtml(item.detail)}</p>
+            </div>
+            <span class="state ${tone}">${item.done ? "Done" : "Open"}</span>
+            <span class="ops-launch-date">${escapeHtml(stamp)}</span>
+            <label class="pilot-switch">
+              <input type="checkbox" data-launch-item="${escapeHtml(item.id)}" ${item.done ? "checked" : ""} />
+              <span>Done</span>
+            </label>
+          </article>
+        `;
+      })
+      .join("");
+  }
 
   controlList.innerHTML = model.controls
     .map((control) => {
@@ -2450,15 +2618,36 @@ function renderOperations() {
         const tone = toneForOperationStatus(order.status);
         const canAdvance = order.status !== "Delivered";
         const paymentBlocked = order.status === "Sent" && model.openCriticalControls.length > 0;
+        const stripeNeeded = order.status === "Sent" || order.status === "Paid" || order.status === "Delivered";
+        const stripeMissing = stripeNeeded && !order.stripeInvoiceUrl;
+        const stripeLine = order.stripeInvoiceUrl
+          ? `<a href="${escapeHtml(order.stripeInvoiceUrl)}" target="_blank" rel="noreferrer">Hosted invoice</a>`
+          : stripeMissing
+            ? `<span class="state amber">Paste Stripe URL before send</span>`
+            : `<span class="metric-label">No Stripe URL yet</span>`;
+        const dueLine = order.deliveryDue
+          ? `Delivery due ${escapeHtml(order.deliveryDue)}`
+          : "Delivery date not set";
         return `
           <article class="ops-order">
             <div>
               <span class="metric-label">${escapeHtml(order.invoiceNumber || "Draft invoice")}</span>
               <h4>${escapeHtml(order.customer)}</h4>
               <p>${escapeHtml(order.serviceTitle)} / ${escapeHtml(order.need || "Need not recorded")}</p>
+              <p class="ops-order-meta">${escapeHtml(dueLine)} / ${stripeLine}</p>
             </div>
             <strong>${money.format(Number(order.amount || 0))}</strong>
             <span class="state ${tone}">${escapeHtml(order.status)}</span>
+            <div class="ops-order-fields">
+              <label>
+                <span>Stripe hosted invoice URL</span>
+                <input type="url" placeholder="https://invoice.stripe.com/i/..." value="${escapeHtml(order.stripeInvoiceUrl || "")}" data-stripe-url-order="${escapeHtml(order.id)}" />
+              </label>
+              <label>
+                <span>Delivery due</span>
+                <input type="date" value="${escapeHtml(order.deliveryDue || "")}" data-delivery-due-order="${escapeHtml(order.id)}" />
+              </label>
+            </div>
             <div class="ops-actions">
               <button type="button" data-copy-operation-packet="${escapeHtml(order.id)}">Packet</button>
               <button type="button" data-advance-operation-order="${escapeHtml(order.id)}" ${canAdvance && !paymentBlocked ? "" : "disabled"}>${nextOperationAction(order.status)}</button>
@@ -2482,12 +2671,107 @@ function renderOperations() {
   document.querySelectorAll("[data-remove-operation-order]").forEach((button) => {
     button.addEventListener("click", () => removeOperationOrder(button.dataset.removeOperationOrder));
   });
+  document.querySelectorAll("[data-launch-item]").forEach((input) => {
+    input.addEventListener("change", () => toggleLaunchItem(input.dataset.launchItem, input.checked));
+  });
+  document.querySelectorAll("[data-stripe-url-order]").forEach((input) => {
+    input.addEventListener("change", () => updateOrderField(input.dataset.stripeUrlOrder, "stripeInvoiceUrl", input.value));
+  });
+  document.querySelectorAll("[data-delivery-due-order]").forEach((input) => {
+    input.addEventListener("change", () => updateOrderField(input.dataset.deliveryDueOrder, "deliveryDue", input.value));
+  });
+}
+
+function formatLaunchDate(value) {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toISOString().slice(0, 10);
+}
+
+function toggleLaunchItem(itemId, done) {
+  const now = new Date().toISOString();
+  operations.launchChecklist = (operations.launchChecklist || []).map((item) => {
+    if (item.id !== itemId) {
+      return item;
+    }
+    return {
+      ...item,
+      done: Boolean(done),
+      completedAt: done ? (item.completedAt || now) : ""
+    };
+  });
+  saveOperations();
+  renderOperations();
+  renderOrderDesk();
+  renderLogs();
+}
+
+function updateOrderField(orderId, field, value) {
+  operations.orders = operations.orders.map((order) =>
+    order.id === orderId
+      ? { ...order, [field]: value, updatedAt: new Date().toISOString() }
+      : order
+  );
+  saveOperations();
+  renderOperations();
+  renderLogs();
+}
+
+function syncOperationsConfigForm() {
+  const form = document.querySelector("#operationsConfigForm");
+  if (!form) {
+    return;
+  }
+  const integration = operations.integration || {};
+  const map = {
+    supportEmail: operations.supportEmail || "",
+    invoicePrefix: operations.invoicePrefix || "",
+    googleSheetUrl: integration.googleSheetUrl || "",
+    googleFormUrl: integration.googleFormUrl || "",
+    appsScriptUrl: integration.appsScriptUrl || "",
+    stripeDashboardUrl: integration.stripeDashboardUrl || "",
+    termsReviewedAt: integration.termsReviewedAt || "",
+    privacyReviewedAt: integration.privacyReviewedAt || ""
+  };
+  Object.entries(map).forEach(([name, value]) => {
+    const input = form.querySelector(`[name="${name}"]`);
+    if (input && input.value !== value) {
+      input.value = value;
+    }
+  });
+}
+
+function saveOperationsConfig(form) {
+  const formData = new FormData(form);
+  const supportEmail = String(formData.get("supportEmail") || "").trim();
+  const invoicePrefix = String(formData.get("invoicePrefix") || operations.invoicePrefix || "SWS").trim();
+  operations.supportEmail = supportEmail || operations.supportEmail;
+  operations.invoicePrefix = invoicePrefix || operations.invoicePrefix;
+  operations.integration = {
+    ...(operations.integration || {}),
+    googleSheetUrl: String(formData.get("googleSheetUrl") || "").trim(),
+    googleFormUrl: String(formData.get("googleFormUrl") || "").trim(),
+    appsScriptUrl: String(formData.get("appsScriptUrl") || "").trim(),
+    stripeDashboardUrl: String(formData.get("stripeDashboardUrl") || "").trim(),
+    termsReviewedAt: String(formData.get("termsReviewedAt") || "").trim(),
+    privacyReviewedAt: String(formData.get("privacyReviewedAt") || "").trim()
+  };
+  saveOperations();
+  renderOperations();
+  renderOrderDesk();
+  renderLogs();
 }
 
 function renderOrderDesk() {
   const verdict = document.querySelector("#orderDeskVerdict");
   const offer = document.querySelector("#orderDeskOffer");
   const serviceSelect = document.querySelector("#requestService");
+  const handoff = document.querySelector("#orderDeskHandoff");
   if (!verdict || !offer || !serviceSelect) {
     return;
   }
@@ -2508,11 +2792,19 @@ function renderOrderDesk() {
     serviceSelect.value = selectedService;
   }
 
+  const integration = operations.integration || {};
+  const intakeReady = Boolean(integration.googleFormUrl || integration.appsScriptUrl);
   const canRequest = model.openCriticalControls.length === 0;
-  const tone = canRequest ? "green" : "amber";
-  const state = canRequest ? "Invoice requests open" : "Request queue only";
+  const tone = canRequest && intakeReady ? "green" : "amber";
+  const state = canRequest
+    ? intakeReady
+      ? "Invoice requests open"
+      : "Local-only requests"
+    : "Request queue only";
   const detail = canRequest
-    ? "You can request a manual invoice packet. Payment still happens outside the static site."
+    ? intakeReady
+      ? "Requests are routed to the configured Google Form or Apps Script. Payment never moves through this site."
+      : "Operator can draft requests locally. Configure a Google Form or Apps Script in Operations to route requests off-site."
     : "You can draft a request, but the operator must clear legal, payment, bookkeeping, and support controls before accepting money.";
 
   verdict.innerHTML = `
@@ -2541,6 +2833,31 @@ function renderOrderDesk() {
       <span>${escapeHtml(operations.supportEmail)}</span>
     </div>
   `;
+
+  if (handoff) {
+    const sheetRow = integration.googleSheetUrl
+      ? `<a href="${escapeHtml(integration.googleSheetUrl)}" target="_blank" rel="noreferrer">Open Sheet ledger</a>`
+      : `<span class="state amber">Sheet ledger not configured</span>`;
+    const formRow = integration.googleFormUrl
+      ? `<a href="${escapeHtml(integration.googleFormUrl)}" target="_blank" rel="noreferrer">Open Google Form intake</a>`
+      : `<span class="state amber">Google Form not configured</span>`;
+    const appsRow = integration.appsScriptUrl
+      ? `<span class="state green">Apps Script endpoint ready</span>`
+      : `<span class="metric-label">Apps Script endpoint not set (optional)</span>`;
+    handoff.innerHTML = `
+      <article class="order-handoff-card">
+        <div>
+          <span class="metric-label">Where the request goes</span>
+          <p>Submitting on this page records the request in the local ledger and, when configured, posts a sanitized packet to the Apps Script web app or opens a prefilled Google Form. The static site does not collect payment data.</p>
+        </div>
+        <div class="ops-link-grid">
+          ${sheetRow}
+          ${formRow}
+          ${appsRow}
+        </div>
+      </article>
+    `;
+  }
 }
 
 function toneForOperationStatus(status) {
@@ -2576,7 +2893,7 @@ function toggleOperationControl(controlId, done) {
   renderLogs();
 }
 
-function createOperationOrder({ customer, contact, serviceId, amount, need, source }) {
+function createOperationOrder({ customer, contact, serviceId, amount, need, source, deliveryDue, notes }) {
   if (!customer) {
     return null;
   }
@@ -2594,6 +2911,9 @@ function createOperationOrder({ customer, contact, serviceId, amount, need, sour
     amount: Number(amount || service?.price || 0),
     status: "Draft",
     source: source || "Operations console",
+    stripeInvoiceUrl: "",
+    deliveryDue: deliveryDue || "",
+    notes: notes || "",
     createdAt: now,
     updatedAt: now
   };
@@ -2612,6 +2932,7 @@ function addOperationOrder(form) {
     serviceId: String(formData.get("orderService") || "").trim(),
     amount: Number(formData.get("orderAmount") || 0),
     need: String(formData.get("orderNeed") || "Need not recorded").trim(),
+    deliveryDue: String(formData.get("orderDeliveryDue") || "").trim(),
     source: "Operations console"
   });
   if (!order) {
@@ -2659,6 +2980,7 @@ function removeOperationOrder(orderId) {
 }
 
 function operationPacket(order) {
+  const integration = operations.integration || {};
   return [
     `Invoice: ${order.invoiceNumber || "Draft"}`,
     `Operator: ${operations.operatorName}`,
@@ -2669,15 +2991,22 @@ function operationPacket(order) {
     `Status: ${order.status}`,
     `Source: ${order.source || "Operations console"}`,
     `Payment route: ${operations.paymentMode}`,
+    `Stripe invoice URL: ${order.stripeInvoiceUrl || "Not yet created"}`,
+    `Delivery due: ${order.deliveryDue || "Not set"}`,
+    `Sheet ledger: ${integration.googleSheetUrl || "Not configured"}`,
     "",
     "Scope:",
     order.need || "Need not recorded",
+    "",
+    "Notes:",
+    order.notes || "None",
     "",
     "Acceptance:",
     "Deliver a monthly compliance proof packet with evidence map, exception notes, and exportable receipt.",
     "",
     "Controls:",
-    "Do not request protected health information, payment credentials, passwords, or regulated source documents in v0."
+    "Do not request protected health information, payment credentials, passwords, or regulated source documents in v0.",
+    "Payment is collected only through a manually created Stripe Hosted Invoice. The static site never collects card data."
   ].join("\n");
 }
 
@@ -2757,13 +3086,29 @@ function submitOrderRequest(form) {
   }
 
   const packet = operationPacket(order);
+  const integration = operations.integration || {};
+  const handoffActions = [];
+  handoffActions.push(`<a href="${orderMailto(order)}">Open email draft</a>`);
+  if (integration.googleFormUrl) {
+    handoffActions.push(`<a href="${escapeHtml(buildGoogleFormHandoff(integration.googleFormUrl, order))}" target="_blank" rel="noreferrer">Open Google Form intake</a>`);
+  }
+  if (integration.googleSheetUrl) {
+    handoffActions.push(`<a href="${escapeHtml(integration.googleSheetUrl)}" target="_blank" rel="noreferrer">Open Sheet ledger</a>`);
+  }
+  handoffActions.push(`<button type="button" data-copy-order-request="${escapeHtml(order.id)}">Copy packet</button>`);
+
   output.classList.add("active");
+  const intakeNote = integration.appsScriptUrl
+    ? `<p class="metric-label">Posting sanitized request to Apps Script web app...</p>`
+    : integration.googleFormUrl
+      ? `<p class="metric-label">Open the Google Form to confirm submission. The static site does not auto-submit.</p>`
+      : `<p class="metric-label">No external intake configured. Forward this packet manually.</p>`;
   output.innerHTML = `
     <span class="metric-label">Invoice request created</span>
     <strong>${escapeHtml(order.invoiceNumber)} / ${escapeHtml(order.customer)}</strong>
+    ${intakeNote}
     <div class="order-output-actions">
-      <a href="${orderMailto(order)}">Open email draft</a>
-      <button type="button" data-copy-order-request="${escapeHtml(order.id)}">Copy packet</button>
+      ${handoffActions.join("")}
     </div>
     <pre>${escapeHtml(packet)}</pre>
   `;
@@ -2773,10 +3118,69 @@ function submitOrderRequest(form) {
     copyButton.addEventListener("click", () => copyOperationPacket(order.id));
   }
 
+  if (integration.appsScriptUrl) {
+    postRequestToAppsScript(integration.appsScriptUrl, order, output);
+  }
+
   form.reset();
   renderOrderDesk();
   renderOperations();
   renderLogs();
+}
+
+function sanitizeForLedger(order) {
+  return {
+    created_at: order.createdAt,
+    source: order.source || "Order Desk",
+    invoice_id: order.invoiceNumber,
+    customer: order.customer,
+    contact: order.contact,
+    service: order.serviceTitle,
+    amount: Number(order.amount || 0),
+    status: order.status,
+    stripe_invoice_url: order.stripeInvoiceUrl || "",
+    delivery_due: order.deliveryDue || "",
+    notes: order.notes || ""
+  };
+}
+
+function buildGoogleFormHandoff(formUrl, order) {
+  const payload = sanitizeForLedger(order);
+  const params = new URLSearchParams();
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === undefined || value === null) {
+      return;
+    }
+    params.append(`entry.${key}`, String(value));
+  });
+  const separator = formUrl.includes("?") ? "&" : "?";
+  return `${formUrl}${separator}${params.toString()}`;
+}
+
+function postRequestToAppsScript(endpoint, order, output) {
+  const payload = sanitizeForLedger(order);
+  fetch(endpoint, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(payload)
+  })
+    .then(() => {
+      if (output) {
+        const note = output.querySelector(".metric-label + .metric-label, p.metric-label");
+        if (note) {
+          note.textContent = "Sanitized request posted to Apps Script web app.";
+        }
+      }
+    })
+    .catch(() => {
+      if (output) {
+        const note = output.querySelector("p.metric-label");
+        if (note) {
+          note.textContent = "Apps Script post failed. Forward the packet manually.";
+        }
+      }
+    });
 }
 
 function canonicalize(value) {
@@ -3650,6 +4054,7 @@ function setupOperations() {
   const serviceSelect = document.querySelector("#orderService");
   const amountInput = document.querySelector("#orderAmount");
   const resetButton = document.querySelector("#resetOperations");
+  const configForm = document.querySelector("#operationsConfigForm");
 
   if (form) {
     form.addEventListener("submit", (event) => {
@@ -3667,11 +4072,19 @@ function setupOperations() {
     });
   }
 
+  if (configForm) {
+    configForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      saveOperationsConfig(configForm);
+    });
+  }
+
   if (resetButton) {
     resetButton.addEventListener("click", () => {
       operations = defaultOperations();
       saveOperations();
       renderOperations();
+      renderOrderDesk();
       renderLogs();
     });
   }

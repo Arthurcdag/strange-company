@@ -73,3 +73,15 @@ The satellite is operational when:
 - the receipt chain records the order state.
 
 Strange Company is live only after the Online Gate clears its separate legal, trust, payment, support, and public-risk requirements.
+
+## Operational V1
+
+Operational v1 is the real US manual paid pilot. It moves the loop above onto real external systems:
+
+- US LLC, EIN, business bank account, and a Stripe account active for the LLC.
+- A monitored support inbox.
+- A Google Sheet ledger with `Requests`, `Invoices`, `Customers`, `Delivery`, and `Incidents` tabs sharing the columns `created_at`, `source`, `invoice_id`, `customer`, `contact`, `service`, `amount`, `status`, `stripe_invoice_url`, `delivery_due`, `notes`.
+- A Google Form or Apps Script web app intake that writes sanitized rows into that Sheet.
+- Manual Stripe Hosted Invoices for every payment. The static site never collects card data.
+
+The Operations tab tracks this as the **Operational launch** checklist and the **Integration config** panel. The exact daily loop for v1 is in [RUN_LIVE_PILOT.md](RUN_LIVE_PILOT.md).

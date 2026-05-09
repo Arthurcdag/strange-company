@@ -45,6 +45,20 @@ The static site can now:
 - generate a packet,
 - open an email handoff,
 - record the request in the Operations ledger,
+- post a sanitized request to a configured Google Apps Script web app,
+- open a prefilled Google Form intake when the form URL is set,
+- expose links to the Google Sheet ledger and the Stripe dashboard,
 - include the order in the receipt chain.
 
-That makes the software operational for a manual v0 workflow. It does not replace forming the actual satellite entity, bank route, support inbox, or bookkeeping process.
+That makes the software operational for a manual v0 workflow. It does not replace forming the actual satellite entity, bank route, support inbox, Sheet ledger, Stripe account, or bookkeeping process.
+
+## Operational V1 Handoff
+
+Operational v1 binds the Order Desk to real external systems:
+
+- the Google Sheet ledger is the source of truth (`Requests`, `Invoices`, `Customers`, `Delivery`, `Incidents` tabs),
+- a Google Form or Apps Script web app appends sanitized rows to that Sheet,
+- Stripe Hosted Invoices are created manually from the dashboard,
+- the static site never collects card data and never auto-charges.
+
+See [RUN_LIVE_PILOT.md](RUN_LIVE_PILOT.md) for the daily operating loop.

@@ -67,6 +67,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [SATELLITE_COMPANY.md](SATELLITE_COMPANY.md): how a separate for-profit company can net profit without breaking the sealed Strange Company charter.
 - [ORDER_DESK.md](ORDER_DESK.md): how public invoice requests become manual order packets.
 - [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md): the manual order, invoice, payment, delivery, and receipt loop for the first functional operator.
+- [RUN_LIVE_PILOT.md](RUN_LIVE_PILOT.md): operational v1 daily loop for the real US manual paid pilot (LLC, EIN, bank, Stripe, Sheet ledger).
 - [TERMS.md](TERMS.md): draft v0 service terms for the satellite company.
 - [PRIVACY.md](PRIVACY.md): draft v0 privacy notice for the static prototype and operating loop.
 - [SUPPORT.md](SUPPORT.md): manual support and incident handling route.
