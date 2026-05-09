@@ -14,10 +14,11 @@ Use this when the external setup is ready and the public Order Desk needs to poi
    - set `termsReviewedAt` and `privacyReviewedAt`,
    - set `liveMode: true` only after the stop rule is clear,
    - adjust service names and prices if the offer changed.
-4. Open `public.html` locally and confirm the readiness banner says `Live intake configured`.
-5. Submit a safe test packet.
-6. Confirm the email draft uses the real inbox.
-7. Open the Google Form from the public packet output and paste the packet.
+4. Run `node tools/preflight_public_launch.js`.
+5. Open `public.html` locally and confirm the readiness banner says `Live intake configured`.
+6. Submit a safe test packet.
+7. Confirm the email draft uses the real inbox.
+8. Open the Google Form from the public packet output and paste the packet.
 
 ## Live Smoke
 
