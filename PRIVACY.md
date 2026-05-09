@@ -2,15 +2,19 @@
 
 This is a draft v0 privacy notice for the static prototype and satellite operating loop. Replace it with counsel-reviewed copy before accepting real payment or sensitive customer data.
 
-## Static Site
+## Public Static Site
 
-The GitHub Pages command center is a static site. The browser stores local command-center state in `localStorage` on the user's device.
+The GitHub Pages public Order Desk is a static site. It builds a request packet in the browser and does not store customer requests in `localStorage`.
 
 The static site does not include a server database.
 
+## Private Command Center
+
+The private/local command center stores local operator state in `localStorage` on the operator's device.
+
 ## Operational Data
 
-The Operations tab can store draft customer names, contact emails, order notes, invoice numbers, and order status in the local browser.
+The private Operations tab can store draft customer names, contact emails, order notes, invoice numbers, and order status in the local browser.
 
 Do not enter protected health information, payment credentials, passwords, private keys, regulated source documents, or sensitive personal data into the prototype.
 

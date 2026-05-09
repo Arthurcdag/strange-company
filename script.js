@@ -1506,6 +1506,57 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
+const GOOGLE_FORM_URLS = ["https://docs.google.com/forms/"];
+const GOOGLE_SHEET_URLS = ["https://docs.google.com/spreadsheets/"];
+const APPS_SCRIPT_URLS = ["https://script.google.com/macros/"];
+const STRIPE_DASHBOARD_URLS = ["https://dashboard.stripe.com/"];
+const STRIPE_INVOICE_URLS = ["https://invoice.stripe.com/"];
+
+function safeExternalUrl(value, allowedPrefixes) {
+  const candidate = String(value || "").trim();
+  if (!candidate) {
+    return "";
+  }
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== "https:") {
+      return "";
+    }
+    const normalized = url.href;
+    return allowedPrefixes.some((prefix) => normalized.startsWith(prefix)) ? normalized : "";
+  } catch {
+    return "";
+  }
+}
+
+function safeExternalLink(value, allowedPrefixes, label, missingLabel) {
+  const url = safeExternalUrl(value, allowedPrefixes);
+  if (!url) {
+    return `<span class="state amber">${escapeHtml(missingLabel)}</span>`;
+  }
+  return `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a>`;
+}
+
+function cleanConfiguredUrl(value, allowedPrefixes) {
+  return safeExternalUrl(value, allowedPrefixes);
+}
+
+function findSensitiveData(text) {
+  const value = String(text || "");
+  const checks = [
+    ["protected health information", /\b(PHI|patient|diagnosis|medical record|MRN|health record|treatment|prescription)\b/i],
+    ["payment card data", /\b(?:\d[ -]*?){13,19}\b/],
+    ["social security number", /\b\d{3}-\d{2}-\d{4}\b/],
+    ["password or secret", /\b(password|passcode|secret|private key|api[_ -]?key|access token|bearer token)\b/i],
+    ["private key material", /-----BEGIN [A-Z ]*PRIVATE KEY-----/i]
+  ];
+  return checks.filter(([, pattern]) => pattern.test(value)).map(([label]) => label);
+}
+
+function requestSensitiveFindings({ customer, contact, need }) {
+  return findSensitiveData([customer, contact, need].join("\n"));
+}
+
 function loadGateRuns() {
   try {
     return JSON.parse(localStorage.getItem(GATE_RUNS_KEY) || "[]");
@@ -1811,7 +1862,15 @@ function loadOperations() {
     const stored = JSON.parse(localStorage.getItem(OPERATIONS_KEY) || "null");
     if (stored && typeof stored === "object") {
       const base = defaultOperations();
-      const integration = { ...base.integration, ...(stored.integration || {}) };
+      const rawIntegration = { ...base.integration, ...(stored.integration || {}) };
+      const integration = {
+        googleSheetUrl: safeExternalUrl(rawIntegration.googleSheetUrl, GOOGLE_SHEET_URLS),
+        googleFormUrl: safeExternalUrl(rawIntegration.googleFormUrl, GOOGLE_FORM_URLS),
+        appsScriptUrl: safeExternalUrl(rawIntegration.appsScriptUrl, APPS_SCRIPT_URLS),
+        stripeDashboardUrl: safeExternalUrl(rawIntegration.stripeDashboardUrl, STRIPE_DASHBOARD_URLS),
+        termsReviewedAt: rawIntegration.termsReviewedAt || "",
+        privacyReviewedAt: rawIntegration.privacyReviewedAt || ""
+      };
       const launchChecklist = mergeChecklist(base.launchChecklist, stored.launchChecklist);
       return {
         operatorName: stored.operatorName || base.operatorName,
@@ -1822,13 +1881,20 @@ function loadOperations() {
         integration,
         launchChecklist,
         controls: Array.isArray(stored.controls) && stored.controls.length ? stored.controls : base.controls,
-        orders: Array.isArray(stored.orders) ? stored.orders : base.orders
+        orders: Array.isArray(stored.orders) ? stored.orders.map((order) => normalizeOperationOrder(order)) : base.orders
       };
     }
   } catch {
     // Fall through to the built-in operations state.
   }
   return defaultOperations();
+}
+
+function normalizeOperationOrder(order) {
+  return {
+    ...order,
+    stripeInvoiceUrl: safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS)
+  };
 }
 
 function mergeChecklist(baseList, storedList) {
@@ -2527,16 +2593,12 @@ function renderOperations() {
   `;
 
   const integration = operations.integration || {};
-  const sheetLink = integration.googleSheetUrl
-    ? `<a href="${escapeHtml(integration.googleSheetUrl)}" target="_blank" rel="noreferrer">Sheet ledger</a>`
-    : `<span class="state amber">Sheet not set</span>`;
-  const stripeLink = integration.stripeDashboardUrl
-    ? `<a href="${escapeHtml(integration.stripeDashboardUrl)}" target="_blank" rel="noreferrer">Stripe</a>`
-    : `<span class="state amber">Stripe not set</span>`;
+  const sheetLink = safeExternalLink(integration.googleSheetUrl, GOOGLE_SHEET_URLS, "Sheet ledger", "Sheet not set");
+  const stripeLink = safeExternalLink(integration.stripeDashboardUrl, STRIPE_DASHBOARD_URLS, "Stripe", "Stripe not set");
   const intakeLink = integration.googleFormUrl
-    ? `<a href="${escapeHtml(integration.googleFormUrl)}" target="_blank" rel="noreferrer">Form intake</a>`
+    ? safeExternalLink(integration.googleFormUrl, GOOGLE_FORM_URLS, "Form intake", "Form URL blocked")
     : integration.appsScriptUrl
-      ? `<a href="${escapeHtml(integration.appsScriptUrl)}" target="_blank" rel="noreferrer">Apps Script</a>`
+      ? safeExternalLink(integration.appsScriptUrl, APPS_SCRIPT_URLS, "Apps Script", "Apps Script URL blocked")
       : `<span class="state amber">Intake not set</span>`;
 
   policy.innerHTML = `
@@ -2618,10 +2680,12 @@ function renderOperations() {
         const tone = toneForOperationStatus(order.status);
         const canAdvance = order.status !== "Delivered";
         const paymentBlocked = order.status === "Sent" && model.openCriticalControls.length > 0;
-        const stripeNeeded = order.status === "Sent" || order.status === "Paid" || order.status === "Delivered";
-        const stripeMissing = stripeNeeded && !order.stripeInvoiceUrl;
-        const stripeLine = order.stripeInvoiceUrl
-          ? `<a href="${escapeHtml(order.stripeInvoiceUrl)}" target="_blank" rel="noreferrer">Hosted invoice</a>`
+        const stripeNeeded = order.status === "Draft" || order.status === "Sent" || order.status === "Paid" || order.status === "Delivered";
+        const safeStripeInvoiceUrl = safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS);
+        const stripeMissing = stripeNeeded && !safeStripeInvoiceUrl;
+        const invoiceBlocked = order.status === "Draft" && stripeMissing;
+        const stripeLine = safeStripeInvoiceUrl
+          ? `<a href="${escapeHtml(safeStripeInvoiceUrl)}" target="_blank" rel="noreferrer">Hosted invoice</a>`
           : stripeMissing
             ? `<span class="state amber">Paste Stripe URL before send</span>`
             : `<span class="metric-label">No Stripe URL yet</span>`;
@@ -2641,7 +2705,7 @@ function renderOperations() {
             <div class="ops-order-fields">
               <label>
                 <span>Stripe hosted invoice URL</span>
-                <input type="url" placeholder="https://invoice.stripe.com/i/..." value="${escapeHtml(order.stripeInvoiceUrl || "")}" data-stripe-url-order="${escapeHtml(order.id)}" />
+                <input type="text" inputmode="url" placeholder="https://invoice.stripe.com/i/..." value="${escapeHtml(order.stripeInvoiceUrl || "")}" data-stripe-url-order="${escapeHtml(order.id)}" />
               </label>
               <label>
                 <span>Delivery due</span>
@@ -2650,7 +2714,8 @@ function renderOperations() {
             </div>
             <div class="ops-actions">
               <button type="button" data-copy-operation-packet="${escapeHtml(order.id)}">Packet</button>
-              <button type="button" data-advance-operation-order="${escapeHtml(order.id)}" ${canAdvance && !paymentBlocked ? "" : "disabled"}>${nextOperationAction(order.status)}</button>
+              <button type="button" data-save-stripe-order="${escapeHtml(order.id)}">Save URL</button>
+              <button type="button" data-advance-operation-order="${escapeHtml(order.id)}" ${canAdvance && !paymentBlocked && !invoiceBlocked ? "" : "disabled"}>${nextOperationAction(order.status)}</button>
               <button type="button" data-remove-operation-order="${escapeHtml(order.id)}">Remove</button>
             </div>
           </article>
@@ -2664,6 +2729,9 @@ function renderOperations() {
   });
   document.querySelectorAll("[data-copy-operation-packet]").forEach((button) => {
     button.addEventListener("click", () => copyOperationPacket(button.dataset.copyOperationPacket));
+  });
+  document.querySelectorAll("[data-save-stripe-order]").forEach((button) => {
+    button.addEventListener("click", () => saveOrderStripeUrl(button.dataset.saveStripeOrder));
   });
   document.querySelectorAll("[data-advance-operation-order]").forEach((button) => {
     button.addEventListener("click", () => advanceOperationOrder(button.dataset.advanceOperationOrder));
@@ -2712,9 +2780,10 @@ function toggleLaunchItem(itemId, done) {
 }
 
 function updateOrderField(orderId, field, value) {
+  const nextValue = field === "stripeInvoiceUrl" ? cleanConfiguredUrl(value, STRIPE_INVOICE_URLS) : value;
   operations.orders = operations.orders.map((order) =>
     order.id === orderId
-      ? { ...order, [field]: value, updatedAt: new Date().toISOString() }
+      ? { ...order, [field]: nextValue, updatedAt: new Date().toISOString() }
       : order
   );
   saveOperations();
@@ -2750,14 +2819,14 @@ function saveOperationsConfig(form) {
   const formData = new FormData(form);
   const supportEmail = String(formData.get("supportEmail") || "").trim();
   const invoicePrefix = String(formData.get("invoicePrefix") || operations.invoicePrefix || "SWS").trim();
-  operations.supportEmail = supportEmail || operations.supportEmail;
+  operations.supportEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(supportEmail) ? supportEmail : operations.supportEmail;
   operations.invoicePrefix = invoicePrefix || operations.invoicePrefix;
   operations.integration = {
     ...(operations.integration || {}),
-    googleSheetUrl: String(formData.get("googleSheetUrl") || "").trim(),
-    googleFormUrl: String(formData.get("googleFormUrl") || "").trim(),
-    appsScriptUrl: String(formData.get("appsScriptUrl") || "").trim(),
-    stripeDashboardUrl: String(formData.get("stripeDashboardUrl") || "").trim(),
+    googleSheetUrl: cleanConfiguredUrl(formData.get("googleSheetUrl"), GOOGLE_SHEET_URLS),
+    googleFormUrl: cleanConfiguredUrl(formData.get("googleFormUrl"), GOOGLE_FORM_URLS),
+    appsScriptUrl: cleanConfiguredUrl(formData.get("appsScriptUrl"), APPS_SCRIPT_URLS),
+    stripeDashboardUrl: cleanConfiguredUrl(formData.get("stripeDashboardUrl"), STRIPE_DASHBOARD_URLS),
     termsReviewedAt: String(formData.get("termsReviewedAt") || "").trim(),
     privacyReviewedAt: String(formData.get("privacyReviewedAt") || "").trim()
   };
@@ -2803,7 +2872,7 @@ function renderOrderDesk() {
     : "Request queue only";
   const detail = canRequest
     ? intakeReady
-      ? "Requests are routed to the configured Google Form or Apps Script. Payment never moves through this site."
+      ? "Requests are routed by copyable packet, email handoff, and the configured Google Form. Payment never moves through this site."
       : "Operator can draft requests locally. Configure a Google Form or Apps Script in Operations to route requests off-site."
     : "You can draft a request, but the operator must clear legal, payment, bookkeeping, and support controls before accepting money.";
 
@@ -2835,20 +2904,16 @@ function renderOrderDesk() {
   `;
 
   if (handoff) {
-    const sheetRow = integration.googleSheetUrl
-      ? `<a href="${escapeHtml(integration.googleSheetUrl)}" target="_blank" rel="noreferrer">Open Sheet ledger</a>`
-      : `<span class="state amber">Sheet ledger not configured</span>`;
-    const formRow = integration.googleFormUrl
-      ? `<a href="${escapeHtml(integration.googleFormUrl)}" target="_blank" rel="noreferrer">Open Google Form intake</a>`
-      : `<span class="state amber">Google Form not configured</span>`;
+    const sheetRow = safeExternalLink(integration.googleSheetUrl, GOOGLE_SHEET_URLS, "Open Sheet ledger", "Sheet ledger not configured");
+    const formRow = safeExternalLink(integration.googleFormUrl, GOOGLE_FORM_URLS, "Open Google Form intake", "Google Form not configured");
     const appsRow = integration.appsScriptUrl
-      ? `<span class="state green">Apps Script endpoint ready</span>`
+      ? safeExternalLink(integration.appsScriptUrl, APPS_SCRIPT_URLS, "Apps Script endpoint", "Apps Script URL blocked")
       : `<span class="metric-label">Apps Script endpoint not set (optional)</span>`;
     handoff.innerHTML = `
       <article class="order-handoff-card">
         <div>
           <span class="metric-label">Where the request goes</span>
-          <p>Submitting on this page records the request in the local ledger and, when configured, posts a sanitized packet to the Apps Script web app or opens a prefilled Google Form. The static site does not collect payment data.</p>
+          <p>Submitting on this page records the request in the private local ledger, prepares an email packet, and opens the configured Google Form for manual confirmation. Apps Script remains an internal sandbox route. The static site does not collect payment data.</p>
         </div>
         <div class="ops-link-grid">
           ${sheetRow}
@@ -2952,6 +3017,14 @@ function advanceOperationOrder(orderId) {
     }
     const currentIndex = operationStages.indexOf(order.status);
     const nextStatus = operationStages[Math.min(currentIndex + 1, operationStages.length - 1)];
+    if (order.status === "Draft" && !safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS)) {
+      return {
+        ...order,
+        blockedAt: new Date().toISOString(),
+        notes: "Blocked: paste a Stripe Hosted Invoice URL before marking sent.",
+        updatedAt: new Date().toISOString()
+      };
+    }
     if (order.status === "Sent" && model.openCriticalControls.length > 0) {
       return {
         ...order,
@@ -3073,6 +3146,16 @@ function submitOrderRequest(form) {
     return;
   }
 
+  const sensitiveFindings = requestSensitiveFindings({ customer, contact, need });
+  if (sensitiveFindings.length) {
+    output.classList.add("active");
+    output.innerHTML = `
+      <span class="metric-label">Request blocked</span>
+      <strong>Remove ${escapeHtml(sensitiveFindings.join(", "))} before creating an invoice packet.</strong>
+    `;
+    return;
+  }
+
   const order = createOperationOrder({
     customer,
     contact,
@@ -3089,19 +3172,22 @@ function submitOrderRequest(form) {
   const integration = operations.integration || {};
   const handoffActions = [];
   handoffActions.push(`<a href="${orderMailto(order)}">Open email draft</a>`);
-  if (integration.googleFormUrl) {
-    handoffActions.push(`<a href="${escapeHtml(buildGoogleFormHandoff(integration.googleFormUrl, order))}" target="_blank" rel="noreferrer">Open Google Form intake</a>`);
+  const googleFormUrl = buildGoogleFormHandoff(integration.googleFormUrl);
+  const googleSheetUrl = safeExternalUrl(integration.googleSheetUrl, GOOGLE_SHEET_URLS);
+  const appsScriptUrl = safeExternalUrl(integration.appsScriptUrl, APPS_SCRIPT_URLS);
+  if (googleFormUrl) {
+    handoffActions.push(`<a href="${escapeHtml(googleFormUrl)}" target="_blank" rel="noreferrer">Open Google Form intake</a>`);
   }
-  if (integration.googleSheetUrl) {
-    handoffActions.push(`<a href="${escapeHtml(integration.googleSheetUrl)}" target="_blank" rel="noreferrer">Open Sheet ledger</a>`);
+  if (googleSheetUrl) {
+    handoffActions.push(`<a href="${escapeHtml(googleSheetUrl)}" target="_blank" rel="noreferrer">Open Sheet ledger</a>`);
   }
   handoffActions.push(`<button type="button" data-copy-order-request="${escapeHtml(order.id)}">Copy packet</button>`);
 
   output.classList.add("active");
-  const intakeNote = integration.appsScriptUrl
-    ? `<p class="metric-label">Posting sanitized request to Apps Script web app...</p>`
-    : integration.googleFormUrl
-      ? `<p class="metric-label">Open the Google Form to confirm submission. The static site does not auto-submit.</p>`
+  const intakeNote = appsScriptUrl
+    ? `<p class="metric-label">Posting sanitized request to internal Apps Script web app...</p>`
+    : googleFormUrl
+      ? `<p class="metric-label">Open the Google Form and paste the packet if needed. The static site does not auto-submit the form.</p>`
       : `<p class="metric-label">No external intake configured. Forward this packet manually.</p>`;
   output.innerHTML = `
     <span class="metric-label">Invoice request created</span>
@@ -3118,8 +3204,8 @@ function submitOrderRequest(form) {
     copyButton.addEventListener("click", () => copyOperationPacket(order.id));
   }
 
-  if (integration.appsScriptUrl) {
-    postRequestToAppsScript(integration.appsScriptUrl, order, output);
+  if (appsScriptUrl) {
+    postRequestToAppsScript(appsScriptUrl, order, output);
   }
 
   form.reset();
@@ -3144,22 +3230,24 @@ function sanitizeForLedger(order) {
   };
 }
 
-function buildGoogleFormHandoff(formUrl, order) {
-  const payload = sanitizeForLedger(order);
-  const params = new URLSearchParams();
-  Object.entries(payload).forEach(([key, value]) => {
-    if (value === undefined || value === null) {
-      return;
-    }
-    params.append(`entry.${key}`, String(value));
-  });
-  const separator = formUrl.includes("?") ? "&" : "?";
-  return `${formUrl}${separator}${params.toString()}`;
+function buildGoogleFormHandoff(formUrl) {
+  return safeExternalUrl(formUrl, GOOGLE_FORM_URLS);
+}
+
+function saveOrderStripeUrl(orderId) {
+  const input = Array.from(document.querySelectorAll("[data-stripe-url-order]")).find(
+    (item) => item.dataset.stripeUrlOrder === orderId
+  );
+  updateOrderField(orderId, "stripeInvoiceUrl", input ? input.value : "");
 }
 
 function postRequestToAppsScript(endpoint, order, output) {
+  const safeEndpoint = safeExternalUrl(endpoint, APPS_SCRIPT_URLS);
+  if (!safeEndpoint) {
+    return;
+  }
   const payload = sanitizeForLedger(order);
-  fetch(endpoint, {
+  fetch(safeEndpoint, {
     method: "POST",
     mode: "no-cors",
     headers: { "Content-Type": "text/plain;charset=utf-8" },

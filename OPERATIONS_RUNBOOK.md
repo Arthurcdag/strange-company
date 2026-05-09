@@ -8,7 +8,7 @@ The current loop is intentionally boring:
 order intent -> invoice packet -> payment confirmation -> scoped delivery -> receipt
 ```
 
-Public requests can begin in the Order Desk. The Order Desk creates the same draft order and invoice packet used by the internal Operations console, then prepares an email handoff for manual review.
+Public requests can begin in the public Order Desk. The public page creates a copyable invoice request packet and email handoff without exposing the private command center. The local/private Operations console records qualified requests as draft orders.
 
 ## Operating Boundary
 
@@ -81,7 +81,7 @@ Operational v1 is the real US manual paid pilot. It moves the loop above onto re
 - US LLC, EIN, business bank account, and a Stripe account active for the LLC.
 - A monitored support inbox.
 - A Google Sheet ledger with `Requests`, `Invoices`, `Customers`, `Delivery`, and `Incidents` tabs sharing the columns `created_at`, `source`, `invoice_id`, `customer`, `contact`, `service`, `amount`, `status`, `stripe_invoice_url`, `delivery_due`, `notes`.
-- A Google Form or Apps Script web app intake that writes sanitized rows into that Sheet.
+- A Google Form intake for the first public route. Apps Script remains an internal/sandbox append template until access and abuse controls are reviewed.
 - Manual Stripe Hosted Invoices for every payment. The static site never collects card data.
 
 The Operations tab tracks this as the **Operational launch** checklist and the **Integration config** panel. The exact daily loop for v1 is in [RUN_LIVE_PILOT.md](RUN_LIVE_PILOT.md).

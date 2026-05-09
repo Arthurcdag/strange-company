@@ -10,9 +10,9 @@ request -> invoice packet -> email handoff -> manual review -> operations ledger
 
 ## What It Does
 
-The Order Desk creates a local invoice request packet and records it in the Operations ledger as a draft order.
+The public Order Desk creates an invoice request packet for manual review.
 
-It can also open a prefilled email draft to the support route.
+It can also open an email draft to the support route and, when configured, send the operator to the Google Form intake. The private command center can record the same request in the Operations ledger as a draft order.
 
 ## What It Does Not Do
 
@@ -40,14 +40,13 @@ Before money is accepted, the operator must verify:
 
 The static site can now:
 
-- accept a request locally,
-- create an invoice number,
+- accept a public request without payment data,
 - generate a packet,
 - open an email handoff,
-- record the request in the Operations ledger,
-- post a sanitized request to a configured Google Apps Script web app,
-- open a prefilled Google Form intake when the form URL is set,
-- expose links to the Google Sheet ledger and the Stripe dashboard,
+- open the configured Google Form intake when the form URL is set,
+- block obvious PHI, credentials, card-like numbers, private keys, and API-key language,
+- keep the public page separate from the private Operations, Treasury, and Decisions console,
+- record requests in the private Operations ledger when used locally,
 - include the order in the receipt chain.
 
 That makes the software operational for a manual v0 workflow. It does not replace forming the actual satellite entity, bank route, support inbox, Sheet ledger, Stripe account, or bookkeeping process.
@@ -57,7 +56,8 @@ That makes the software operational for a manual v0 workflow. It does not replac
 Operational v1 binds the Order Desk to real external systems:
 
 - the Google Sheet ledger is the source of truth (`Requests`, `Invoices`, `Customers`, `Delivery`, `Incidents` tabs),
-- a Google Form or Apps Script web app appends sanitized rows to that Sheet,
+- a Google Form is the first public intake route,
+- the Apps Script template is internal/sandbox only until abuse monitoring and access settings are reviewed,
 - Stripe Hosted Invoices are created manually from the dashboard,
 - the static site never collects card data and never auto-charges.
 
