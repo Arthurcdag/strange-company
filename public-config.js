@@ -2,6 +2,11 @@ window.PUBLIC_ORDER_CONFIG = {
   operatorName: "Strange Works Studio",
   supportEmail: "ops@strangeworks.studio",
   googleFormUrl: "",
+  supportInboxVerified: false,
+  googleFormVerified: false,
+  termsReviewedAt: "",
+  privacyReviewedAt: "",
+  liveMode: false,
   services: [
     {
       id: "proof-sprint",
