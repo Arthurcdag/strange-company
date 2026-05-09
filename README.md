@@ -99,6 +99,8 @@ Before turning on `liveMode` or merging public config changes, run:
 node tools/preflight_public_launch.js
 ```
 
+Pull requests also run the same syntax and public launch preflight checks through the `Validate static site` workflow.
+
 The GitHub repository deploys `public.html` as the GitHub Pages homepage from `main`. The private command center is not the public homepage and should not be treated as live autonomous business operation.
 
 If cloning from GitHub, initialize the research-tool submodule first:
