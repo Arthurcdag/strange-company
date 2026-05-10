@@ -16,6 +16,7 @@ Treasury proposal
 -> Execution packet
 -> Delivered work
 -> Outcome receipt
+-> Evidence review receipt
 -> Experiment portfolio
 -> Capital route
 -> Next treasury claim
@@ -36,6 +37,8 @@ These labels are not final judgments. They are routing instructions for the next
 The Experiments view now contains an outcome ledger, cycle metrics, and routing actions.
 
 The Bounties view now lets delivered packets emit outcome receipts before archival.
+
+The Experiments view now requires an evidence review receipt before any outcome can route to a Treasury proposal or cooldown lane.
 
 The Treasury view now shows cooled spend lanes created from kill outcomes.
 
@@ -67,6 +70,14 @@ These fields ride with the outcome into:
 External Signal context is copied as `sourceSignal*` metadata only. It can support review context, but it cannot replace artifact or measurement evidence and cannot approve spend.
 
 A Research Gate receipt is optional. When missing, the drafted Treasury proposal still starts in the `needs_gate` state and the outcome card flags it.
+
+## Evidence Review Gate
+
+Outcome receipts are now reviewable but not immediately routable.
+
+Before the route button can draft a Treasury proposal or cool a lane, the operator must approve an evidence review receipt in the private Experiments view. The review checks that required evidence is still present, referenced gate and signal receipts still exist, and no obvious sensitive data is present.
+
+The approved review is carried forward as `evidenceReviewId` and `evidenceReviewNote`. It is an accountability checkpoint only; it does not approve spend or replace the Research Gate.
 
 ## Hardening Path
 

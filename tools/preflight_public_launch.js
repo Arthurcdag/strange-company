@@ -139,11 +139,19 @@ function checkOutcomeEvidenceContract() {
     ["source signal sensitive scan", "signalSensitiveFindings(sourceSignal)"],
     ["source signal metadata copy", "sourceSignalReference: sourceSignal ? sourceSignal.evidence_reference"],
     ["sensitive-data scan over evidence", "findSensitiveData(`${measuredBefore}"],
+    ["outcome review storage", "const OUTCOME_REVIEWS_KEY"],
+    ["outcome review validator", "function validateOutcomeForReview"],
+    ["outcome review approval", "function approveOutcomeReview"],
+    ["outcome route review blocker", "function outcomeRouteBlockedReason"],
+    ["route guard uses review blocker", "const routeBlock = outcomeRouteBlockedReason(outcome)"],
     ["proposal carries artifact evidence", "evidenceArtifactUrl: artifact"],
     ["proposal carries measurement evidence", "evidenceMeasuredBefore: before"],
+    ["proposal carries review evidence", "evidenceReviewId: review ? review.id"],
     ["proposal carries signal evidence", "sourceSignalId: outcome.sourceSignalId"],
+    ["receipt chain carries review receipts", 'push("Review", review.id'],
     ["receipt chain carries outcome artifact", "artifactUrl: outcome.artifactUrl"],
     ["receipt chain carries outcome measurement", "measuredBefore: outcome.measuredBefore"],
+    ["receipt chain carries outcome review", "evidenceReviewId: review ? review.id"],
     ["receipt chain carries outcome signal", "sourceSignalId: outcome.sourceSignalId"]
   ];
   for (const [label, snippet] of required) {
