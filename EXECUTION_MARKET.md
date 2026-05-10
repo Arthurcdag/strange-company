@@ -66,12 +66,30 @@ Weak resilience drills can now issue hardening packets. These packets use the sa
 
 Packet state is stored in browser local storage. This is not yet an accounting backend, but it proves the operating loop.
 
+## Outcome Receipt Evidence
+
+Outcome receipts now require operator-attached evidence before they leave the Bounties view.
+
+When a packet reaches `Delivered`, the Bounties card surfaces an evidence form. The operator must record:
+
+- a delivery artifact (https URL),
+- measured before,
+- measured after,
+- the single next claim this outcome should route into the gate or treasury,
+- and optionally a Research Gate receipt id from the `gateRuns` log.
+
+The handler `submitOutcomeEvidence` validates the artifact through `safeHttpsUrl`, runs `findSensitiveData` over the measurement and next-claim text, and verifies the chosen gate receipt still exists. Only then does `createOutcomeFromPacket` run; otherwise the form shows the failure reason and the packet remains in `Delivered` without an outcome.
+
+This evidence is carried forward into:
+
+- the drafted Treasury proposal (`evidenceArtifactUrl`, `evidenceMeasuredBefore`, `evidenceMeasuredAfter`, `evidenceGateRunId`, plus the measurement quote in the argument),
+- the cooldown lane reason for `kill` outcomes,
+- and the receipt-chain canonical form for the Outcome, Treasury, and Cooldown event types.
+
 ## Next Evolution
 
-The next layer is to require evidence attachments for every outcome receipt:
+The next layer is to require, before a packet can issue:
 
-- delivery artifact,
-- measured result,
-- next claim,
-- Research Gate receipt,
-- and budget route.
+- a budget bucket with remaining capacity,
+- a resilience score above threshold,
+- and a decision-log entry that links the gate receipt, the outcome receipt, and the proposal id.

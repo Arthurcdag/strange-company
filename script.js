@@ -135,6 +135,11 @@ function defaultAutonomousOutcomes() {
       metric: "9 day payback",
       evidence: "Paid checklist bundle converted without requiring a full SaaS account.",
       next: "Issue distribution packet",
+      artifactUrl: "",
+      measuredBefore: "0 paid bundles in week 1",
+      measuredAfter: "11 paid bundles in week 2",
+      nextClaim: "A distribution packet should issue scale capital for the bundle landing page.",
+      gateRunId: "",
       createdAt: "2026-05-05T00:00:00.000Z"
     },
     {
@@ -145,6 +150,11 @@ function defaultAutonomousOutcomes() {
       metric: "Low-intent spend lane closed",
       evidence: "High click cost and low buyer intent after two capped cycles.",
       next: "Cool down paid search scale lane",
+      artifactUrl: "",
+      measuredBefore: "Cycle 1: $4.20 cost per click, 0 buyer-stage replies",
+      measuredAfter: "Cycle 2: $3.80 cost per click, 0 buyer-stage replies",
+      nextClaim: "Paid search scale lane should be cooled until a narrower buyer trigger is found.",
+      gateRunId: "",
       createdAt: "2026-05-05T00:00:00.000Z"
     }
   ];
@@ -1219,17 +1229,36 @@ function renderOutcomes() {
     .map((outcome) => {
       const tone = toneForOutcome(outcome.decision);
       const action = actionForOutcome(outcome);
+      const artifact = outcome.artifactUrl ? safeHttpsUrl(outcome.artifactUrl) : "";
+      const artifactLine = artifact
+        ? `<a class="outcome-artifact" href="${escapeHtml(artifact)}" target="_blank" rel="noreferrer noopener">Delivery artifact</a>`
+        : `<span class="state amber">No artifact attached</span>`;
+      const measurementLine =
+        outcome.measuredBefore || outcome.measuredAfter
+          ? `<p class="outcome-measure"><strong>Before:</strong> ${escapeHtml(outcome.measuredBefore || "—")} <strong>After:</strong> ${escapeHtml(outcome.measuredAfter || "—")}</p>`
+          : `<p class="outcome-measure outcome-measure-missing">No before/after measurement attached.</p>`;
+      const gateRun = outcome.gateRunId
+        ? gateRuns.find((run) => run.id === outcome.gateRunId)
+        : null;
+      const gateLine = gateRun
+        ? `<p class="outcome-gate"><strong>Gate receipt:</strong> ${escapeHtml(gateRun.recommendation || "ungated")} — ${escapeHtml((gateRun.claim || "").slice(0, 90))}</p>`
+        : `<p class="outcome-gate outcome-gate-missing">No Research Gate receipt attached. Drafted proposals will start ungated.</p>`;
       return `
         <article class="outcome-card">
           <div>
             <span class="metric-label">${escapeHtml(outcome.source || "Autonomous cycle")}</span>
             <h4>${escapeHtml(outcome.title)}</h4>
             <p>${escapeHtml(outcome.metric || outcome.evidence || "Outcome captured")}</p>
+            <div class="outcome-evidence">
+              ${artifactLine}
+              ${measurementLine}
+              ${gateLine}
+            </div>
           </div>
           <span class="state ${tone}">${escapeHtml(formatOutcomeDecision(outcome.decision))}</span>
           <div class="outcome-route">
             <strong>Next</strong>
-            <p class="outcome-next">${escapeHtml(outcome.next || "Route to gate")}</p>
+            <p class="outcome-next">${escapeHtml(outcome.nextClaim || outcome.next || "Route to gate")}</p>
             <button type="button" data-route-outcome="${escapeHtml(outcome.id)}" ${action.disabled ? "disabled" : ""}>
               ${escapeHtml(action.label)}
             </button>
@@ -1364,6 +1393,7 @@ function renderBounties() {
   list.innerHTML = executionPackets
     .map((packet) => {
       const tone = toneForPacket(packet.state);
+      const needsEvidence = packet.state === "Delivered" && !packet.outcomeId;
       const actionLabel =
         packet.state === "Draft"
           ? "Open"
@@ -1373,8 +1403,8 @@ function renderBounties() {
               ? "Deliver"
               : packet.outcomeId
                 ? "Archive"
-                : "Outcome";
-      return `
+                : "Attach evidence";
+      const card = `
         <article class="bounty-item">
           <div>
             <h3>${escapeHtml(packet.title)}</h3>
@@ -1389,11 +1419,140 @@ function renderBounties() {
           </div>
         </article>
       `;
+      return needsEvidence ? card + renderEvidenceForm(packet) : card;
     })
     .join("");
 
   document.querySelectorAll("[data-advance-packet]").forEach((button) => {
     button.addEventListener("click", () => advanceExecutionPacket(button.dataset.advancePacket));
+  });
+
+  document.querySelectorAll("[data-evidence-form]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitOutcomeEvidence(form);
+    });
+  });
+}
+
+function renderEvidenceForm(packet) {
+  const gateOptions = gateRuns
+    .map(
+      (run) => `
+        <option value="${escapeHtml(run.id)}">
+          ${escapeHtml(run.recommendation || "ungated")} — ${escapeHtml((run.claim || "").slice(0, 80))}
+        </option>
+      `
+    )
+    .join("");
+
+  return `
+    <form class="bounty-evidence" data-evidence-form="${escapeHtml(packet.id)}" autocomplete="off">
+      <p class="evidence-form-kicker">Outcome receipt evidence</p>
+      <p class="evidence-form-hint">
+        A delivered packet does not become an outcome receipt until artifact, measurement, and the next claim are recorded.
+        A Research Gate receipt is optional but the proposal it drafts will be flagged ungated until one is attached.
+      </p>
+      <div class="field-row">
+        <div class="field">
+          <label for="evidence-artifact-${escapeHtml(packet.id)}">Delivery artifact (https URL)</label>
+          <input id="evidence-artifact-${escapeHtml(packet.id)}" name="artifactUrl" type="url" placeholder="https://..." required />
+        </div>
+        <div class="field">
+          <label for="evidence-gate-${escapeHtml(packet.id)}">Research Gate receipt</label>
+          <select id="evidence-gate-${escapeHtml(packet.id)}" name="gateRunId">
+            <option value="">No gate receipt attached</option>
+            ${gateOptions}
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="evidence-before-${escapeHtml(packet.id)}">Measured before</label>
+          <input id="evidence-before-${escapeHtml(packet.id)}" name="measuredBefore" type="text" placeholder="State or value before the delivery" required />
+        </div>
+        <div class="field">
+          <label for="evidence-after-${escapeHtml(packet.id)}">Measured after</label>
+          <input id="evidence-after-${escapeHtml(packet.id)}" name="measuredAfter" type="text" placeholder="State or value after the delivery" required />
+        </div>
+      </div>
+      <div class="field">
+        <label for="evidence-next-${escapeHtml(packet.id)}">Next claim</label>
+        <textarea id="evidence-next-${escapeHtml(packet.id)}" name="nextClaim" rows="3" placeholder="The single follow-on claim this outcome should route into the gate or treasury." required></textarea>
+      </div>
+      <div class="evidence-form-actions">
+        <button class="primary-action" type="submit">
+          <i data-lucide="file-check-2"></i>
+          <span>Emit outcome receipt</span>
+        </button>
+        <p class="evidence-form-error" data-evidence-error="${escapeHtml(packet.id)}" hidden></p>
+      </div>
+    </form>
+  `;
+}
+
+function submitOutcomeEvidence(form) {
+  const packetId = form.dataset.evidenceForm;
+  const error = document.querySelector(`[data-evidence-error="${packetId}"]`);
+  const showError = (message) => {
+    if (!error) {
+      return;
+    }
+    error.textContent = message;
+    error.hidden = false;
+  };
+  const clearError = () => {
+    if (error) {
+      error.textContent = "";
+      error.hidden = true;
+    }
+  };
+
+  const packet = executionPackets.find((item) => item.id === packetId);
+  if (!packet) {
+    showError("Packet no longer exists.");
+    return;
+  }
+
+  const formData = new FormData(form);
+  const artifactInput = String(formData.get("artifactUrl") || "").trim();
+  const measuredBefore = String(formData.get("measuredBefore") || "").trim();
+  const measuredAfter = String(formData.get("measuredAfter") || "").trim();
+  const nextClaim = String(formData.get("nextClaim") || "").trim();
+  const gateRunId = String(formData.get("gateRunId") || "").trim();
+
+  const artifactUrl = safeHttpsUrl(artifactInput);
+  if (!artifactUrl) {
+    showError("Delivery artifact must be a valid https:// URL.");
+    return;
+  }
+  if (!measuredBefore || !measuredAfter) {
+    showError("Measured before and measured after are both required.");
+    return;
+  }
+  if (!nextClaim) {
+    showError("A single next claim is required so the outcome can route somewhere.");
+    return;
+  }
+
+  const findings = findSensitiveData(`${measuredBefore}\n${measuredAfter}\n${nextClaim}`);
+  if (findings.length) {
+    showError(`Evidence text contains ${findings.join(", ")}. Strip the sensitive text and resubmit.`);
+    return;
+  }
+
+  if (gateRunId && !gateRuns.some((run) => run.id === gateRunId)) {
+    showError("Selected Research Gate receipt no longer exists. Pick another.");
+    return;
+  }
+
+  clearError();
+  createOutcomeFromPacket(packetId, {
+    artifactUrl,
+    measuredBefore,
+    measuredAfter,
+    nextClaim,
+    gateRunId
   });
 }
 
@@ -1547,6 +1706,25 @@ function safeExternalLink(value, allowedPrefixes, label, missingLabel) {
 
 function cleanConfiguredUrl(value, allowedPrefixes) {
   return safeExternalUrl(value, allowedPrefixes);
+}
+
+function safeHttpsUrl(value) {
+  const candidate = String(value || "").trim();
+  if (!candidate) {
+    return "";
+  }
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== "https:") {
+      return "";
+    }
+    if (!url.hostname || /\s/.test(url.hostname)) {
+      return "";
+    }
+    return url.href;
+  } catch {
+    return "";
+  }
 }
 
 function findSensitiveData(text) {
@@ -3501,6 +3679,11 @@ function collectReceiptEvents() {
         approved: Boolean(proposal.approved),
         bucket: proposal.bucket,
         className: proposal.className,
+        evidenceArtifactUrl: proposal.evidenceArtifactUrl || "",
+        evidenceGateRunId: proposal.evidenceGateRunId || "",
+        evidenceMeasuredAfter: proposal.evidenceMeasuredAfter || "",
+        evidenceMeasuredBefore: proposal.evidenceMeasuredBefore || "",
+        outcomeId: proposal.outcomeId || "",
         packetId: proposal.packetId || "",
         recommendation: proposal.recommendation || "ungated",
         reportId: proposal.reportId || ""
@@ -3528,9 +3711,14 @@ function collectReceiptEvents() {
       formatOutcomeDecision(outcome.decision),
       outcome.routedAt || outcome.createdAt,
       {
+        artifactUrl: outcome.artifactUrl || "",
         cooldownId: outcome.cooldownId || "",
         decision: outcome.decision,
+        gateRunId: outcome.gateRunId || "",
+        measuredAfter: outcome.measuredAfter || "",
+        measuredBefore: outcome.measuredBefore || "",
         metric: outcome.metric,
+        nextClaim: outcome.nextClaim || "",
         proposalId: outcome.proposalId || "",
         sourcePacketId: outcome.sourcePacketId || ""
       }
@@ -3539,6 +3727,7 @@ function collectReceiptEvents() {
 
   cooldownLanes.forEach((lane) => {
     push("Cooldown", lane.id, lane.lane, "Capital firewall", "Cooldown", lane.createdAt, {
+      artifactUrl: lane.artifactUrl || "",
       expires: lane.expires,
       reason: lane.reason,
       source: lane.source,
@@ -4700,8 +4889,36 @@ function draftTreasuryProposalFromOutcome(outcome) {
 
   const isRevision = outcome.decision === "revise";
   const title = `${isRevision ? "Revise" : "Scale"} ${outcome.title}`;
-  const claim = `${outcome.title} should receive capped follow-on capital`;
+  const operatorClaim = (outcome.nextClaim || "").trim();
+  const claim = operatorClaim || `${outcome.title} should receive capped follow-on capital`;
   const metric = outcome.metric || "the recorded outcome";
+  const before = outcome.measuredBefore || "";
+  const after = outcome.measuredAfter || "";
+  const measurementLine = before || after ? `Measured before: ${before || "—"}. Measured after: ${after || "—"}.` : "";
+  const artifact = outcome.artifactUrl ? safeHttpsUrl(outcome.artifactUrl) : "";
+  const artifactLine = artifact ? `Delivery artifact: ${artifact}.` : "";
+  const gateRun = outcome.gateRunId ? gateRuns.find((run) => run.id === outcome.gateRunId) : null;
+  const gateLine = gateRun
+    ? `Outcome gate receipt: ${gateRun.recommendation} (${gateRun.id}).`
+    : "Outcome gate receipt: none attached. Proposal must run the gate before approval.";
+  const note = [
+    `Autonomous draft from outcome receipt: ${metric}.`,
+    measurementLine,
+    artifactLine,
+    gateLine,
+    `Next route: ${outcome.nextClaim || outcome.next || "gate review"}.`
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const argument = [
+    `${outcome.title} produced the measured outcome "${metric}".`,
+    measurementLine,
+    artifactLine,
+    "The outcome receipt is evidence for a capped follow-on packet.",
+    `Therefore ${claim}.`
+  ]
+    .filter(Boolean)
+    .join(" ");
   const now = new Date().toISOString();
 
   treasuryProposals.unshift({
@@ -4710,11 +4927,9 @@ function draftTreasuryProposalFromOutcome(outcome) {
     bucket: bucketForOutcome(outcome),
     amount: amountForOutcome(outcome),
     className: isRevision ? "C" : "B",
-    note: `Autonomous draft from outcome receipt: ${metric}. Next route: ${outcome.next || "gate review"}.`,
+    note,
     claim,
-    argument:
-      `${outcome.title} produced the measured outcome "${metric}". ` +
-      `The outcome receipt is evidence for a capped follow-on packet. Therefore ${claim}.`,
+    argument,
     context: "Strange Company autonomous outcome routing",
     status: "needs_gate",
     recommendation: "ungated",
@@ -4726,6 +4941,10 @@ function draftTreasuryProposalFromOutcome(outcome) {
     approved: false,
     outcomeId: outcome.id,
     generatedFromOutcome: true,
+    evidenceArtifactUrl: artifact,
+    evidenceMeasuredBefore: before,
+    evidenceMeasuredAfter: after,
+    evidenceGateRunId: outcome.gateRunId || "",
     createdAt: now
   });
 
@@ -4748,13 +4967,22 @@ function coolDownOutcomeLane(outcome) {
   }
 
   const now = new Date().toISOString();
+  const before = outcome.measuredBefore || "";
+  const after = outcome.measuredAfter || "";
+  const measurementLine = before || after ? `Before: ${before || "—"}. After: ${after || "—"}.` : "";
+  const artifact = outcome.artifactUrl ? safeHttpsUrl(outcome.artifactUrl) : "";
+  const reason = [`${outcome.metric || "Kill signal recorded"}.`, measurementLine, outcome.evidence || ""]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(" ");
   cooldownLanes.unshift({
     id: cooldownId,
     lane: laneNameForOutcome(outcome),
-    reason: `${outcome.metric || "Kill signal recorded"}. ${outcome.evidence || ""}`.trim(),
+    reason,
     source: outcome.source || "Autonomous cycle",
     sourceOutcomeId: outcome.id,
     expires: "2 cycles",
+    artifactUrl: artifact,
     createdAt: now
   });
 
@@ -4977,9 +5205,12 @@ function deriveOutcome(packet) {
   };
 }
 
-function createOutcomeFromPacket(packetId) {
+function createOutcomeFromPacket(packetId, evidence) {
   const packet = executionPackets.find((item) => item.id === packetId);
   if (!packet || packet.state !== "Delivered") {
+    return;
+  }
+  if (!evidence) {
     return;
   }
 
@@ -4989,11 +5220,21 @@ function createOutcomeFromPacket(packetId) {
     saveExecutionPackets();
     renderBounties();
     renderOutcomes();
+    renderReceiptChain();
     renderLogs();
     return;
   }
 
-  const outcome = deriveOutcome(packet);
+  const base = deriveOutcome(packet);
+  const outcome = {
+    ...base,
+    artifactUrl: evidence.artifactUrl || "",
+    measuredBefore: evidence.measuredBefore || "",
+    measuredAfter: evidence.measuredAfter || "",
+    nextClaim: evidence.nextClaim || base.next || "",
+    gateRunId: evidence.gateRunId || "",
+    next: evidence.nextClaim || base.next || ""
+  };
   autonomousOutcomes.unshift(outcome);
   packet.outcomeId = outcome.id;
   packet.outcomeAt = outcome.createdAt;
@@ -5002,6 +5243,7 @@ function createOutcomeFromPacket(packetId) {
   saveExecutionPackets();
   renderBounties();
   renderOutcomes();
+  renderReceiptChain();
   renderLogs();
 }
 
@@ -5017,7 +5259,11 @@ function advanceExecutionPacket(packetId) {
   } else if (packet.state === "Awarded") {
     packet.state = "Delivered";
   } else if (!packet.outcomeId) {
-    createOutcomeFromPacket(packetId);
+    const focusInput = document.querySelector(`#evidence-artifact-${CSS.escape(packetId)}`);
+    if (focusInput) {
+      focusInput.scrollIntoView({ behavior: "smooth", block: "center" });
+      focusInput.focus({ preventScroll: true });
+    }
     return;
   } else {
     executionPackets = executionPackets.filter((item) => item.id !== packetId);

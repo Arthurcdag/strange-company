@@ -2094,6 +2094,70 @@ input[type="range"] {
   color: var(--ink);
 }
 
+.bounty-evidence {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px 18px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.evidence-form-kicker {
+  margin: 0;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.evidence-form-hint {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.evidence-form-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.evidence-form-error {
+  margin: 0;
+  color: var(--red, #bd3d2a);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.outcome-evidence {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.outcome-artifact {
+  width: fit-content;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.outcome-measure,
+.outcome-gate {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.outcome-measure-missing,
+.outcome-gate-missing {
+  color: var(--red, #bd3d2a);
+}
+
 .receipt-summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 190px 150px 210px;
