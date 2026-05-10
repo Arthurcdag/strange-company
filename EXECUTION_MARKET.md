@@ -76,13 +76,14 @@ When a packet reaches `Delivered`, the Bounties card surfaces an evidence form. 
 - measured before,
 - measured after,
 - the single next claim this outcome should route into the gate or treasury,
-- and optionally a Research Gate receipt id from the `gateRuns` log.
+- optionally a Research Gate receipt id from the `gateRuns` log,
+- and optionally a routed, boundary-confirmed External Signal as supporting context.
 
-The handler `submitOutcomeEvidence` validates the artifact through `safeHttpsUrl`, runs `findSensitiveData` over the measurement and next-claim text, and verifies the chosen gate receipt still exists. Only then does `createOutcomeFromPacket` run; otherwise the form shows the failure reason and the packet remains in `Delivered` without an outcome.
+The handler `submitOutcomeEvidence` validates the artifact through `safeHttpsUrl`, runs `findSensitiveData` over the measurement and next-claim text, verifies the chosen gate receipt still exists, and checks that any selected External Signal is still routed, boundary-confirmed, and clean. Only then does `createOutcomeFromPacket` run; otherwise the form shows the failure reason and the packet remains in `Delivered` without an outcome.
 
 This evidence is carried forward into:
 
-- the drafted Treasury proposal (`evidenceArtifactUrl`, `evidenceMeasuredBefore`, `evidenceMeasuredAfter`, `evidenceGateRunId`, plus the measurement quote in the argument),
+- the drafted Treasury proposal (`evidenceArtifactUrl`, `evidenceMeasuredBefore`, `evidenceMeasuredAfter`, `evidenceGateRunId`, optional `sourceSignal*` metadata, plus the measurement quote in the argument),
 - the cooldown lane reason for `kill` outcomes,
 - and the receipt-chain canonical form for the Outcome, Treasury, and Cooldown event types.
 

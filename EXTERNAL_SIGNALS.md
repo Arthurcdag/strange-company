@@ -62,6 +62,21 @@ Signals may be copied into a Research Gate prompt.
 
 The prompt should ask whether the signal is sufficient to draft a research question or next review step. It must not claim that the signal is sufficient to approve spend.
 
+## Outcome Evidence Bridge
+
+Routed, boundary-confirmed signals may be attached to an outcome evidence form in the private Bounties view.
+
+Only signals with `status = routed` and `boundary_confirmed = true` appear in the selector. The selected signal is scanned again before the outcome receipt is emitted.
+
+The outcome stores only signal metadata:
+
+- `sourceSignalId`
+- `sourceSignalSource`
+- `sourceSignalSubject`
+- `sourceSignalReference`
+
+This signal metadata is supporting context. It does not replace the delivery artifact, before/after measurement, next claim, or Research Gate review.
+
 External Signals can inform:
 
 - research questions,

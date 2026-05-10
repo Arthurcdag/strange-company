@@ -1243,6 +1243,9 @@ function renderOutcomes() {
       const gateLine = gateRun
         ? `<p class="outcome-gate"><strong>Gate receipt:</strong> ${escapeHtml(gateRun.recommendation || "ungated")} — ${escapeHtml((gateRun.claim || "").slice(0, 90))}</p>`
         : `<p class="outcome-gate outcome-gate-missing">No Research Gate receipt attached. Drafted proposals will start ungated.</p>`;
+      const signalLine = outcome.sourceSignalId
+        ? `<p class="outcome-signal"><strong>Signal context:</strong> ${escapeHtml(outcome.sourceSignalSource || "External signal")} - ${escapeHtml(outcome.sourceSignalSubject || "untitled signal")} ${outcome.sourceSignalReference ? `<code>${escapeHtml(outcome.sourceSignalReference)}</code>` : ""}</p>`
+        : `<p class="outcome-signal outcome-signal-missing">No external signal attached. Signals are optional review context only.</p>`;
       return `
         <article class="outcome-card">
           <div>
@@ -1253,6 +1256,7 @@ function renderOutcomes() {
               ${artifactLine}
               ${measurementLine}
               ${gateLine}
+              ${signalLine}
             </div>
           </div>
           <span class="state ${tone}">${escapeHtml(formatOutcomeDecision(outcome.decision))}</span>
@@ -1445,6 +1449,15 @@ function renderEvidenceForm(packet) {
       `
     )
     .join("");
+  const signalOptions = eligibleOutcomeSignals()
+    .map(
+      (signal) => `
+        <option value="${escapeHtml(signal.id)}">
+          ${escapeHtml(signal.source)} - ${escapeHtml((signal.subject || "").slice(0, 80))}
+        </option>
+      `
+    )
+    .join("");
 
   return `
     <form class="bounty-evidence" data-evidence-form="${escapeHtml(packet.id)}" autocomplete="off">
@@ -1465,6 +1478,14 @@ function renderEvidenceForm(packet) {
             ${gateOptions}
           </select>
         </div>
+      </div>
+      <div class="field">
+        <label for="evidence-signal-${escapeHtml(packet.id)}">External signal context</label>
+        <select id="evidence-signal-${escapeHtml(packet.id)}" name="sourceSignalId">
+          <option value="">No external signal attached</option>
+          ${signalOptions}
+        </select>
+        <p class="evidence-form-hint">Only routed, boundary-confirmed signals appear here. Signals add review context; they never approve spend.</p>
       </div>
       <div class="field-row">
         <div class="field">
@@ -1520,6 +1541,7 @@ function submitOutcomeEvidence(form) {
   const measuredAfter = String(formData.get("measuredAfter") || "").trim();
   const nextClaim = String(formData.get("nextClaim") || "").trim();
   const gateRunId = String(formData.get("gateRunId") || "").trim();
+  const sourceSignalId = String(formData.get("sourceSignalId") || "").trim();
 
   const artifactUrl = safeHttpsUrl(artifactInput);
   if (!artifactUrl) {
@@ -1546,14 +1568,55 @@ function submitOutcomeEvidence(form) {
     return;
   }
 
+  const sourceSignal = sourceSignalId ? externalSignals.find((signal) => signal.id === sourceSignalId) : null;
+  if (sourceSignalId && !sourceSignal) {
+    showError("Selected external signal no longer exists. Pick another.");
+    return;
+  }
+  if (sourceSignal && (sourceSignal.status !== "routed" || !sourceSignal.boundary_confirmed)) {
+    showError("Selected external signal must be routed and boundary-confirmed.");
+    return;
+  }
+  if (sourceSignal) {
+    const signalFindings = signalSensitiveFindings(sourceSignal);
+    if (signalFindings.length) {
+      showError(`Selected external signal contains ${signalFindings.join(", ")}. Reject or sanitize that signal first.`);
+      return;
+    }
+  }
+
   clearError();
   createOutcomeFromPacket(packetId, {
     artifactUrl,
     measuredBefore,
     measuredAfter,
     nextClaim,
-    gateRunId
+    gateRunId,
+    sourceSignalId: sourceSignal ? sourceSignal.id : "",
+    sourceSignalSource: sourceSignal ? sourceSignal.source : "",
+    sourceSignalSubject: sourceSignal ? sourceSignal.subject : "",
+    sourceSignalReference: sourceSignal ? sourceSignal.evidence_reference : ""
   });
+}
+
+function eligibleOutcomeSignals() {
+  return externalSignals.filter(
+    (signal) =>
+      signal &&
+      signal.status === "routed" &&
+      signal.boundary_confirmed &&
+      signalSensitiveFindings(signal).length === 0
+  );
+}
+
+function signalEvidenceText(record) {
+  if (!record || !record.sourceSignalId) {
+    return "";
+  }
+  const source = record.sourceSignalSource || "External signal";
+  const subject = record.sourceSignalSubject || "untitled signal";
+  const reference = record.sourceSignalReference ? ` Reference: ${record.sourceSignalReference}.` : "";
+  return `Signal context: ${source} - ${subject}.${reference} This supports review only and does not approve spend.`;
 }
 
 function toneForPacket(state) {
@@ -3686,7 +3749,11 @@ function collectReceiptEvents() {
         outcomeId: proposal.outcomeId || "",
         packetId: proposal.packetId || "",
         recommendation: proposal.recommendation || "ungated",
-        reportId: proposal.reportId || ""
+        reportId: proposal.reportId || "",
+        sourceSignalId: proposal.sourceSignalId || "",
+        sourceSignalReference: proposal.sourceSignalReference || "",
+        sourceSignalSource: proposal.sourceSignalSource || "",
+        sourceSignalSubject: proposal.sourceSignalSubject || ""
       }
     );
   });
@@ -3720,6 +3787,10 @@ function collectReceiptEvents() {
         metric: outcome.metric,
         nextClaim: outcome.nextClaim || "",
         proposalId: outcome.proposalId || "",
+        sourceSignalId: outcome.sourceSignalId || "",
+        sourceSignalReference: outcome.sourceSignalReference || "",
+        sourceSignalSource: outcome.sourceSignalSource || "",
+        sourceSignalSubject: outcome.sourceSignalSubject || "",
         sourcePacketId: outcome.sourcePacketId || ""
       }
     );
@@ -3731,6 +3802,10 @@ function collectReceiptEvents() {
       expires: lane.expires,
       reason: lane.reason,
       source: lane.source,
+      sourceSignalId: lane.sourceSignalId || "",
+      sourceSignalReference: lane.sourceSignalReference || "",
+      sourceSignalSource: lane.sourceSignalSource || "",
+      sourceSignalSubject: lane.sourceSignalSubject || "",
       sourceOutcomeId: lane.sourceOutcomeId || ""
     });
   });
@@ -4901,11 +4976,13 @@ function draftTreasuryProposalFromOutcome(outcome) {
   const gateLine = gateRun
     ? `Outcome gate receipt: ${gateRun.recommendation} (${gateRun.id}).`
     : "Outcome gate receipt: none attached. Proposal must run the gate before approval.";
+  const signalLine = signalEvidenceText(outcome);
   const note = [
     `Autonomous draft from outcome receipt: ${metric}.`,
     measurementLine,
     artifactLine,
     gateLine,
+    signalLine,
     `Next route: ${outcome.nextClaim || outcome.next || "gate review"}.`
   ]
     .filter(Boolean)
@@ -4914,6 +4991,7 @@ function draftTreasuryProposalFromOutcome(outcome) {
     `${outcome.title} produced the measured outcome "${metric}".`,
     measurementLine,
     artifactLine,
+    signalLine,
     "The outcome receipt is evidence for a capped follow-on packet.",
     `Therefore ${claim}.`
   ]
@@ -4945,6 +5023,10 @@ function draftTreasuryProposalFromOutcome(outcome) {
     evidenceMeasuredBefore: before,
     evidenceMeasuredAfter: after,
     evidenceGateRunId: outcome.gateRunId || "",
+    sourceSignalId: outcome.sourceSignalId || "",
+    sourceSignalSource: outcome.sourceSignalSource || "",
+    sourceSignalSubject: outcome.sourceSignalSubject || "",
+    sourceSignalReference: outcome.sourceSignalReference || "",
     createdAt: now
   });
 
@@ -4971,7 +5053,8 @@ function coolDownOutcomeLane(outcome) {
   const after = outcome.measuredAfter || "";
   const measurementLine = before || after ? `Before: ${before || "—"}. After: ${after || "—"}.` : "";
   const artifact = outcome.artifactUrl ? safeHttpsUrl(outcome.artifactUrl) : "";
-  const reason = [`${outcome.metric || "Kill signal recorded"}.`, measurementLine, outcome.evidence || ""]
+  const signalLine = signalEvidenceText(outcome);
+  const reason = [`${outcome.metric || "Kill signal recorded"}.`, measurementLine, signalLine, outcome.evidence || ""]
     .map((part) => String(part || "").trim())
     .filter(Boolean)
     .join(" ");
@@ -4983,6 +5066,10 @@ function coolDownOutcomeLane(outcome) {
     sourceOutcomeId: outcome.id,
     expires: "2 cycles",
     artifactUrl: artifact,
+    sourceSignalId: outcome.sourceSignalId || "",
+    sourceSignalSource: outcome.sourceSignalSource || "",
+    sourceSignalSubject: outcome.sourceSignalSubject || "",
+    sourceSignalReference: outcome.sourceSignalReference || "",
     createdAt: now
   });
 
@@ -5233,6 +5320,10 @@ function createOutcomeFromPacket(packetId, evidence) {
     measuredAfter: evidence.measuredAfter || "",
     nextClaim: evidence.nextClaim || base.next || "",
     gateRunId: evidence.gateRunId || "",
+    sourceSignalId: evidence.sourceSignalId || "",
+    sourceSignalSource: evidence.sourceSignalSource || "",
+    sourceSignalSubject: evidence.sourceSignalSubject || "",
+    sourceSignalReference: evidence.sourceSignalReference || "",
     next: evidence.nextClaim || base.next || ""
   };
   autonomousOutcomes.unshift(outcome);
