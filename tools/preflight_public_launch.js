@@ -134,11 +134,17 @@ function checkOutcomeEvidenceContract() {
     ["measured before field", 'name="measuredBefore"'],
     ["measured after field", 'name="measuredAfter"'],
     ["next claim field", 'name="nextClaim"'],
+    ["source signal field", 'name="sourceSignalId"'],
+    ["eligible source signal filter", "function eligibleOutcomeSignals"],
+    ["source signal sensitive scan", "signalSensitiveFindings(sourceSignal)"],
+    ["source signal metadata copy", "sourceSignalReference: sourceSignal ? sourceSignal.evidence_reference"],
     ["sensitive-data scan over evidence", "findSensitiveData(`${measuredBefore}"],
     ["proposal carries artifact evidence", "evidenceArtifactUrl: artifact"],
     ["proposal carries measurement evidence", "evidenceMeasuredBefore: before"],
+    ["proposal carries signal evidence", "sourceSignalId: outcome.sourceSignalId"],
     ["receipt chain carries outcome artifact", "artifactUrl: outcome.artifactUrl"],
-    ["receipt chain carries outcome measurement", "measuredBefore: outcome.measuredBefore"]
+    ["receipt chain carries outcome measurement", "measuredBefore: outcome.measuredBefore"],
+    ["receipt chain carries outcome signal", "sourceSignalId: outcome.sourceSignalId"]
   ];
   for (const [label, snippet] of required) {
     assert(script.includes(snippet), `script.js is missing ${label}.`);

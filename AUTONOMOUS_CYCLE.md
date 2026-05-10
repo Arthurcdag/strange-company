@@ -52,7 +52,8 @@ The operator must attach:
 - a delivery artifact (https URL),
 - measured before and measured after values,
 - a single next claim,
-- and an optional Research Gate receipt.
+- an optional Research Gate receipt,
+- and an optional routed, boundary-confirmed External Signal.
 
 The artifact URL is rejected unless it parses as `https://`. Measurement and next-claim text are rejected if the sensitive-data scan flags PHI, payment card data, secrets, or private keys.
 
@@ -62,6 +63,8 @@ These fields ride with the outcome into:
 - the drafted Treasury proposal note and argument,
 - the cooldown lane reason for `kill` outcomes,
 - and the receipt-chain canonical form for outcomes, treasury proposals, and cooldown lanes.
+
+External Signal context is copied as `sourceSignal*` metadata only. It can support review context, but it cannot replace artifact or measurement evidence and cannot approve spend.
 
 A Research Gate receipt is optional. When missing, the drafted Treasury proposal still starts in the `needs_gate` state and the outcome card flags it.
 
