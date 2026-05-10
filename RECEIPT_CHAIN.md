@@ -11,6 +11,7 @@ Every material event becomes a receipt:
 - treasury proposals and approvals,
 - execution packets,
 - delivered outcomes,
+- outcome evidence reviews,
 - cooled capital lanes,
 - resilience drills.
 
@@ -27,6 +28,12 @@ After that:
 - **Unsealed** means no baseline root has been recorded yet.
 
 The seal is not included in the chain itself. Otherwise sealing would change the root it was trying to preserve.
+
+## Outcome Reviews
+
+Outcome evidence reviews are material receipts.
+
+Each review records the reviewed outcome id, decision, note, blockers, and optional External Signal metadata. Treasury proposals and cooldown lanes also carry the approved review id forward, so a sealed chain can show whether capital routing followed a human review receipt instead of raw delivery evidence alone.
 
 ## Limits
 

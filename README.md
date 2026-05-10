@@ -79,6 +79,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [TREASURY_OS.md](TREASURY_OS.md): how treasury spend proposals are gated before approval.
 - [EXECUTION_MARKET.md](EXECUTION_MARKET.md): how approved capital becomes external work packets.
 - [AUTONOMOUS_CYCLE.md](AUTONOMOUS_CYCLE.md): how delivered work becomes outcomes, experiment updates, and new capital decisions.
+- [OUTCOME_REVIEW.md](OUTCOME_REVIEW.md): how outcome evidence must be reviewed before routing into Treasury or cooldown lanes.
 - [CAPITAL_ROUTER.md](CAPITAL_ROUTER.md): how outcomes draft follow-on proposals or cool down weak spend lanes.
 - [RECEIPT_CHAIN.md](RECEIPT_CHAIN.md): how material state changes become a local tamper-evident proof chain.
 
@@ -90,7 +91,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [tools/preflight_public_launch.js](tools/preflight_public_launch.js): launch preflight for public/private separation, URL allowlists, live-mode config, and sensitive-data guard coverage.
 - [index.html](index.html): private/local command center for Operations, Treasury, Decisions, and Research Gate.
 - [styles.css](styles.css): interface design for the prototype.
-- [script.js](script.js): treasury allocation, launch readiness, private order requests, revenue pilot, satellite profit model, operations console, external signals, execution packets, outcome receipts, capital routing, resilience drills, cooldown lanes, local receipt chain, logs, and operating loop animation.
+- [script.js](script.js): treasury allocation, launch readiness, private order requests, revenue pilot, satellite profit model, operations console, external signals, execution packets, outcome receipts, outcome evidence reviews, capital routing, resilience drills, cooldown lanes, local receipt chain, logs, and operating loop animation.
 
 Open `index.html` directly in a browser for private/local operation. Open `public.html` to test the public request surface. No build step is required.
 

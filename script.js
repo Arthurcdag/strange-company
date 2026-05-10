@@ -612,6 +612,7 @@ const GATE_RUNS_KEY = "strange-company-gate-runs";
 const TREASURY_PROPOSALS_KEY = "strange-company-treasury-proposals";
 const EXECUTION_PACKETS_KEY = "strange-company-execution-packets";
 const AUTONOMOUS_OUTCOMES_KEY = "strange-company-outcomes";
+const OUTCOME_REVIEWS_KEY = "strange-company-outcome-reviews";
 const COOLDOWN_LANES_KEY = "strange-company-cooldown-lanes";
 const RESILIENCE_DRILLS_KEY = "strange-company-resilience-drills";
 const LAUNCH_GATE_KEY = "strange-company-launch-gate";
@@ -628,6 +629,7 @@ let gateRuns = loadGateRuns();
 let treasuryProposals = loadTreasuryProposals();
 let executionPackets = loadExecutionPackets();
 let autonomousOutcomes = loadAutonomousOutcomes();
+let outcomeReviews = loadOutcomeReviews();
 let cooldownLanes = loadCooldownLanes();
 let resilienceDrills = loadResilienceDrills();
 let launchGate = loadLaunchGate();
@@ -1180,6 +1182,10 @@ function renderCycleMetrics() {
   const scale = autonomousOutcomes.filter((outcome) => outcome.decision === "scale").length;
   const revise = autonomousOutcomes.filter((outcome) => outcome.decision === "revise").length;
   const kill = autonomousOutcomes.filter((outcome) => outcome.decision === "kill").length;
+  const reviewed = autonomousOutcomes.filter((outcome) => {
+    const review = latestOutcomeReview(outcome.id);
+    return review && review.decision === "approved";
+  }).length;
 
   metrics.innerHTML = `
     <article class="metric-card">
@@ -1197,6 +1203,10 @@ function renderCycleMetrics() {
     <article class="metric-card">
       <span class="metric-label">Kill signals</span>
       <strong>${kill}</strong>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Reviewed</span>
+      <strong>${reviewed}</strong>
     </article>
   `;
 }
@@ -1246,6 +1256,28 @@ function renderOutcomes() {
       const signalLine = outcome.sourceSignalId
         ? `<p class="outcome-signal"><strong>Signal context:</strong> ${escapeHtml(outcome.sourceSignalSource || "External signal")} - ${escapeHtml(outcome.sourceSignalSubject || "untitled signal")} ${outcome.sourceSignalReference ? `<code>${escapeHtml(outcome.sourceSignalReference)}</code>` : ""}</p>`
         : `<p class="outcome-signal outcome-signal-missing">No external signal attached. Signals are optional review context only.</p>`;
+      const review = latestOutcomeReview(outcome.id);
+      const reviewIssues = validateOutcomeForReview(outcome);
+      const reviewTone = toneForOutcomeReview(review, reviewIssues);
+      const staleApprovedReview = review && review.decision === "approved" && reviewIssues.length;
+      const reviewLabel = review
+        ? staleApprovedReview
+          ? "Evidence review blocked"
+          : review.decision === "approved"
+          ? "Evidence review approved"
+          : "Evidence review rejected"
+        : reviewIssues.length
+          ? "Evidence review blocked"
+          : "Evidence review pending";
+      const reviewNote = review && review.note ? ` Note: ${review.note}` : "";
+      const reviewLine = review
+        ? staleApprovedReview
+          ? `Approved receipt ${review.id} is stale: ${reviewIssues.join("; ")}.`
+          : `${reviewLabel} ${formatReceiptDate(review.createdAt)}.${reviewNote}`
+        : reviewIssues.length
+          ? `Resolve before routing: ${reviewIssues.join("; ")}.`
+          : "Operator review receipt required before routing.";
+      const routeBlock = action.disabled ? "" : outcomeRouteBlockedReason(outcome);
       return `
         <article class="outcome-card">
           <div>
@@ -1257,13 +1289,22 @@ function renderOutcomes() {
               ${measurementLine}
               ${gateLine}
               ${signalLine}
+              <p class="outcome-review ${reviewTone}"><strong>${escapeHtml(reviewLabel)}:</strong> ${escapeHtml(reviewLine)}</p>
             </div>
           </div>
           <span class="state ${tone}">${escapeHtml(formatOutcomeDecision(outcome.decision))}</span>
           <div class="outcome-route">
             <strong>Next</strong>
             <p class="outcome-next">${escapeHtml(outcome.nextClaim || outcome.next || "Route to gate")}</p>
-            <button type="button" data-route-outcome="${escapeHtml(outcome.id)}" ${action.disabled ? "disabled" : ""}>
+            <div class="outcome-review-tools" ${action.disabled ? "hidden" : ""}>
+              <input id="outcome-review-note-${escapeHtml(outcome.id)}" type="text" maxlength="180" placeholder="Evidence review note" />
+              <div>
+                <button type="button" data-approve-outcome-review="${escapeHtml(outcome.id)}">Approve review</button>
+                <button type="button" data-reject-outcome-review="${escapeHtml(outcome.id)}">Reject</button>
+              </div>
+            </div>
+            ${routeBlock ? `<p class="outcome-route-blocker">${escapeHtml(routeBlock)}</p>` : ""}
+            <button type="button" data-route-outcome="${escapeHtml(outcome.id)}" ${action.disabled || routeBlock ? "disabled" : ""}>
               ${escapeHtml(action.label)}
             </button>
           </div>
@@ -1274,6 +1315,12 @@ function renderOutcomes() {
 
   document.querySelectorAll("[data-route-outcome]").forEach((button) => {
     button.addEventListener("click", () => routeOutcome(button.dataset.routeOutcome));
+  });
+  document.querySelectorAll("[data-approve-outcome-review]").forEach((button) => {
+    button.addEventListener("click", () => approveOutcomeReview(button.dataset.approveOutcomeReview));
+  });
+  document.querySelectorAll("[data-reject-outcome-review]").forEach((button) => {
+    button.addEventListener("click", () => rejectOutcomeReview(button.dataset.rejectOutcomeReview));
   });
 }
 
@@ -1686,6 +1733,151 @@ function actionForOutcome(outcome) {
   };
 }
 
+function latestOutcomeReview(outcomeId) {
+  return outcomeReviews
+    .filter((review) => review.outcomeId === outcomeId)
+    .sort((left, right) => String(right.createdAt || "").localeCompare(String(left.createdAt || "")))[0] || null;
+}
+
+function toneForOutcomeReview(review, issues = []) {
+  if (issues.length) {
+    return "red";
+  }
+  if (review && review.decision === "approved") {
+    return "green";
+  }
+  if (review && review.decision === "rejected") {
+    return "red";
+  }
+  return "amber";
+}
+
+function validateOutcomeForReview(outcome) {
+  const issues = [];
+  const artifact = outcome.artifactUrl ? safeHttpsUrl(outcome.artifactUrl) : "";
+  if (!artifact) {
+    issues.push("missing https delivery artifact");
+  }
+  if (!String(outcome.measuredBefore || "").trim()) {
+    issues.push("missing before measurement");
+  }
+  if (!String(outcome.measuredAfter || "").trim()) {
+    issues.push("missing after measurement");
+  }
+  if (!String(outcome.nextClaim || outcome.next || "").trim()) {
+    issues.push("missing next claim");
+  }
+
+  const sensitiveFindings = findSensitiveData([
+    outcome.title,
+    outcome.metric,
+    outcome.evidence,
+    outcome.measuredBefore,
+    outcome.measuredAfter,
+    outcome.nextClaim,
+    outcome.sourceSignalSubject,
+    outcome.sourceSignalReference
+  ].join("\n"));
+  if (sensitiveFindings.length) {
+    issues.push(`sensitive data: ${sensitiveFindings.join(", ")}`);
+  }
+
+  if (outcome.gateRunId && !gateRuns.some((run) => run.id === outcome.gateRunId)) {
+    issues.push("missing Research Gate receipt");
+  }
+
+  if (outcome.sourceSignalId) {
+    const sourceSignal = externalSignals.find((signal) => signal.id === outcome.sourceSignalId);
+    if (!sourceSignal) {
+      issues.push("attached external signal is missing");
+    } else {
+      if (sourceSignal.status !== "routed" || !sourceSignal.boundary_confirmed) {
+        issues.push("attached external signal is not routed and boundary-confirmed");
+      }
+      const signalFindings = signalSensitiveFindings(sourceSignal);
+      if (signalFindings.length) {
+        issues.push(`attached signal sensitive data: ${signalFindings.join(", ")}`);
+      }
+    }
+  }
+
+  return issues;
+}
+
+function outcomeRouteBlockedReason(outcome) {
+  const issues = validateOutcomeForReview(outcome);
+  if (issues.length) {
+    return `Evidence review blockers: ${issues.join("; ")}.`;
+  }
+  const review = latestOutcomeReview(outcome.id);
+  if (!review) {
+    return "Approve an evidence review receipt before routing.";
+  }
+  if (review.decision !== "approved") {
+    return "Latest evidence review rejected this route.";
+  }
+  return "";
+}
+
+function readOutcomeReviewNote(outcomeId) {
+  const input = document.querySelector(`#outcome-review-note-${CSS.escape(outcomeId)}`);
+  return input ? input.value.trim() : "";
+}
+
+function addOutcomeReview(outcomeId, decision) {
+  const outcome = autonomousOutcomes.find((item) => item.id === outcomeId);
+  if (!outcome) {
+    return;
+  }
+
+  const note = readOutcomeReviewNote(outcomeId);
+  const noteFindings = findSensitiveData(note);
+  if (noteFindings.length) {
+    outcomeReviews.unshift({
+      id: `review-${Date.now().toString(36)}`,
+      outcomeId,
+      decision: "rejected",
+      note: `Review note rejected for sensitive data: ${noteFindings.join(", ")}`,
+      blockers: noteFindings,
+      sourceSignalId: outcome.sourceSignalId || "",
+      createdAt: new Date().toISOString()
+    });
+    saveOutcomeReviews();
+    renderOutcomes();
+    renderReceiptChain();
+    renderLogs();
+    return;
+  }
+
+  const blockers = validateOutcomeForReview(outcome);
+  const safeDecision = decision === "approved" && blockers.length ? "rejected" : decision;
+  const review = {
+    id: `review-${Date.now().toString(36)}`,
+    outcomeId,
+    decision: safeDecision,
+    note: note || (safeDecision === "approved" ? "Required evidence reviewed for routing." : "Evidence route rejected by operator."),
+    blockers,
+    sourceSignalId: outcome.sourceSignalId || "",
+    sourceSignalSource: outcome.sourceSignalSource || "",
+    sourceSignalSubject: outcome.sourceSignalSubject || "",
+    sourceSignalReference: outcome.sourceSignalReference || "",
+    createdAt: new Date().toISOString()
+  };
+  outcomeReviews.unshift(review);
+  saveOutcomeReviews();
+  renderOutcomes();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function approveOutcomeReview(outcomeId) {
+  addOutcomeReview(outcomeId, "approved");
+}
+
+function rejectOutcomeReview(outcomeId) {
+  addOutcomeReview(outcomeId, "rejected");
+}
+
 function renderExecutionMetrics() {
   const metrics = document.querySelector("#executionMetrics");
   if (!metrics) {
@@ -1963,6 +2155,26 @@ function loadAutonomousOutcomes() {
 function saveAutonomousOutcomes() {
   try {
     localStorage.setItem(AUTONOMOUS_OUTCOMES_KEY, JSON.stringify(autonomousOutcomes));
+  } catch {
+    // Local storage can be unavailable in hardened browser contexts.
+  }
+}
+
+function loadOutcomeReviews() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(OUTCOME_REVIEWS_KEY) || "null");
+    if (Array.isArray(stored)) {
+      return stored;
+    }
+  } catch {
+    // Fall through to the empty review ledger.
+  }
+  return [];
+}
+
+function saveOutcomeReviews() {
+  try {
+    localStorage.setItem(OUTCOME_REVIEWS_KEY, JSON.stringify(outcomeReviews.slice(0, 80)));
   } catch {
     // Local storage can be unavailable in hardened browser contexts.
   }
@@ -3718,6 +3930,18 @@ function collectReceiptEvents() {
     });
   });
 
+  outcomeReviews.forEach((review) => {
+    push("Review", review.id, `Outcome evidence review: ${review.outcomeId}`, "Evidence review", review.decision, review.createdAt, {
+      blockers: review.blockers || [],
+      note: review.note || "",
+      outcomeId: review.outcomeId,
+      sourceSignalId: review.sourceSignalId || "",
+      sourceSignalReference: review.sourceSignalReference || "",
+      sourceSignalSource: review.sourceSignalSource || "",
+      sourceSignalSubject: review.sourceSignalSubject || ""
+    });
+  });
+
   gateRuns.forEach((run, index) => {
     push("Gate", run.id || `gate-${index + 1}`, run.claim, "Effective Boolean Filter", run.recommendation, run.createdAt, {
       argument: run.argument,
@@ -3746,6 +3970,8 @@ function collectReceiptEvents() {
         evidenceGateRunId: proposal.evidenceGateRunId || "",
         evidenceMeasuredAfter: proposal.evidenceMeasuredAfter || "",
         evidenceMeasuredBefore: proposal.evidenceMeasuredBefore || "",
+        evidenceReviewId: proposal.evidenceReviewId || "",
+        evidenceReviewNote: proposal.evidenceReviewNote || "",
         outcomeId: proposal.outcomeId || "",
         packetId: proposal.packetId || "",
         recommendation: proposal.recommendation || "ungated",
@@ -3770,6 +3996,7 @@ function collectReceiptEvents() {
   });
 
   autonomousOutcomes.forEach((outcome) => {
+    const review = latestOutcomeReview(outcome.id);
     push(
       "Outcome",
       outcome.id,
@@ -3782,6 +4009,8 @@ function collectReceiptEvents() {
         cooldownId: outcome.cooldownId || "",
         decision: outcome.decision,
         gateRunId: outcome.gateRunId || "",
+        evidenceReviewId: review ? review.id : "",
+        evidenceReviewDecision: review ? review.decision : "",
         measuredAfter: outcome.measuredAfter || "",
         measuredBefore: outcome.measuredBefore || "",
         metric: outcome.metric,
@@ -3799,6 +4028,8 @@ function collectReceiptEvents() {
   cooldownLanes.forEach((lane) => {
     push("Cooldown", lane.id, lane.lane, "Capital firewall", "Cooldown", lane.createdAt, {
       artifactUrl: lane.artifactUrl || "",
+      evidenceReviewId: lane.evidenceReviewId || "",
+      evidenceReviewNote: lane.evidenceReviewNote || "",
       expires: lane.expires,
       reason: lane.reason,
       source: lane.source,
@@ -4626,6 +4857,7 @@ function setupAutonomousCycle() {
   }
   resetButton.addEventListener("click", () => {
     autonomousOutcomes = defaultAutonomousOutcomes();
+    outcomeReviews = [];
     cooldownLanes = defaultCooldownLanes();
     treasuryProposals = treasuryProposals.filter((proposal) => !proposal.generatedFromOutcome);
     executionPackets = executionPackets.map((packet) => {
@@ -4633,6 +4865,7 @@ function setupAutonomousCycle() {
       return rest;
     });
     saveAutonomousOutcomes();
+    saveOutcomeReviews();
     saveCooldownLanes();
     saveExecutionPackets();
     saveTreasuryProposals();
@@ -4935,6 +5168,12 @@ function routeOutcome(outcomeId) {
   if (!outcome) {
     return;
   }
+  const routeBlock = outcomeRouteBlockedReason(outcome);
+  if (routeBlock) {
+    renderOutcomes();
+    renderLogs();
+    return;
+  }
 
   if (outcome.decision === "kill") {
     coolDownOutcomeLane(outcome);
@@ -4977,12 +5216,17 @@ function draftTreasuryProposalFromOutcome(outcome) {
     ? `Outcome gate receipt: ${gateRun.recommendation} (${gateRun.id}).`
     : "Outcome gate receipt: none attached. Proposal must run the gate before approval.";
   const signalLine = signalEvidenceText(outcome);
+  const review = latestOutcomeReview(outcome.id);
+  const reviewLine = review
+    ? `Outcome evidence review: ${review.decision} (${review.id}). ${review.note || ""}`
+    : "Outcome evidence review: missing.";
   const note = [
     `Autonomous draft from outcome receipt: ${metric}.`,
     measurementLine,
     artifactLine,
     gateLine,
     signalLine,
+    reviewLine,
     `Next route: ${outcome.nextClaim || outcome.next || "gate review"}.`
   ]
     .filter(Boolean)
@@ -4992,6 +5236,7 @@ function draftTreasuryProposalFromOutcome(outcome) {
     measurementLine,
     artifactLine,
     signalLine,
+    reviewLine,
     "The outcome receipt is evidence for a capped follow-on packet.",
     `Therefore ${claim}.`
   ]
@@ -5023,6 +5268,8 @@ function draftTreasuryProposalFromOutcome(outcome) {
     evidenceMeasuredBefore: before,
     evidenceMeasuredAfter: after,
     evidenceGateRunId: outcome.gateRunId || "",
+    evidenceReviewId: review ? review.id : "",
+    evidenceReviewNote: review ? review.note || "" : "",
     sourceSignalId: outcome.sourceSignalId || "",
     sourceSignalSource: outcome.sourceSignalSource || "",
     sourceSignalSubject: outcome.sourceSignalSubject || "",
@@ -5054,7 +5301,9 @@ function coolDownOutcomeLane(outcome) {
   const measurementLine = before || after ? `Before: ${before || "—"}. After: ${after || "—"}.` : "";
   const artifact = outcome.artifactUrl ? safeHttpsUrl(outcome.artifactUrl) : "";
   const signalLine = signalEvidenceText(outcome);
-  const reason = [`${outcome.metric || "Kill signal recorded"}.`, measurementLine, signalLine, outcome.evidence || ""]
+  const review = latestOutcomeReview(outcome.id);
+  const reviewLine = review ? `Evidence review: ${review.decision} (${review.id}). ${review.note || ""}` : "";
+  const reason = [`${outcome.metric || "Kill signal recorded"}.`, measurementLine, signalLine, reviewLine, outcome.evidence || ""]
     .map((part) => String(part || "").trim())
     .filter(Boolean)
     .join(" ");
@@ -5066,6 +5315,8 @@ function coolDownOutcomeLane(outcome) {
     sourceOutcomeId: outcome.id,
     expires: "2 cycles",
     artifactUrl: artifact,
+    evidenceReviewId: review ? review.id : "",
+    evidenceReviewNote: review ? review.note || "" : "",
     sourceSignalId: outcome.sourceSignalId || "",
     sourceSignalSource: outcome.sourceSignalSource || "",
     sourceSignalSubject: outcome.sourceSignalSubject || "",
