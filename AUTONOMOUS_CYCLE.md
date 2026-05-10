@@ -43,13 +43,34 @@ The Decisions view now mirrors outcome and routing receipts beside treasury, gat
 
 Browser local storage keeps the prototype state across reloads.
 
+## Outcome Receipt Evidence
+
+A delivered packet no longer becomes an outcome receipt automatically.
+
+The operator must attach:
+
+- a delivery artifact (https URL),
+- measured before and measured after values,
+- a single next claim,
+- and an optional Research Gate receipt.
+
+The artifact URL is rejected unless it parses as `https://`. Measurement and next-claim text are rejected if the sensitive-data scan flags PHI, payment card data, secrets, or private keys.
+
+These fields ride with the outcome into:
+
+- the Experiments view outcome card,
+- the drafted Treasury proposal note and argument,
+- the cooldown lane reason for `kill` outcomes,
+- and the receipt-chain canonical form for outcomes, treasury proposals, and cooldown lanes.
+
+A Research Gate receipt is optional. When missing, the drafted Treasury proposal still starts in the `needs_gate` state and the outcome card flags it.
+
 ## Hardening Path
 
 The next version should add:
 
-- artifact links for each delivery,
-- measured before and after values,
-- Research Gate checks for each next claim,
 - cooldown expiry and re-entry criteria,
 - proposal quality scores before gate submission,
-- and tamper-evident receipt hashes.
+- a resilience-score threshold for autonomous-drafted proposals,
+- a budget-bucket capacity check before any proposal can issue a packet,
+- and an externally anchored receipt root.

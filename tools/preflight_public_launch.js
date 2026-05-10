@@ -123,6 +123,28 @@ function checkPrivateUrlAllowlists() {
   }
 }
 
+function checkOutcomeEvidenceContract() {
+  const script = read("script.js");
+  const required = [
+    ["safeHttpsUrl helper", "function safeHttpsUrl"],
+    ["evidence submit handler", "function submitOutcomeEvidence"],
+    ["evidence-required guard in createOutcomeFromPacket", "if (!evidence) {"],
+    ["bounty evidence form renderer", 'data-evidence-form="'],
+    ["artifact URL field", 'name="artifactUrl"'],
+    ["measured before field", 'name="measuredBefore"'],
+    ["measured after field", 'name="measuredAfter"'],
+    ["next claim field", 'name="nextClaim"'],
+    ["sensitive-data scan over evidence", "findSensitiveData(`${measuredBefore}"],
+    ["proposal carries artifact evidence", "evidenceArtifactUrl: artifact"],
+    ["proposal carries measurement evidence", "evidenceMeasuredBefore: before"],
+    ["receipt chain carries outcome artifact", "artifactUrl: outcome.artifactUrl"],
+    ["receipt chain carries outcome measurement", "measuredBefore: outcome.measuredBefore"]
+  ];
+  for (const [label, snippet] of required) {
+    assert(script.includes(snippet), `script.js is missing ${label}.`);
+  }
+}
+
 function checkConfig() {
   const config = loadPublicConfig();
   const formUrl = String(config.googleFormUrl || "").trim();
@@ -165,6 +187,7 @@ compileJavaScript("public.js");
 compileJavaScript("script.js");
 checkPublicSurface();
 checkPrivateUrlAllowlists();
+checkOutcomeEvidenceContract();
 checkConfig();
 
 if (failures.length) {
