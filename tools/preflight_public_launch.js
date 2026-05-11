@@ -205,6 +205,56 @@ function checkLedgerBridgeContract() {
   );
 }
 
+function checkOrderLifecycleContract() {
+  const script = read("script.js");
+  const runbook = read("OPERATIONS_RUNBOOK.md");
+  const publicHtml = read("public.html");
+  const publicJs = read("public.js");
+
+  const required = [
+    ["incident storage key", 'const OPERATION_INCIDENTS_KEY = "strange-company-operation-incidents"'],
+    ["incident severities", 'const INCIDENT_SEVERITIES = ["info", "low", "medium", "high"]'],
+    ["incident statuses", 'const INCIDENT_STATUSES = ["open", "mitigating", "resolved", "closed"]'],
+    ["normalizeOperationIncident", "function normalizeOperationIncident"],
+    ["loadOperationIncidents", "function loadOperationIncidents"],
+    ["saveOperationIncidents", "function saveOperationIncidents"],
+    ["operation incident state", "let operationIncidents"],
+    ["order normalizer for delivery artifact", "deliveryArtifactUrl: artifactRaw ? safeHttpsUrl(artifactRaw)"],
+    ["order normalizer for acceptance note", "acceptanceNote: typeof order.acceptanceNote === \"string\""],
+    ["order normalizer for incidentIds", "incidentIds: Array.isArray(order.incidentIds)"],
+    ["order advance block helper", "function orderAdvanceBlock"],
+    ["delivery artifact gate", "Attach an https:// delivery artifact URL before marking Delivered."],
+    ["acceptance note gate", "Record an acceptance note before marking Delivered."],
+    ["acceptance note sensitive scan", "findSensitiveData(String(order.acceptanceNote"],
+    ["invoiceSentAt stamp", "next.invoiceSentAt = now"],
+    ["paidAt stamp", "next.paidAt = now"],
+    ["deliveredAt stamp", "next.deliveredAt = now"],
+    ["incident submit handler", "function submitOrderIncident"],
+    ["incident push to chain", 'operationIncidents.forEach((incident) => {'],
+    ["incident receipt type", '"Incident",'],
+    ["order chain payload carries acceptance", "acceptanceNote: order.acceptanceNote"],
+    ["order chain payload carries delivery artifact", "deliveryArtifactUrl: safeHttpsUrl(order.deliveryArtifactUrl"],
+    ["order chain payload carries timestamps", "invoiceSentAt: order.invoiceSentAt"],
+    ["order chain payload carries incidentIds", "incidentIds: Array.isArray(order.incidentIds)"]
+  ];
+  for (const [label, snippet] of required) {
+    assert(script.includes(snippet), `script.js is missing ${label}.`);
+  }
+
+  assert(
+    runbook.includes("Order Lifecycle Receipts"),
+    "OPERATIONS_RUNBOOK.md must document Order Lifecycle Receipts."
+  );
+  assert(runbook.includes("Incidents"), "OPERATIONS_RUNBOOK.md must document Incidents.");
+
+  for (const [file, contents] of [["public.html", publicHtml], ["public.js", publicJs]]) {
+    assert(!/data-incident-form/.test(contents), `${file} exposes incident form attribute.`);
+    assert(!/operationIncidents/.test(contents), `${file} exposes operationIncidents state.`);
+    assert(!/deliveryArtifactUrl/.test(contents), `${file} exposes deliveryArtifactUrl field.`);
+    assert(!/acceptanceNote/.test(contents), `${file} exposes acceptanceNote field.`);
+  }
+}
+
 function checkConfig() {
   const config = loadPublicConfig();
   const formUrl = String(config.googleFormUrl || "").trim();
@@ -249,6 +299,7 @@ checkPublicSurface();
 checkPrivateUrlAllowlists();
 checkOutcomeEvidenceContract();
 checkLedgerBridgeContract();
+checkOrderLifecycleContract();
 checkConfig();
 
 if (failures.length) {
