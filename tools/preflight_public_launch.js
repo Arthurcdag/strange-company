@@ -85,6 +85,8 @@ function checkPublicSurface() {
     ["private Treasury label", /\bTreasury\b/],
     ["private Decisions label", /\bDecisions\b/],
     ["private External Signals console", /\bExternal Signals\b/],
+    ["private Sheet ledger bridge", /\bSheet ledger bridge\b/i],
+    ["ledger bridge form id", /operationsLedgerBridgeForm/],
     ["plugin workflow UI", /\b(Alpaca|Binance|Zotero|Life Science Research|GitHub signal)\b/],
     ["automatic network submit", /\bfetch\s*\(/]
   ];
@@ -159,6 +161,48 @@ function checkOutcomeEvidenceContract() {
   }
 }
 
+function checkLedgerBridgeContract() {
+  const script = read("script.js");
+  const indexHtml = read("index.html");
+  const ledgerDoc = read("GOOGLE_SHEET_LEDGER.md");
+  const required = [
+    ["LEDGER_HEADERS constant", "const LEDGER_HEADERS = ["],
+    ["LEDGER_STATUSES constant", 'const LEDGER_STATUSES = ["Draft", "Sent", "Paid", "Delivered"]'],
+    ["parseLedgerTsv parser", "function parseLedgerTsv"],
+    ["validateLedgerRow validator", "function validateLedgerRow"],
+    ["importLedger upsert", "function importLedger"],
+    ["upsert reads operations.orders", "operations.orders || []"],
+    ["non-blank preservation for customer", "customer: incoming.customer || existing.customer"],
+    ["sensitive-data scan in row validator", "findSensitiveData(joined)"],
+    ["status whitelist applied", "LEDGER_STATUSES.includes(status)"],
+    ["stripe URL allowlist applied", "safeExternalUrl(stripeRaw, STRIPE_INVOICE_URLS)"],
+    ["per-row export helper", "function orderToLedgerRow"],
+    ["bulk export helper", "function allOrdersLedgerTsv"],
+    ["per-row copy handler", "function copyOrderLedgerRow"],
+    ["bulk copy handler", "function copyAllLedgerRows"],
+    ["per-row copy attribute", "data-copy-ledger-row="]
+  ];
+  for (const [label, snippet] of required) {
+    assert(script.includes(snippet), `script.js is missing ${label}.`);
+  }
+
+  const indexExpectations = [
+    ["bridge form", 'id="operationsLedgerBridgeForm"'],
+    ["bridge textarea", 'id="operationsLedgerTsv"'],
+    ["preview button", 'id="operationsLedgerPreview"'],
+    ["apply button", 'id="operationsLedgerImport"'],
+    ["bulk copy button", 'id="copyAllLedgerRows"']
+  ];
+  for (const [label, snippet] of indexExpectations) {
+    assert(indexHtml.includes(snippet), `index.html is missing ${label}.`);
+  }
+
+  assert(
+    ledgerDoc.includes("Private Ledger Bridge"),
+    "GOOGLE_SHEET_LEDGER.md must document the Private Ledger Bridge."
+  );
+}
+
 function checkConfig() {
   const config = loadPublicConfig();
   const formUrl = String(config.googleFormUrl || "").trim();
@@ -202,6 +246,7 @@ compileJavaScript("script.js");
 checkPublicSurface();
 checkPrivateUrlAllowlists();
 checkOutcomeEvidenceContract();
+checkLedgerBridgeContract();
 checkConfig();
 
 if (failures.length) {

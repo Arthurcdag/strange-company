@@ -568,6 +568,20 @@ const pilotStages = ["Prospect", "Contacted", "Call booked", "Committed", "Ready
 const operationStages = ["Draft", "Sent", "Paid", "Delivered"];
 const signalSources = ["Alpaca", "Binance", "Zotero", "Life Science Research", "GitHub"];
 const signalStatuses = ["observed", "triaged", "routed", "rejected"];
+const LEDGER_HEADERS = [
+  "created_at",
+  "source",
+  "invoice_id",
+  "customer",
+  "contact",
+  "service",
+  "amount",
+  "status",
+  "stripe_invoice_url",
+  "delivery_due",
+  "notes"
+];
+const LEDGER_STATUSES = ["Draft", "Sent", "Paid", "Delivered"];
 
 const gateChecks = [
   {
@@ -3237,6 +3251,7 @@ function renderOperations() {
             </div>
             <div class="ops-actions">
               <button type="button" data-copy-operation-packet="${escapeHtml(order.id)}">Packet</button>
+              <button type="button" data-copy-ledger-row="${escapeHtml(order.id)}">Copy row</button>
               <button type="button" data-save-stripe-order="${escapeHtml(order.id)}">Save URL</button>
               <button type="button" data-advance-operation-order="${escapeHtml(order.id)}" ${canAdvance && !paymentBlocked && !invoiceBlocked ? "" : "disabled"}>${nextOperationAction(order.status)}</button>
               <button type="button" data-remove-operation-order="${escapeHtml(order.id)}">Remove</button>
@@ -3252,6 +3267,9 @@ function renderOperations() {
   });
   document.querySelectorAll("[data-copy-operation-packet]").forEach((button) => {
     button.addEventListener("click", () => copyOperationPacket(button.dataset.copyOperationPacket));
+  });
+  document.querySelectorAll("[data-copy-ledger-row]").forEach((button) => {
+    button.addEventListener("click", () => copyOrderLedgerRow(button.dataset.copyLedgerRow, button));
   });
   document.querySelectorAll("[data-save-stripe-order]").forEach((button) => {
     button.addEventListener("click", () => saveOrderStripeUrl(button.dataset.saveStripeOrder));
@@ -3567,6 +3585,235 @@ function advanceOperationOrder(orderId) {
   renderLogs();
 }
 
+function parseLedgerTsv(text) {
+  const normalized = String(text || "").replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+  const lines = normalized.split("\n").map((line) => line.replace(/\s+$/, "")).filter((line) => line.length > 0);
+  if (!lines.length) {
+    return { headers: LEDGER_HEADERS.slice(), rows: [], skippedHeader: false };
+  }
+
+  let cursor = 0;
+  const firstCells = lines[0].split("\t").map((cell) => cell.trim().toLowerCase());
+  const headerMatches = LEDGER_HEADERS.every((header, index) => firstCells[index] === header);
+  if (headerMatches) {
+    cursor = 1;
+  }
+
+  const rows = [];
+  for (let lineIndex = cursor; lineIndex < lines.length; lineIndex += 1) {
+    const cells = lines[lineIndex].split("\t");
+    if (cells.length < LEDGER_HEADERS.length) {
+      while (cells.length < LEDGER_HEADERS.length) {
+        cells.push("");
+      }
+    }
+    if (cells.length > LEDGER_HEADERS.length) {
+      cells.length = LEDGER_HEADERS.length;
+    }
+    const row = {};
+    LEDGER_HEADERS.forEach((header, index) => {
+      row[header] = String(cells[index] || "").trim();
+    });
+    rows.push({ lineNumber: lineIndex + 1, raw: row });
+  }
+  return { headers: LEDGER_HEADERS.slice(), rows, skippedHeader: cursor === 1 };
+}
+
+function validateLedgerRow(raw) {
+  const errors = [];
+  const invoiceId = String(raw.invoice_id || "").trim();
+  const customer = String(raw.customer || "").trim();
+  const contact = String(raw.contact || "").trim();
+  const service = String(raw.service || "").trim();
+  const amountRaw = String(raw.amount || "").trim();
+  const status = String(raw.status || "").trim();
+  const stripeRaw = String(raw.stripe_invoice_url || "").trim();
+  const deliveryDue = String(raw.delivery_due || "").trim();
+  const notes = String(raw.notes || "").trim();
+  const source = String(raw.source || "").trim();
+  const createdAt = String(raw.created_at || "").trim();
+
+  if (!invoiceId) {
+    errors.push("invoice_id is required as the upsert key.");
+  }
+  if (!customer) {
+    errors.push("customer is required.");
+  }
+  const amountNumber = Number(amountRaw.replace(/[$,\s]/g, ""));
+  if (!amountRaw) {
+    errors.push("amount is required.");
+  } else if (!Number.isFinite(amountNumber) || amountNumber < 0) {
+    errors.push("amount must be a finite, non-negative number.");
+  }
+  if (!status) {
+    errors.push("status is required.");
+  } else if (!LEDGER_STATUSES.includes(status)) {
+    errors.push(`status must be one of ${LEDGER_STATUSES.join(", ")}.`);
+  }
+  if (contact && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact)) {
+    errors.push("contact must be a valid email when set.");
+  }
+  let stripeUrl = "";
+  if (stripeRaw) {
+    stripeUrl = safeExternalUrl(stripeRaw, STRIPE_INVOICE_URLS);
+    if (!stripeUrl) {
+      errors.push("stripe_invoice_url must be an https://invoice.stripe.com/ URL.");
+    }
+  }
+  if (deliveryDue && !/^\d{4}-\d{2}-\d{2}$/.test(deliveryDue)) {
+    errors.push("delivery_due must be blank or YYYY-MM-DD.");
+  }
+  if (createdAt) {
+    const parsed = new Date(createdAt);
+    if (Number.isNaN(parsed.valueOf())) {
+      errors.push("created_at must be blank or an ISO date.");
+    }
+  }
+  const joined = [customer, contact, service, notes, source, raw.invoice_id || ""].join("\n");
+  const sensitive = findSensitiveData(joined);
+  if (sensitive.length) {
+    errors.push(`row contains ${sensitive.join(", ")}.`);
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
+    normalized: {
+      invoiceId,
+      customer,
+      contact,
+      service,
+      amount: amountNumber,
+      status,
+      stripeInvoiceUrl: stripeUrl,
+      deliveryDue,
+      notes,
+      source,
+      createdAt
+    }
+  };
+}
+
+function previewLedgerImport(text) {
+  const parsed = parseLedgerTsv(text);
+  const summary = {
+    totalRows: parsed.rows.length,
+    skippedHeader: parsed.skippedHeader,
+    willCreate: 0,
+    willUpdate: 0,
+    rejected: [],
+    valid: []
+  };
+  if (!parsed.rows.length) {
+    return summary;
+  }
+  const seenInvoiceIds = new Set();
+  parsed.rows.forEach((entry) => {
+    const result = validateLedgerRow(entry.raw);
+    if (!result.ok) {
+      summary.rejected.push({ lineNumber: entry.lineNumber, errors: result.errors });
+      return;
+    }
+    if (seenInvoiceIds.has(result.normalized.invoiceId)) {
+      summary.rejected.push({
+        lineNumber: entry.lineNumber,
+        errors: [`invoice_id ${result.normalized.invoiceId} appears more than once in the paste; resolve in the Sheet first.`]
+      });
+      return;
+    }
+    seenInvoiceIds.add(result.normalized.invoiceId);
+    const existing = (operations.orders || []).find((order) => order.invoiceNumber === result.normalized.invoiceId);
+    if (existing) {
+      summary.willUpdate += 1;
+    } else {
+      summary.willCreate += 1;
+    }
+    summary.valid.push({ lineNumber: entry.lineNumber, normalized: result.normalized });
+  });
+  return summary;
+}
+
+function importLedger(text) {
+  const preview = previewLedgerImport(text);
+  if (!preview.valid.length) {
+    return preview;
+  }
+  const now = new Date().toISOString();
+  const services = operationServices();
+  const orders = operations.orders || [];
+  preview.valid.forEach((entry) => {
+    const incoming = entry.normalized;
+    const existingIndex = orders.findIndex((order) => order.invoiceNumber === incoming.invoiceId);
+    const matchedService = services.find((service) => service.title === incoming.service || service.id === incoming.service);
+    if (existingIndex >= 0) {
+      const existing = orders[existingIndex];
+      orders[existingIndex] = {
+        ...existing,
+        customer: incoming.customer || existing.customer,
+        contact: incoming.contact || existing.contact,
+        serviceId: matchedService?.id || existing.serviceId,
+        serviceTitle: incoming.service || existing.serviceTitle,
+        amount: Number.isFinite(incoming.amount) && incoming.amount > 0 ? incoming.amount : existing.amount,
+        status: incoming.status || existing.status,
+        stripeInvoiceUrl: incoming.stripeInvoiceUrl || existing.stripeInvoiceUrl,
+        deliveryDue: incoming.deliveryDue || existing.deliveryDue,
+        notes: incoming.notes || existing.notes,
+        source: incoming.source || existing.source,
+        ledgerSyncedAt: now,
+        updatedAt: now
+      };
+    } else {
+      orders.unshift({
+        id: `order-ledger-${slugify(incoming.invoiceId)}-${Date.now()}`,
+        invoiceNumber: incoming.invoiceId,
+        customer: incoming.customer,
+        contact: incoming.contact,
+        serviceId: matchedService?.id || "imported",
+        serviceTitle: incoming.service || "Sheet import",
+        need: "Imported from Sheet ledger.",
+        amount: Number.isFinite(incoming.amount) ? incoming.amount : 0,
+        status: incoming.status,
+        source: incoming.source || "Sheet ledger",
+        stripeInvoiceUrl: incoming.stripeInvoiceUrl,
+        deliveryDue: incoming.deliveryDue,
+        notes: incoming.notes,
+        createdAt: incoming.createdAt || now,
+        updatedAt: now,
+        ledgerSyncedAt: now
+      });
+    }
+  });
+  operations.orders = orders;
+  saveOperations();
+  return preview;
+}
+
+function orderToLedgerCells(order) {
+  return [
+    order.createdAt || "",
+    order.source || "Operations console",
+    order.invoiceNumber || "",
+    order.customer || "",
+    order.contact || "",
+    order.serviceTitle || "",
+    String(Number(order.amount || 0)),
+    order.status || "Draft",
+    order.stripeInvoiceUrl || "",
+    order.deliveryDue || "",
+    (order.notes || "").replace(/[\t\r\n]+/g, " ")
+  ];
+}
+
+function orderToLedgerRow(order) {
+  return orderToLedgerCells(order).join("\t");
+}
+
+function allOrdersLedgerTsv() {
+  const header = LEDGER_HEADERS.join("\t");
+  const rows = (operations.orders || []).map((order) => orderToLedgerRow(order));
+  return [header, ...rows].join("\n");
+}
+
 function removeOperationOrder(orderId) {
   operations.orders = operations.orders.filter((order) => order.id !== orderId);
   saveOperations();
@@ -3634,6 +3881,47 @@ async function copyOperationPacket(orderId) {
     </div>
     <pre>${escapeHtml(packet)}</pre>
   `;
+}
+
+async function copyOrderLedgerRow(orderId, button) {
+  const order = (operations.orders || []).find((item) => item.id === orderId);
+  if (!order || !button) {
+    return;
+  }
+  const row = orderToLedgerRow(order);
+  const previous = button.textContent;
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(row);
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  button.textContent = copied ? "Row copied" : "Copy failed";
+  setTimeout(() => {
+    button.textContent = previous;
+  }, 1500);
+}
+
+async function copyAllLedgerRows(button) {
+  if (!button) {
+    return;
+  }
+  const tsv = allOrdersLedgerTsv();
+  const previous = button.getAttribute("aria-label") || "";
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(tsv);
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  button.setAttribute("aria-label", copied ? "All orders copied as TSV" : "Copy failed");
+  button.classList.add(copied ? "ledger-copy-ok" : "ledger-copy-fail");
+  setTimeout(() => {
+    button.setAttribute("aria-label", previous);
+    button.classList.remove("ledger-copy-ok", "ledger-copy-fail");
+  }, 1500);
 }
 
 function submitOrderRequest(form) {
@@ -4983,6 +5271,108 @@ function setupOperations() {
       renderOrderDesk();
       renderLogs();
     });
+  }
+
+  const bridgeForm = document.querySelector("#operationsLedgerBridgeForm");
+  const bridgeTextarea = document.querySelector("#operationsLedgerTsv");
+  const bridgeOutput = document.querySelector("#operationsLedgerOutput");
+  const bridgePreview = document.querySelector("#operationsLedgerPreview");
+  const bridgeImport = document.querySelector("#operationsLedgerImport");
+  const bridgeClear = document.querySelector("#operationsLedgerClear");
+
+  const renderBridgeOutput = (preview, tone = "amber", label = "Preview") => {
+    if (!bridgeOutput) {
+      return;
+    }
+    if (!preview || preview.totalRows === 0) {
+      bridgeOutput.innerHTML = `
+        <article class="ops-bridge-output-card">
+          <span class="metric-label">${escapeHtml(label)}</span>
+          <p>No TSV rows detected. Paste rows copied from the Sheet, with or without the header line.</p>
+        </article>
+      `;
+      if (bridgeImport) {
+        bridgeImport.disabled = true;
+      }
+      return;
+    }
+    const rejectedList = preview.rejected
+      .map(
+        (entry) => `
+          <li>
+            <strong>Line ${entry.lineNumber}:</strong> ${escapeHtml(entry.errors.join(" "))}
+          </li>
+        `
+      )
+      .join("");
+    const validList = preview.valid
+      .map(
+        (entry) => `
+          <li>
+            Line ${entry.lineNumber}: ${escapeHtml(entry.normalized.invoiceId)} / ${escapeHtml(entry.normalized.customer)}
+            (${escapeHtml(entry.normalized.status)})
+          </li>
+        `
+      )
+      .join("");
+    bridgeOutput.innerHTML = `
+      <article class="ops-bridge-output-card">
+        <span class="metric-label">${escapeHtml(label)}</span>
+        <p>
+          Rows parsed: ${preview.totalRows}.
+          Will create: ${preview.willCreate}.
+          Will update: ${preview.willUpdate}.
+          Rejected: ${preview.rejected.length}.
+          ${preview.skippedHeader ? "Header row detected and skipped." : ""}
+        </p>
+        ${preview.rejected.length ? `<details open><summary>Rejected rows</summary><ul class="ops-bridge-rejected">${rejectedList}</ul></details>` : ""}
+        ${preview.valid.length ? `<details><summary>Valid rows</summary><ul class="ops-bridge-valid">${validList}</ul></details>` : ""}
+      </article>
+    `;
+    if (bridgeImport) {
+      bridgeImport.disabled = preview.valid.length === 0;
+    }
+  };
+
+  if (bridgePreview) {
+    bridgePreview.addEventListener("click", () => {
+      const text = bridgeTextarea ? bridgeTextarea.value : "";
+      const preview = previewLedgerImport(text);
+      renderBridgeOutput(preview, "amber", "Preview");
+    });
+  }
+
+  if (bridgeForm) {
+    bridgeForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const text = bridgeTextarea ? bridgeTextarea.value : "";
+      const preview = importLedger(text);
+      renderBridgeOutput(preview, "green", "Imported");
+      if (bridgeTextarea && preview.valid.length) {
+        bridgeTextarea.value = "";
+      }
+      if (preview.valid.length) {
+        renderOperations();
+        renderOrderDesk();
+        renderLogs();
+      }
+    });
+  }
+
+  if (bridgeClear) {
+    bridgeClear.addEventListener("click", () => {
+      if (bridgeOutput) {
+        bridgeOutput.innerHTML = "";
+      }
+      if (bridgeImport) {
+        bridgeImport.disabled = true;
+      }
+    });
+  }
+
+  const copyAllButton = document.querySelector("#copyAllLedgerRows");
+  if (copyAllButton) {
+    copyAllButton.addEventListener("click", () => copyAllLedgerRows(copyAllButton));
   }
 }
 
