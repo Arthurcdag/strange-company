@@ -67,13 +67,14 @@ A row is rejected, and the rest of the paste is still processed, if any of the f
 
 - `invoice_id` is blank (the bridge needs a key).
 - `customer` is blank.
-- `amount` is blank, non-numeric, or negative.
+- `amount` is blank, non-numeric, zero, or negative.
 - `status` is anything other than `Draft`, `Sent`, `Paid`, or `Delivered`.
 - `contact` is set but is not a plausible email address.
 - `stripe_invoice_url` is set but does not start with `https://invoice.stripe.com/`.
 - `delivery_due` is set but is not `YYYY-MM-DD`.
 - `created_at` is set but is not parseable as a date.
 - The sensitive-data scan flags PHI, payment card data, secrets, or private keys anywhere in the row.
+- The pasted line has extra columns beyond the required eleven-column ledger shape.
 
 Duplicate `invoice_id` values inside one paste are rejected so the operator resolves the conflict in the Sheet before retrying.
 

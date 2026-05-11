@@ -3594,7 +3594,8 @@ function parseLedgerTsv(text) {
 
   let cursor = 0;
   const firstCells = lines[0].split("\t").map((cell) => cell.trim().toLowerCase());
-  const headerMatches = LEDGER_HEADERS.every((header, index) => firstCells[index] === header);
+  const headerMatches =
+    firstCells.length === LEDGER_HEADERS.length && LEDGER_HEADERS.every((header, index) => firstCells[index] === header);
   if (headerMatches) {
     cursor = 1;
   }
@@ -3602,6 +3603,7 @@ function parseLedgerTsv(text) {
   const rows = [];
   for (let lineIndex = cursor; lineIndex < lines.length; lineIndex += 1) {
     const cells = lines[lineIndex].split("\t");
+    const columnCount = cells.length;
     if (cells.length < LEDGER_HEADERS.length) {
       while (cells.length < LEDGER_HEADERS.length) {
         cells.push("");
@@ -3614,6 +3616,7 @@ function parseLedgerTsv(text) {
     LEDGER_HEADERS.forEach((header, index) => {
       row[header] = String(cells[index] || "").trim();
     });
+    row.__columnCount = columnCount;
     rows.push({ lineNumber: lineIndex + 1, raw: row });
   }
   return { headers: LEDGER_HEADERS.slice(), rows, skippedHeader: cursor === 1 };
@@ -3632,6 +3635,11 @@ function validateLedgerRow(raw) {
   const notes = String(raw.notes || "").trim();
   const source = String(raw.source || "").trim();
   const createdAt = String(raw.created_at || "").trim();
+  const columnCount = Number(raw.__columnCount || 0);
+
+  if (columnCount > LEDGER_HEADERS.length) {
+    errors.push(`row has ${columnCount} columns; expected ${LEDGER_HEADERS.length}. Remove extra Sheet columns before import.`);
+  }
 
   if (!invoiceId) {
     errors.push("invoice_id is required as the upsert key.");
@@ -3642,8 +3650,8 @@ function validateLedgerRow(raw) {
   const amountNumber = Number(amountRaw.replace(/[$,\s]/g, ""));
   if (!amountRaw) {
     errors.push("amount is required.");
-  } else if (!Number.isFinite(amountNumber) || amountNumber < 0) {
-    errors.push("amount must be a finite, non-negative number.");
+  } else if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
+    errors.push("amount must be a finite, positive number.");
   }
   if (!status) {
     errors.push("status is required.");

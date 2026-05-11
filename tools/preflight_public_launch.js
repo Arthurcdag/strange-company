@@ -173,6 +173,8 @@ function checkLedgerBridgeContract() {
     ["importLedger upsert", "function importLedger"],
     ["upsert reads operations.orders", "operations.orders || []"],
     ["non-blank preservation for customer", "customer: incoming.customer || existing.customer"],
+    ["extra column rejection", "expected ${LEDGER_HEADERS.length}. Remove extra Sheet columns before import."],
+    ["positive amount required", "amount must be a finite, positive number."],
     ["sensitive-data scan in row validator", "findSensitiveData(joined)"],
     ["status whitelist applied", "LEDGER_STATUSES.includes(status)"],
     ["stripe URL allowlist applied", "safeExternalUrl(stripeRaw, STRIPE_INVOICE_URLS)"],
