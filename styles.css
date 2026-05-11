@@ -2631,13 +2631,71 @@ input[type="range"] {
   color: var(--muted);
 }
 
-.ops-order-fields input {
+.ops-order-fields input,
+.ops-order-fields textarea {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 8px 10px;
   background: var(--surface);
   color: var(--ink);
   font-size: 13px;
+  font-family: inherit;
+}
+
+.ops-order-fields textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.ops-order-artifact {
+  color: var(--blue);
+  font-weight: 700;
+}
+
+.ops-order-acceptance,
+.ops-order-incidents {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ops-order-acceptance-missing {
+  color: var(--red);
+}
+
+.ops-order-block {
+  margin-top: 6px;
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ops-incident-form {
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  margin-top: 10px;
+}
+
+.ops-incident-form select,
+.ops-incident-form textarea {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.ops-incident-form textarea {
+  resize: vertical;
+  min-height: 60px;
 }
 
 @media (max-width: 720px) {

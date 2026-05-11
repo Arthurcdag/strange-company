@@ -54,6 +54,31 @@ Do not accept protected health information, payment credentials, passwords, or r
 6. Mark `Delivered` only after acceptance criteria are met.
 7. Seal the receipt chain after material state changes.
 
+## Order Lifecycle Receipts
+
+Every order state transition is now stamped with a timestamp and gated by evidence:
+
+- `Draft -> Sent` requires a Stripe Hosted Invoice URL pasted on the order. The transition stamps `invoiceSentAt`.
+- `Sent -> Paid` requires every critical commercial control to be closed. The transition stamps `paidAt`.
+- `Paid -> Delivered` requires an `https://` delivery artifact URL and an acceptance note on the order. The acceptance note is scanned for PHI, payment card data, secrets, and private key material; rows that flag are blocked. The transition stamps `deliveredAt`.
+
+The order card shows the timeline (`Sent / Paid / Delivered` with dates), the artifact link, the acceptance note, and any linked incidents. The advance button is disabled and the block reason is rendered inline whenever one of these conditions is unmet.
+
+The receipt-chain canonical form now carries `invoiceSentAt`, `paidAt`, `deliveredAt`, `deliveryArtifactUrl`, `acceptanceNote`, and `incidentIds` on every Order receipt. Sealing the chain after a transition preserves the proof that the gate was satisfied.
+
+## Incidents
+
+Every order card has a `Log incident` button. The form captures:
+
+- severity (`info`, `low`, `medium`, `high`),
+- status (`open`, `mitigating`, `resolved`, `closed`),
+- a summary,
+- and the operator response.
+
+Submission is blocked if either text field is empty or if the sensitive-data scan flags PHI, payment card data, secrets, or private key material. Accepted incidents are stored locally, linked back to the order via `incidentIds`, and emit a dedicated `Incident` receipt in the decision and audit chain. `high open` and `high mitigating` incidents render red in the chain to make them obvious in the audit surface.
+
+Refunds, disputes, regulated-data submissions, Sheet outages, and Stripe holds should all become incidents before they become quiet operator memory.
+
 ## Weekly Operating Loop
 
 - Reconcile invoices against the bookkeeping ledger.
