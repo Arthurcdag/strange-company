@@ -85,6 +85,8 @@ function checkPublicSurface() {
     ["private Treasury label", /\bTreasury\b/],
     ["private Decisions label", /\bDecisions\b/],
     ["private External Signals console", /\bExternal Signals\b/],
+    ["private Daily pilot run console", /\bDaily pilot run\b/i],
+    ["daily run storage key", /strange-company-daily-pilot-run/],
     ["plugin workflow UI", /\b(Alpaca|Binance|Zotero|Life Science Research|GitHub signal)\b/],
     ["automatic network submit", /\bfetch\s*\(/]
   ];
@@ -159,6 +161,60 @@ function checkOutcomeEvidenceContract() {
   }
 }
 
+function checkDailyPilotRunContract() {
+  const script = read("script.js");
+  const indexHtml = read("index.html");
+  const runbook = read("OPERATIONS_RUNBOOK.md");
+  const livePilot = read("RUN_LIVE_PILOT.md");
+
+  const required = [
+    ["DAILY_PILOT_RUN_KEY", 'const DAILY_PILOT_RUN_KEY = "strange-company-daily-pilot-run"'],
+    ["DAILY_RUN_CHECKS constant", "const DAILY_RUN_CHECKS = ["],
+    ["DAILY_RUN_STOP_RULES constant", "const DAILY_RUN_STOP_RULES = ["],
+    ["loadDailyPilotRun", "function loadDailyPilotRun"],
+    ["saveDailyPilotRun", "function saveDailyPilotRun"],
+    ["normalizeDailyRunRecord", "function normalizeDailyRunRecord"],
+    ["activeStopRules helper", "function activeStopRules"],
+    ["dailyRunPausedReason helper", "function dailyRunPausedReason"],
+    ["startDailyPilotRun", "function startDailyPilotRun"],
+    ["closeDailyPilotRun", "function closeDailyPilotRun"],
+    ["toggleDailyRunCheck", "function toggleDailyRunCheck"],
+    ["toggleDailyRunStopRule", "function toggleDailyRunStopRule"],
+    ["resetDailyPilotRun", "function resetDailyPilotRun"],
+    ["renderDailyPilotRun", "function renderDailyPilotRun"],
+    ["collectDailyRunOrderIds", "function collectDailyRunOrderIds"],
+    ["receipt root captured at close", "buildReceiptChain()"],
+    ["paused state in Operations model", 'state: "Paused"'],
+    ["Draft to Sent paused block", "order.status === \"Draft\" && pausedReason"],
+    ["Run receipt push", 'push(\n      "Run",'],
+    ["Run receipt carries receiptRoot", "receiptRoot: entry.receiptRoot"],
+    ["Run receipt carries completedChecks", "completedChecks,"],
+    ["Run receipt carries stopRules", "stopRules: entry.activeRules"]
+  ];
+  for (const [label, snippet] of required) {
+    assert(script.includes(snippet), `script.js is missing ${label}.`);
+  }
+
+  const indexExpectations = [
+    ["daily run panel container", 'id="operationsDailyRun"'],
+    ["start run button", 'id="startDailyPilotRun"'],
+    ["close run button", 'id="closeDailyPilotRun"'],
+    ["reset run button", 'id="resetDailyPilotRun"']
+  ];
+  for (const [label, snippet] of indexExpectations) {
+    assert(indexHtml.includes(snippet), `index.html is missing ${label}.`);
+  }
+
+  assert(
+    runbook.includes("Daily Pilot Run Console"),
+    "OPERATIONS_RUNBOOK.md must document the Daily Pilot Run Console."
+  );
+  assert(
+    livePilot.includes("Run the daily pilot console"),
+    "RUN_LIVE_PILOT.md must document the daily pilot console step."
+  );
+}
+
 function checkConfig() {
   const config = loadPublicConfig();
   const formUrl = String(config.googleFormUrl || "").trim();
@@ -202,6 +258,7 @@ compileJavaScript("script.js");
 checkPublicSurface();
 checkPrivateUrlAllowlists();
 checkOutcomeEvidenceContract();
+checkDailyPilotRunContract();
 checkConfig();
 
 if (failures.length) {

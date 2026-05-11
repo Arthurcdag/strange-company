@@ -54,6 +54,19 @@ Do not accept protected health information, payment credentials, passwords, or r
 6. Mark `Delivered` only after acceptance criteria are met.
 7. Seal the receipt chain after material state changes.
 
+## Daily Pilot Run Console
+
+The Operations view has a `Daily pilot run` panel that captures one workday of the loop as a single receipt.
+
+The operator presses `Start run` once per day. While the run is open, the panel surfaces:
+
+- A checklist for review-requests, qualify-customer, create-Stripe-invoice, update-ledger, track-payment, deliver, log-incidents, and seal-chain. Each item can be ticked independently; tick state is local until the run is closed.
+- Stop-rule toggles for Stripe hold, business bank restricted, regulated-data submitted, Sheet ledger outage, support-inbox outage, and terms-or-privacy change. Any active stop rule paints the panel red, sets the Operations console state to `Paused`, and blocks `Draft -> Sent` transitions for new orders. Active drafts can still receive Stripe URLs and acceptance notes, but no new invoices may be marked sent until the stop rule clears.
+- A live list of orders whose `updatedAt` is later than the run's `startedAt`. This is captured as `orderIds` when the run closes.
+- A freeform textarea for incident ids. Operators paste the ids of incidents the run touched, comma or whitespace separated. The ids are persisted on close.
+
+Pressing `Close run` snapshots the current receipt-chain root (the same root `Seal chain` would record), copies the checklist state and active stop rules into a history entry, and clears the active run. Closed runs are immutable in the local store. The receipt chain carries a `Run` receipt for the active run (state `Active` or `Paused`) and one for every closed run (state `Closed clean` or `Closed with stop rules`), so the audit surface preserves both the in-progress and historical views.
+
 ## Weekly Operating Loop
 
 - Reconcile invoices against the bookkeeping ledger.
