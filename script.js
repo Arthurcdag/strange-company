@@ -620,7 +620,10 @@ const RECEIPT_SEAL_KEY = "strange-company-receipt-seal";
 const REVENUE_PILOT_KEY = "strange-company-revenue-pilot";
 const SATELLITE_COMPANY_KEY = "strange-company-satellite-company";
 const OPERATIONS_KEY = "strange-company-operations";
+const OPERATION_INCIDENTS_KEY = "strange-company-operation-incidents";
 const EXTERNAL_SIGNALS_KEY = "strange-company-external-signals";
+const INCIDENT_SEVERITIES = ["info", "low", "medium", "high"];
+const INCIDENT_STATUSES = ["open", "mitigating", "resolved", "closed"];
 
 let activeScenario = "base";
 let loopAnimationId = 0;
@@ -637,6 +640,7 @@ let receiptSeal = loadReceiptSeal();
 let revenuePilot = loadRevenuePilot();
 let satelliteCompany = loadSatelliteCompany();
 let operations = loadOperations();
+let operationIncidents = loadOperationIncidents();
 let externalSignals = loadExternalSignals();
 
 function activateView(target) {
@@ -2354,9 +2358,60 @@ function loadOperations() {
 }
 
 function normalizeOperationOrder(order) {
+  const artifactRaw = order.deliveryArtifactUrl || "";
   return {
     ...order,
-    stripeInvoiceUrl: safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS)
+    stripeInvoiceUrl: safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS),
+    deliveryArtifactUrl: artifactRaw ? safeHttpsUrl(artifactRaw) : "",
+    acceptanceNote: typeof order.acceptanceNote === "string" ? order.acceptanceNote : "",
+    invoiceSentAt: typeof order.invoiceSentAt === "string" ? order.invoiceSentAt : "",
+    paidAt: typeof order.paidAt === "string" ? order.paidAt : "",
+    deliveredAt: typeof order.deliveredAt === "string" ? order.deliveredAt : "",
+    incidentIds: Array.isArray(order.incidentIds) ? order.incidentIds.filter((id) => typeof id === "string" && id) : []
+  };
+}
+
+function defaultOperationIncidents() {
+  return [];
+}
+
+function loadOperationIncidents() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(OPERATION_INCIDENTS_KEY) || "null");
+    if (Array.isArray(stored)) {
+      return stored.map((incident) => normalizeOperationIncident(incident)).filter(Boolean);
+    }
+  } catch {
+    // Fall through to default.
+  }
+  return defaultOperationIncidents();
+}
+
+function saveOperationIncidents() {
+  try {
+    localStorage.setItem(OPERATION_INCIDENTS_KEY, JSON.stringify(operationIncidents));
+  } catch {
+    // Local storage can be unavailable in hardened browser contexts.
+  }
+}
+
+function normalizeOperationIncident(incident) {
+  if (!incident || typeof incident !== "object") {
+    return null;
+  }
+  const severity = INCIDENT_SEVERITIES.includes(incident.severity) ? incident.severity : "low";
+  const status = INCIDENT_STATUSES.includes(incident.status) ? incident.status : "open";
+  const id = typeof incident.id === "string" && incident.id ? incident.id : `incident-${Date.now()}`;
+  return {
+    id,
+    orderId: typeof incident.orderId === "string" ? incident.orderId : "",
+    invoiceNumber: typeof incident.invoiceNumber === "string" ? incident.invoiceNumber : "",
+    severity,
+    status,
+    summary: typeof incident.summary === "string" ? incident.summary : "",
+    response: typeof incident.response === "string" ? incident.response : "",
+    createdAt: typeof incident.createdAt === "string" ? incident.createdAt : new Date().toISOString(),
+    updatedAt: typeof incident.updatedAt === "string" ? incident.updatedAt : new Date().toISOString()
   };
 }
 
@@ -3202,11 +3257,10 @@ function renderOperations() {
       .map((order) => {
         const tone = toneForOperationStatus(order.status);
         const canAdvance = order.status !== "Delivered";
-        const paymentBlocked = order.status === "Sent" && model.openCriticalControls.length > 0;
-        const stripeNeeded = order.status === "Draft" || order.status === "Sent" || order.status === "Paid" || order.status === "Delivered";
+        const blockReason = orderAdvanceBlock(order, model);
         const safeStripeInvoiceUrl = safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS);
-        const stripeMissing = stripeNeeded && !safeStripeInvoiceUrl;
-        const invoiceBlocked = order.status === "Draft" && stripeMissing;
+        const stripeMissing = order.status === "Draft" && !safeStripeInvoiceUrl;
+        const safeArtifact = safeHttpsUrl(order.deliveryArtifactUrl || "");
         const stripeLine = safeStripeInvoiceUrl
           ? `<a href="${escapeHtml(safeStripeInvoiceUrl)}" target="_blank" rel="noreferrer">Hosted invoice</a>`
           : stripeMissing
@@ -3215,6 +3269,32 @@ function renderOperations() {
         const dueLine = order.deliveryDue
           ? `Delivery due ${escapeHtml(order.deliveryDue)}`
           : "Delivery date not set";
+        const timeline = [];
+        if (order.invoiceSentAt) timeline.push(`Sent ${escapeHtml(formatReceiptDate(order.invoiceSentAt))}`);
+        if (order.paidAt) timeline.push(`Paid ${escapeHtml(formatReceiptDate(order.paidAt))}`);
+        if (order.deliveredAt) timeline.push(`Delivered ${escapeHtml(formatReceiptDate(order.deliveredAt))}`);
+        const timelineLine = timeline.length ? `<p class="ops-order-meta">${timeline.join(" / ")}</p>` : "";
+        const artifactLine = safeArtifact
+          ? `<a class="ops-order-artifact" href="${escapeHtml(safeArtifact)}" target="_blank" rel="noreferrer noopener">Delivery artifact</a>`
+          : order.status === "Paid" || order.status === "Delivered"
+            ? `<span class="state amber">No https artifact attached</span>`
+            : "";
+        const acceptanceLine = order.acceptanceNote
+          ? `<p class="ops-order-acceptance"><strong>Acceptance:</strong> ${escapeHtml(order.acceptanceNote)}</p>`
+          : order.status === "Paid" || order.status === "Delivered"
+            ? `<p class="ops-order-acceptance ops-order-acceptance-missing">No acceptance note yet.</p>`
+            : "";
+        const linkedIncidents = (order.incidentIds || [])
+          .map((incidentId) => operationIncidents.find((entry) => entry.id === incidentId))
+          .filter(Boolean);
+        const incidentLine = linkedIncidents.length
+          ? `<p class="ops-order-incidents"><strong>Incidents:</strong> ${linkedIncidents
+              .map((entry) => `${escapeHtml(entry.severity)} ${escapeHtml(entry.status)}: ${escapeHtml((entry.summary || "").slice(0, 80))}`)
+              .join(" / ")}</p>`
+          : "";
+        const blockLine = blockReason && canAdvance
+          ? `<p class="ops-order-block">${escapeHtml(blockReason)}</p>`
+          : "";
         return `
           <article class="ops-order">
             <div>
@@ -3222,6 +3302,11 @@ function renderOperations() {
               <h4>${escapeHtml(order.customer)}</h4>
               <p>${escapeHtml(order.serviceTitle)} / ${escapeHtml(order.need || "Need not recorded")}</p>
               <p class="ops-order-meta">${escapeHtml(dueLine)} / ${stripeLine}</p>
+              ${timelineLine}
+              ${artifactLine ? `<p class="ops-order-meta">${artifactLine}</p>` : ""}
+              ${acceptanceLine}
+              ${incidentLine}
+              ${blockLine}
             </div>
             <strong>${money.format(Number(order.amount || 0))}</strong>
             <span class="state ${tone}">${escapeHtml(order.status)}</span>
@@ -3234,13 +3319,53 @@ function renderOperations() {
                 <span>Delivery due</span>
                 <input type="date" value="${escapeHtml(order.deliveryDue || "")}" data-delivery-due-order="${escapeHtml(order.id)}" />
               </label>
+              <label>
+                <span>Delivery artifact URL (https)</span>
+                <input type="url" inputmode="url" placeholder="https://..." value="${escapeHtml(order.deliveryArtifactUrl || "")}" data-artifact-url-order="${escapeHtml(order.id)}" />
+              </label>
+              <label>
+                <span>Acceptance note</span>
+                <textarea rows="2" placeholder="What the customer accepted; what was delivered." data-acceptance-note-order="${escapeHtml(order.id)}">${escapeHtml(order.acceptanceNote || "")}</textarea>
+              </label>
             </div>
             <div class="ops-actions">
               <button type="button" data-copy-operation-packet="${escapeHtml(order.id)}">Packet</button>
               <button type="button" data-save-stripe-order="${escapeHtml(order.id)}">Save URL</button>
-              <button type="button" data-advance-operation-order="${escapeHtml(order.id)}" ${canAdvance && !paymentBlocked && !invoiceBlocked ? "" : "disabled"}>${nextOperationAction(order.status)}</button>
+              <button type="button" data-save-delivery-order="${escapeHtml(order.id)}">Save delivery</button>
+              <button type="button" data-advance-operation-order="${escapeHtml(order.id)}" ${canAdvance && !blockReason ? "" : "disabled"}>${nextOperationAction(order.status)}</button>
+              <button type="button" data-open-incident-form="${escapeHtml(order.id)}">Log incident</button>
               <button type="button" data-remove-operation-order="${escapeHtml(order.id)}">Remove</button>
             </div>
+            <form class="ops-incident-form" data-incident-form="${escapeHtml(order.id)}" hidden autocomplete="off">
+              <p class="evidence-form-kicker">Incident receipt</p>
+              <div class="field-row">
+                <label class="field">
+                  <span>Severity</span>
+                  <select name="severity">
+                    ${INCIDENT_SEVERITIES.map((sev) => `<option value="${escapeHtml(sev)}" ${sev === "low" ? "selected" : ""}>${escapeHtml(sev)}</option>`).join("")}
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Status</span>
+                  <select name="status">
+                    ${INCIDENT_STATUSES.map((st) => `<option value="${escapeHtml(st)}" ${st === "open" ? "selected" : ""}>${escapeHtml(st)}</option>`).join("")}
+                  </select>
+                </label>
+              </div>
+              <label class="field">
+                <span>Summary</span>
+                <textarea name="summary" rows="2" required placeholder="What went wrong, observed from outside."></textarea>
+              </label>
+              <label class="field">
+                <span>Response</span>
+                <textarea name="response" rows="2" required placeholder="What the operator did; what the customer was told."></textarea>
+              </label>
+              <div class="evidence-form-actions">
+                <button class="primary-action" type="submit">Record incident</button>
+                <button type="button" data-cancel-incident-form="${escapeHtml(order.id)}">Cancel</button>
+                <p class="evidence-form-error" data-incident-error="${escapeHtml(order.id)}" hidden></p>
+              </div>
+            </form>
           </article>
         `;
       })
@@ -3270,6 +3395,42 @@ function renderOperations() {
   });
   document.querySelectorAll("[data-delivery-due-order]").forEach((input) => {
     input.addEventListener("change", () => updateOrderField(input.dataset.deliveryDueOrder, "deliveryDue", input.value));
+  });
+  document.querySelectorAll("[data-artifact-url-order]").forEach((input) => {
+    input.addEventListener("change", () => updateOrderField(input.dataset.artifactUrlOrder, "deliveryArtifactUrl", input.value));
+  });
+  document.querySelectorAll("[data-acceptance-note-order]").forEach((textarea) => {
+    textarea.addEventListener("change", () => updateOrderField(textarea.dataset.acceptanceNoteOrder, "acceptanceNote", textarea.value));
+  });
+  document.querySelectorAll("[data-save-delivery-order]").forEach((button) => {
+    button.addEventListener("click", () => saveOrderDeliveryFields(button.dataset.saveDeliveryOrder, button));
+  });
+  document.querySelectorAll("[data-open-incident-form]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const orderId = button.dataset.openIncidentForm;
+      const form = document.querySelector(`[data-incident-form="${CSS.escape(orderId)}"]`);
+      if (form) {
+        form.hidden = false;
+        const summary = form.querySelector("[name='summary']");
+        if (summary) summary.focus();
+      }
+    });
+  });
+  document.querySelectorAll("[data-cancel-incident-form]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const orderId = button.dataset.cancelIncidentForm;
+      const form = document.querySelector(`[data-incident-form="${CSS.escape(orderId)}"]`);
+      if (form) {
+        form.hidden = true;
+        form.reset();
+      }
+    });
+  });
+  document.querySelectorAll("[data-incident-form]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitOrderIncident(form);
+    });
   });
 }
 
@@ -3303,13 +3464,118 @@ function toggleLaunchItem(itemId, done) {
 }
 
 function updateOrderField(orderId, field, value) {
-  const nextValue = field === "stripeInvoiceUrl" ? cleanConfiguredUrl(value, STRIPE_INVOICE_URLS) : value;
+  let nextValue = value;
+  if (field === "stripeInvoiceUrl") {
+    nextValue = cleanConfiguredUrl(value, STRIPE_INVOICE_URLS);
+  } else if (field === "deliveryArtifactUrl") {
+    nextValue = safeHttpsUrl(value);
+  } else if (field === "acceptanceNote") {
+    nextValue = String(value || "");
+  }
   operations.orders = operations.orders.map((order) =>
     order.id === orderId
       ? { ...order, [field]: nextValue, updatedAt: new Date().toISOString() }
       : order
   );
   saveOperations();
+  renderOperations();
+  renderLogs();
+}
+
+async function saveOrderDeliveryFields(orderId, button) {
+  const order = (operations.orders || []).find((entry) => entry.id === orderId);
+  if (!order || !button) {
+    return;
+  }
+  const artifactInput = document.querySelector(`[data-artifact-url-order="${CSS.escape(orderId)}"]`);
+  const noteInput = document.querySelector(`[data-acceptance-note-order="${CSS.escape(orderId)}"]`);
+  const previous = button.textContent;
+  if (artifactInput) {
+    updateOrderField(orderId, "deliveryArtifactUrl", artifactInput.value);
+  }
+  if (noteInput) {
+    updateOrderField(orderId, "acceptanceNote", noteInput.value);
+  }
+  button.textContent = "Saved";
+  setTimeout(() => {
+    button.textContent = previous;
+  }, 1500);
+}
+
+function submitOrderIncident(form) {
+  const orderId = form.dataset.incidentForm;
+  const order = (operations.orders || []).find((entry) => entry.id === orderId);
+  const errorBox = document.querySelector(`[data-incident-error="${CSS.escape(orderId)}"]`);
+  const showError = (message) => {
+    if (!errorBox) return;
+    errorBox.textContent = message;
+    errorBox.hidden = false;
+  };
+  const clearError = () => {
+    if (errorBox) {
+      errorBox.textContent = "";
+      errorBox.hidden = true;
+    }
+  };
+  if (!order) {
+    showError("Order no longer exists.");
+    return;
+  }
+  const formData = new FormData(form);
+  const severity = String(formData.get("severity") || "low");
+  const status = String(formData.get("status") || "open");
+  const summary = String(formData.get("summary") || "").trim();
+  const response = String(formData.get("response") || "").trim();
+
+  if (!INCIDENT_SEVERITIES.includes(severity)) {
+    showError("Severity must be one of " + INCIDENT_SEVERITIES.join(", ") + ".");
+    return;
+  }
+  if (!INCIDENT_STATUSES.includes(status)) {
+    showError("Status must be one of " + INCIDENT_STATUSES.join(", ") + ".");
+    return;
+  }
+  if (!summary) {
+    showError("Summary is required.");
+    return;
+  }
+  if (!response) {
+    showError("Response is required.");
+    return;
+  }
+  const sensitive = findSensitiveData(`${summary}\n${response}`);
+  if (sensitive.length) {
+    showError(`Incident text contains ${sensitive.join(", ")}. Strip and retry.`);
+    return;
+  }
+
+  clearError();
+  const now = new Date().toISOString();
+  const incident = normalizeOperationIncident({
+    id: `incident-${slugify(order.invoiceNumber || order.id)}-${Date.now().toString(36)}`,
+    orderId: order.id,
+    invoiceNumber: order.invoiceNumber || "",
+    severity,
+    status,
+    summary,
+    response,
+    createdAt: now,
+    updatedAt: now
+  });
+  operationIncidents.unshift(incident);
+  saveOperationIncidents();
+  operations.orders = operations.orders.map((entry) =>
+    entry.id === order.id
+      ? {
+          ...entry,
+          incidentIds: Array.from(new Set([...(entry.incidentIds || []), incident.id])),
+          updatedAt: now
+        }
+      : entry
+  );
+  saveOperations();
+  form.reset();
+  form.hidden = true;
   renderOperations();
   renderLogs();
 }
@@ -3532,34 +3798,61 @@ function addOperationOrder(form) {
   renderLogs();
 }
 
+function orderAdvanceBlock(order, model) {
+  if (order.status === "Draft" && !safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS)) {
+    return "Paste a Stripe Hosted Invoice URL before marking Sent.";
+  }
+  if (order.status === "Sent" && model.openCriticalControls.length > 0) {
+    return `Close ${model.openCriticalControls.length} critical control${model.openCriticalControls.length === 1 ? "" : "s"} before marking Paid.`;
+  }
+  if (order.status === "Paid") {
+    if (!safeHttpsUrl(order.deliveryArtifactUrl || "")) {
+      return "Attach an https:// delivery artifact URL before marking Delivered.";
+    }
+    if (!String(order.acceptanceNote || "").trim()) {
+      return "Record an acceptance note before marking Delivered.";
+    }
+    const sensitive = findSensitiveData(String(order.acceptanceNote || ""));
+    if (sensitive.length) {
+      return `Acceptance note contains ${sensitive.join(", ")}; remove and resubmit.`;
+    }
+  }
+  return "";
+}
+
 function advanceOperationOrder(orderId) {
   const model = buildOperationsModel();
+  const now = new Date().toISOString();
   operations.orders = operations.orders.map((order) => {
     if (order.id !== orderId) {
       return order;
     }
+    const blockReason = orderAdvanceBlock(order, model);
+    if (blockReason) {
+      return {
+        ...order,
+        blockedAt: now,
+        blockReason,
+        updatedAt: now
+      };
+    }
     const currentIndex = operationStages.indexOf(order.status);
     const nextStatus = operationStages[Math.min(currentIndex + 1, operationStages.length - 1)];
-    if (order.status === "Draft" && !safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS)) {
-      return {
-        ...order,
-        blockedAt: new Date().toISOString(),
-        notes: "Blocked: paste a Stripe Hosted Invoice URL before marking sent.",
-        updatedAt: new Date().toISOString()
-      };
-    }
-    if (order.status === "Sent" && model.openCriticalControls.length > 0) {
-      return {
-        ...order,
-        blockedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-    }
-    return {
+    const next = {
       ...order,
       status: nextStatus,
-      updatedAt: new Date().toISOString()
+      blockedAt: "",
+      blockReason: "",
+      updatedAt: now
     };
+    if (order.status === "Draft" && nextStatus === "Sent") {
+      next.invoiceSentAt = now;
+    } else if (order.status === "Sent" && nextStatus === "Paid") {
+      next.paidAt = now;
+    } else if (order.status === "Paid" && nextStatus === "Delivered") {
+      next.deliveredAt = now;
+    }
+    return next;
   });
   saveOperations();
   renderOperations();
@@ -3912,12 +4205,37 @@ function collectReceiptEvents() {
 
   operations.orders.forEach((order) => {
     push("Order", order.id, order.customer, "Operations console", order.status, order.updatedAt || order.createdAt, {
+      acceptanceNote: order.acceptanceNote || "",
       amount: Number(order.amount || 0),
       contact: order.contact || "",
+      deliveredAt: order.deliveredAt || "",
+      deliveryArtifactUrl: safeHttpsUrl(order.deliveryArtifactUrl || ""),
+      incidentIds: Array.isArray(order.incidentIds) ? order.incidentIds.slice() : [],
       invoiceNumber: order.invoiceNumber || "",
+      invoiceSentAt: order.invoiceSentAt || "",
+      paidAt: order.paidAt || "",
       source: order.source || "",
       serviceTitle: order.serviceTitle || ""
     });
+  });
+
+  operationIncidents.forEach((incident) => {
+    push(
+      "Incident",
+      incident.id,
+      incident.summary || incident.invoiceNumber || incident.orderId,
+      "Operations console",
+      `${incident.severity} ${incident.status}`,
+      incident.updatedAt || incident.createdAt,
+      {
+        invoiceNumber: incident.invoiceNumber || "",
+        orderId: incident.orderId || "",
+        response: incident.response || "",
+        severity: incident.severity,
+        status: incident.status,
+        summary: incident.summary || ""
+      }
+    );
   });
 
   externalSignals.forEach((signal) => {
@@ -4105,7 +4423,9 @@ function toneForReceiptEvent(receipt) {
     state.includes("online") ||
     state.includes("paid sandbox") ||
     state.includes("passed") ||
-    state.includes("scale")
+    state.includes("scale") ||
+    state.includes("resolved") ||
+    state.includes("closed")
   ) {
     return "green";
   }
@@ -4116,7 +4436,9 @@ function toneForReceiptEvent(receipt) {
     state.includes("kill") ||
     state.includes("offline") ||
     state.includes("reject") ||
-    state.includes("weak")
+    state.includes("weak") ||
+    state.includes("high open") ||
+    state.includes("high mitigating")
   ) {
     return "red";
   }
@@ -4978,7 +5300,9 @@ function setupOperations() {
   if (resetButton) {
     resetButton.addEventListener("click", () => {
       operations = defaultOperations();
+      operationIncidents = defaultOperationIncidents();
       saveOperations();
+      saveOperationIncidents();
       renderOperations();
       renderOrderDesk();
       renderLogs();
