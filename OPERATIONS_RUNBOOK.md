@@ -54,6 +54,21 @@ Do not accept protected health information, payment credentials, passwords, or r
 6. Mark `Delivered` only after acceptance criteria are met.
 7. Seal the receipt chain after material state changes.
 
+## Daily Pilot Run Console
+
+The Operations view has a `Daily pilot run` panel that captures one workday of the manual loop as a single private receipt.
+
+The operator presses `Start run` once per day. While the run is open, the panel surfaces:
+
+- checklist items for reviewing requests, qualifying customers, creating the Stripe invoice, updating the ledger, tracking payment, delivering, logging incidents, and sealing the chain;
+- stop-rule toggles for Stripe holds, bank restrictions, regulated-data submissions, Sheet outages, support inbox outages, and terms or privacy changes;
+- a live list of orders whose `updatedAt` is later than the run's `startedAt`;
+- a field for incident ids touched during the run.
+
+Any active stop rule turns Operations to `Paused` and blocks `Draft -> Sent`. It does not approve or reject spending, does not replace the Google Sheet ledger, and does not automate Stripe. Existing draft metadata can still be edited, but no new invoice can be marked sent until the stop rule clears.
+
+Pressing `Close run` snapshots the current receipt-chain root, stores the completed checks, active stop rules, touched orders, and linked incidents, then clears the active run. Closed runs are local operator receipts, not accounting records or autonomous authority.
+
 ## Order Lifecycle Receipts
 
 Every order state transition is now stamped with a timestamp and gated by evidence:

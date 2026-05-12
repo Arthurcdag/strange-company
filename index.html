@@ -500,6 +500,27 @@
 
           <div class="view-header compact-header ops-section-header">
             <div>
+              <p class="section-kicker">Daily pilot run</p>
+              <h3>Today's operating loop receipt</h3>
+            </div>
+            <div class="topbar-actions">
+              <button class="primary-action" id="startDailyPilotRun" type="button">
+                <i data-lucide="play"></i>
+                <span>Start run</span>
+              </button>
+              <button class="primary-action" id="closeDailyPilotRun" type="button">
+                <i data-lucide="check"></i>
+                <span>Close run</span>
+              </button>
+              <button class="icon-button" id="resetDailyPilotRun" type="button" aria-label="Reset daily run history" title="Reset daily run history">
+                <i data-lucide="rotate-ccw"></i>
+              </button>
+            </div>
+          </div>
+          <div class="ops-daily-run" id="operationsDailyRun"></div>
+
+          <div class="view-header compact-header ops-section-header">
+            <div>
               <p class="section-kicker">Sheet ledger bridge</p>
               <h3>Paste TSV rows from the Google Sheet</h3>
             </div>

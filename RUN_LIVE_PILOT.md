@@ -75,6 +75,13 @@ Run this once per workday until the pilot is on rails.
 ### 7. Log incidents (if any)
 - Anything off-script - failed payment, scope dispute, data boundary breach, missing delivery - gets a row in the Sheet `Incidents` tab with `created_at`, severity, customer, summary, response.
 
+### 8. Run the daily pilot console
+- Open Operations and press `Start run` at the beginning of the workday.
+- Tick each checklist item as it completes: review requests, qualify customer, create Stripe invoice, update ledger, track payment, deliver, log incidents, seal chain.
+- Flip any stop rule that applies during the day: Stripe hold, business bank restricted, regulated-data submission, Sheet ledger outage, support inbox outage, terms or privacy change. While any stop rule is active the Operations console reads `Paused` and `Draft -> Sent` is blocked across all orders. Clear the rule when the underlying issue is fixed.
+- Paste the ids of any incidents logged in step 7 into the `Incident ids` field on the run panel.
+- At end of day press `Close run`. The console snapshots the current receipt-chain root, captures which orders moved during the run, and stores the result locally. The active run becomes a closed entry in the run history.
+
 ## Weekly Review
 
 - Reconcile the Sheet `Invoices` tab against Stripe.

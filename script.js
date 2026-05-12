@@ -635,9 +635,28 @@ const REVENUE_PILOT_KEY = "strange-company-revenue-pilot";
 const SATELLITE_COMPANY_KEY = "strange-company-satellite-company";
 const OPERATIONS_KEY = "strange-company-operations";
 const OPERATION_INCIDENTS_KEY = "strange-company-operation-incidents";
+const DAILY_PILOT_RUN_KEY = "strange-company-daily-pilot-run";
 const EXTERNAL_SIGNALS_KEY = "strange-company-external-signals";
 const INCIDENT_SEVERITIES = ["info", "low", "medium", "high"];
 const INCIDENT_STATUSES = ["open", "mitigating", "resolved", "closed"];
+const DAILY_RUN_CHECKS = [
+  { id: "review-requests", title: "Review new requests", detail: "Sheet Requests tab, support inbox, and Order Desk submissions." },
+  { id: "qualify-customer", title: "Qualify customer", detail: "Real US business, allowed service, no regulated data in the request." },
+  { id: "stripe-invoice", title: "Create Stripe invoice", detail: "Manually create the Hosted Invoice and copy the URL." },
+  { id: "ledger-update", title: "Update ledger", detail: "Stripe URL pasted into the order; ledger row up to date." },
+  { id: "track-payment", title: "Track payment", detail: "Move the order to Paid only after settlement." },
+  { id: "deliver", title: "Deliver", detail: "Send the scoped proof packet; record artifact URL and acceptance note." },
+  { id: "log-incidents", title: "Log incidents", detail: "Anything off-script becomes an incident row in the Sheet and the chain." },
+  { id: "seal-chain", title: "Seal receipt chain", detail: "Decisions view: capture the day's root before closing the run." }
+];
+const DAILY_RUN_STOP_RULES = [
+  { id: "stripe-hold", title: "Stripe account on hold", detail: "Stripe has flagged, restricted, or held the account or payouts." },
+  { id: "bank-restricted", title: "Business bank restricted", detail: "The LLC bank account is frozen, restricted, or under review." },
+  { id: "regulated-data", title: "Regulated data submitted", detail: "An intake included regulated source documents the operator did not solicit." },
+  { id: "sheet-outage", title: "Sheet ledger outage", detail: "The Google Sheet ledger is inaccessible or out of sync with Stripe." },
+  { id: "support-outage", title: "Support inbox outage", detail: "The support inbox is unmonitored or unreachable for the day." },
+  { id: "terms-change", title: "Terms or privacy change required", detail: "Terms or privacy require an unscheduled change before sending more invoices." }
+];
 
 let activeScenario = "base";
 let loopAnimationId = 0;
@@ -655,6 +674,7 @@ let revenuePilot = loadRevenuePilot();
 let satelliteCompany = loadSatelliteCompany();
 let operations = loadOperations();
 let operationIncidents = loadOperationIncidents();
+let dailyPilotRun = loadDailyPilotRun();
 let externalSignals = loadExternalSignals();
 
 function activateView(target) {
@@ -2409,6 +2429,206 @@ function saveOperationIncidents() {
   }
 }
 
+function defaultDailyPilotRun() {
+  return {
+    current: null,
+    history: []
+  };
+}
+
+function normalizeDailyRunRecord(record) {
+  if (!record || typeof record !== "object") {
+    return null;
+  }
+  const allowedChecks = new Set(DAILY_RUN_CHECKS.map((entry) => entry.id));
+  const allowedRules = new Set(DAILY_RUN_STOP_RULES.map((entry) => entry.id));
+  const checks = {};
+  if (record.checks && typeof record.checks === "object") {
+    for (const id of allowedChecks) {
+      checks[id] = Boolean(record.checks[id]);
+    }
+  } else {
+    for (const id of allowedChecks) {
+      checks[id] = false;
+    }
+  }
+  const stopRules = {};
+  if (record.stopRules && typeof record.stopRules === "object") {
+    for (const id of allowedRules) {
+      stopRules[id] = Boolean(record.stopRules[id]);
+    }
+  } else {
+    for (const id of allowedRules) {
+      stopRules[id] = false;
+    }
+  }
+  const orderIds = Array.isArray(record.orderIds)
+    ? record.orderIds.filter((id) => typeof id === "string" && id)
+    : [];
+  const incidentIds = Array.isArray(record.incidentIds)
+    ? record.incidentIds.filter((id) => typeof id === "string" && id)
+    : [];
+  return {
+    id: typeof record.id === "string" && record.id ? record.id : `run-${Date.now().toString(36)}`,
+    runDate:
+      typeof record.runDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(record.runDate)
+        ? record.runDate
+        : new Date().toISOString().slice(0, 10),
+    startedAt: typeof record.startedAt === "string" ? record.startedAt : new Date().toISOString(),
+    closedAt: typeof record.closedAt === "string" ? record.closedAt : "",
+    receiptRoot: typeof record.receiptRoot === "string" ? record.receiptRoot : "",
+    checks,
+    stopRules,
+    orderIds,
+    incidentIds
+  };
+}
+
+function loadDailyPilotRun() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(DAILY_PILOT_RUN_KEY) || "null");
+    if (stored && typeof stored === "object") {
+      const current = stored.current ? normalizeDailyRunRecord(stored.current) : null;
+      const history = Array.isArray(stored.history)
+        ? stored.history.map((entry) => normalizeDailyRunRecord(entry)).filter(Boolean).slice(0, 30)
+        : [];
+      return { current, history };
+    }
+  } catch {
+    // Fall through to default.
+  }
+  return defaultDailyPilotRun();
+}
+
+function saveDailyPilotRun() {
+  try {
+    localStorage.setItem(DAILY_PILOT_RUN_KEY, JSON.stringify(dailyPilotRun));
+  } catch {
+    // Local storage can be unavailable in hardened browser contexts.
+  }
+}
+
+function activeStopRules() {
+  const current = dailyPilotRun.current;
+  if (!current) {
+    return [];
+  }
+  return DAILY_RUN_STOP_RULES.filter((rule) => current.stopRules[rule.id]);
+}
+
+function dailyRunPausedReason() {
+  const rules = activeStopRules();
+  if (!rules.length) {
+    return "";
+  }
+  return `Daily pilot run paused by ${rules.map((rule) => rule.title).join(", ")}.`;
+}
+
+function startDailyPilotRun() {
+  if (dailyPilotRun.current) {
+    return;
+  }
+  const now = new Date();
+  dailyPilotRun.current = normalizeDailyRunRecord({
+    id: `run-${now.getTime().toString(36)}`,
+    runDate: now.toISOString().slice(0, 10),
+    startedAt: now.toISOString()
+  });
+  saveDailyPilotRun();
+  renderDailyPilotRun();
+  renderOperations();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function toggleDailyRunCheck(checkId, done) {
+  if (!dailyPilotRun.current) {
+    return;
+  }
+  if (!DAILY_RUN_CHECKS.some((entry) => entry.id === checkId)) {
+    return;
+  }
+  dailyPilotRun.current.checks[checkId] = Boolean(done);
+  saveDailyPilotRun();
+  renderDailyPilotRun();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function toggleDailyRunStopRule(ruleId, active) {
+  if (!dailyPilotRun.current) {
+    return;
+  }
+  if (!DAILY_RUN_STOP_RULES.some((entry) => entry.id === ruleId)) {
+    return;
+  }
+  dailyPilotRun.current.stopRules[ruleId] = Boolean(active);
+  saveDailyPilotRun();
+  renderDailyPilotRun();
+  renderOperations();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function updateDailyRunIncidentIds(value) {
+  if (!dailyPilotRun.current) {
+    return;
+  }
+  const ids = String(value || "")
+    .split(/[\s,]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  dailyPilotRun.current.incidentIds = Array.from(new Set(ids));
+  saveDailyPilotRun();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function collectDailyRunOrderIds() {
+  const current = dailyPilotRun.current;
+  if (!current) {
+    return [];
+  }
+  const startedAt = current.startedAt ? new Date(current.startedAt).getTime() : 0;
+  return (operations.orders || [])
+    .filter((order) => {
+      const updatedTs = order.updatedAt ? new Date(order.updatedAt).getTime() : 0;
+      return updatedTs >= startedAt;
+    })
+    .map((order) => order.id);
+}
+
+function closeDailyPilotRun() {
+  if (!dailyPilotRun.current) {
+    return;
+  }
+  const now = new Date().toISOString();
+  const orderIds = collectDailyRunOrderIds();
+  const chain = buildReceiptChain();
+  const closed = normalizeDailyRunRecord({
+    ...dailyPilotRun.current,
+    closedAt: now,
+    orderIds,
+    receiptRoot: chain && typeof chain.root === "string" ? chain.root : ""
+  });
+  dailyPilotRun.history = [closed, ...(dailyPilotRun.history || [])].slice(0, 30);
+  dailyPilotRun.current = null;
+  saveDailyPilotRun();
+  renderDailyPilotRun();
+  renderOperations();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function resetDailyPilotRun() {
+  dailyPilotRun = defaultDailyPilotRun();
+  saveDailyPilotRun();
+  renderDailyPilotRun();
+  renderOperations();
+  renderReceiptChain();
+  renderLogs();
+}
+
 function normalizeOperationIncident(incident) {
   if (!incident || typeof incident !== "object") {
     return null;
@@ -3043,6 +3263,7 @@ function buildOperationsModel() {
   if (!stripeReady) integrationGaps.push("Stripe dashboard link");
   if (!termsReviewed) integrationGaps.push("terms reviewed date");
   if (!privacyReviewed) integrationGaps.push("privacy reviewed date");
+  const pausedReason = dailyRunPausedReason();
 
   const baseModel = {
     controls,
@@ -3061,8 +3282,19 @@ function buildOperationsModel() {
     stripeReady,
     termsReviewed,
     privacyReviewed,
-    integrationGaps
+    integrationGaps,
+    pausedReason
   };
+
+  if (pausedReason) {
+    return {
+      ...baseModel,
+      state: "Paused",
+      tone: "red",
+      headline: "Daily pilot run is paused.",
+      detail: pausedReason
+    };
+  }
 
   if (openCriticalControls.length > 0) {
     return {
@@ -3450,6 +3682,142 @@ function renderOperations() {
       submitOrderIncident(form);
     });
   });
+
+  renderDailyPilotRun();
+}
+
+function renderDailyPilotRun() {
+  const container = document.querySelector("#operationsDailyRun");
+  const startButton = document.querySelector("#startDailyPilotRun");
+  const closeButton = document.querySelector("#closeDailyPilotRun");
+  if (!container) {
+    return;
+  }
+  const current = dailyPilotRun.current;
+  const history = dailyPilotRun.history || [];
+  const activeRules = activeStopRules();
+  if (startButton) {
+    startButton.disabled = Boolean(current);
+  }
+  if (closeButton) {
+    closeButton.disabled = !current;
+  }
+
+  const checksMarkup = current
+    ? DAILY_RUN_CHECKS.map((entry) => {
+        const done = Boolean(current.checks[entry.id]);
+        return `
+          <label class="ops-daily-check">
+            <input type="checkbox" data-daily-check="${escapeHtml(entry.id)}" ${done ? "checked" : ""} />
+            <span>
+              <strong>${escapeHtml(entry.title)}</strong>
+              <small>${escapeHtml(entry.detail)}</small>
+            </span>
+          </label>
+        `;
+      }).join("")
+    : "";
+
+  const rulesMarkup = current
+    ? DAILY_RUN_STOP_RULES.map((entry) => {
+        const active = Boolean(current.stopRules[entry.id]);
+        return `
+          <label class="ops-daily-rule ${active ? "active" : ""}">
+            <input type="checkbox" data-daily-stop-rule="${escapeHtml(entry.id)}" ${active ? "checked" : ""} />
+            <span>
+              <strong>${escapeHtml(entry.title)}</strong>
+              <small>${escapeHtml(entry.detail)}</small>
+            </span>
+          </label>
+        `;
+      }).join("")
+    : "";
+
+  const touchedOrderIds = current ? collectDailyRunOrderIds() : [];
+  const touchedOrders = touchedOrderIds
+    .map((orderId) => (operations.orders || []).find((order) => order.id === orderId))
+    .filter(Boolean);
+  const touchedMarkup = touchedOrders.length
+    ? touchedOrders
+        .map(
+          (order) => `<li>${escapeHtml(order.invoiceNumber || order.id)} / ${escapeHtml(order.customer || "")} / ${escapeHtml(order.status || "")}</li>`
+        )
+        .join("")
+    : "<li>No orders touched since the run started.</li>";
+
+  const currentPanel = current
+    ? `
+      <article class="ops-daily-current ${activeRules.length ? "paused" : ""}">
+        <div class="ops-daily-header">
+          <span class="metric-label">Run ${escapeHtml(current.runDate)}</span>
+          <h4>${activeRules.length ? "Paused" : "Active"}</h4>
+          <p>Started ${escapeHtml(formatReceiptDate(current.startedAt))}</p>
+          ${activeRules.length ? `<p class="ops-daily-paused-line">${escapeHtml(dailyRunPausedReason())}</p>` : ""}
+        </div>
+        <div class="ops-daily-section">
+          <span class="metric-label">Checklist</span>
+          <div class="ops-daily-checks">${checksMarkup}</div>
+        </div>
+        <div class="ops-daily-section">
+          <span class="metric-label">Stop rules</span>
+          <p class="ops-daily-rule-hint">Any active rule pauses new orders from advancing to Sent.</p>
+          <div class="ops-daily-rules">${rulesMarkup}</div>
+        </div>
+        <div class="ops-daily-section">
+          <span class="metric-label">Orders touched this run</span>
+          <ul class="ops-daily-touched">${touchedMarkup}</ul>
+        </div>
+        <div class="ops-daily-section">
+          <label class="ops-daily-incidents-label">
+            <span class="metric-label">Incident ids (comma or whitespace separated)</span>
+            <textarea id="operationsDailyRunIncidents" rows="2" placeholder="incident-... incident-...">${escapeHtml((current.incidentIds || []).join(", "))}</textarea>
+          </label>
+        </div>
+      </article>
+    `
+    : `
+      <article class="ops-daily-empty">
+        <span class="metric-label">No run in progress</span>
+        <h4>Start a run for today.</h4>
+        <p>The run captures checks, stop rules, orders moved, linked incidents, and the receipt-chain root at close. While a run is open, any active stop rule pauses Draft to Sent transitions.</p>
+      </article>
+    `;
+
+  const historyMarkup = history.length
+    ? history
+        .map((entry) => {
+          const doneCount = Object.values(entry.checks || {}).filter(Boolean).length;
+          const stopCount = Object.values(entry.stopRules || {}).filter(Boolean).length;
+          const root = entry.receiptRoot
+            ? `<code>${escapeHtml(entry.receiptRoot.slice(0, 12))}</code>`
+            : "<span>No root captured</span>";
+          return `
+            <article class="ops-daily-history-card">
+              <span class="metric-label">${escapeHtml(entry.runDate)}</span>
+              <h4>${stopCount ? "Closed with stop rules" : "Closed clean"}</h4>
+              <p>${doneCount}/${DAILY_RUN_CHECKS.length} checks. ${stopCount} stop rule${stopCount === 1 ? "" : "s"}. ${entry.orderIds.length} order${entry.orderIds.length === 1 ? "" : "s"} touched. ${entry.incidentIds.length} incident id${entry.incidentIds.length === 1 ? "" : "s"} attached.</p>
+              <p>Closed ${escapeHtml(formatReceiptDate(entry.closedAt))} / Root ${root}</p>
+            </article>
+          `;
+        })
+        .join("")
+    : "";
+
+  container.innerHTML = `
+    ${currentPanel}
+    ${historyMarkup ? `<div class="ops-daily-history">${historyMarkup}</div>` : ""}
+  `;
+
+  document.querySelectorAll("[data-daily-check]").forEach((input) => {
+    input.addEventListener("change", () => toggleDailyRunCheck(input.dataset.dailyCheck, input.checked));
+  });
+  document.querySelectorAll("[data-daily-stop-rule]").forEach((input) => {
+    input.addEventListener("change", () => toggleDailyRunStopRule(input.dataset.dailyStopRule, input.checked));
+  });
+  const incidentsField = document.querySelector("#operationsDailyRunIncidents");
+  if (incidentsField) {
+    incidentsField.addEventListener("change", () => updateDailyRunIncidentIds(incidentsField.value));
+  }
 }
 
 function formatLaunchDate(value) {
@@ -3817,6 +4185,10 @@ function addOperationOrder(form) {
 }
 
 function orderAdvanceBlock(order, model) {
+  const pausedReason = model.pausedReason || dailyRunPausedReason();
+  if (order.status === "Draft" && pausedReason) {
+    return pausedReason;
+  }
   if (order.status === "Draft" && !safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS)) {
     return "Paste a Stripe Hosted Invoice URL before marking Sent.";
   }
@@ -4530,6 +4902,49 @@ function collectReceiptEvents() {
         severity: incident.severity,
         status: incident.status,
         summary: incident.summary || ""
+      }
+    );
+  });
+
+  const runEvents = [];
+  if (dailyPilotRun.current) {
+    const activeRules = activeStopRules().map((rule) => rule.id);
+    runEvents.push({
+      ...dailyPilotRun.current,
+      orderIds: collectDailyRunOrderIds(),
+      state: activeRules.length ? "Paused" : "Active",
+      activeRules
+    });
+  }
+  (dailyPilotRun.history || []).forEach((entry) => {
+    const stopRules = Object.entries(entry.stopRules || [])
+      .filter(([, on]) => on)
+      .map(([id]) => id);
+    runEvents.push({
+      ...entry,
+      state: stopRules.length ? "Closed with stop rules" : "Closed clean",
+      activeRules: stopRules
+    });
+  });
+  runEvents.forEach((entry) => {
+    const completedChecks = Object.entries(entry.checks || {})
+      .filter(([, on]) => on)
+      .map(([id]) => id);
+    push(
+      "Run",
+      entry.id,
+      `Daily pilot run ${entry.runDate}`,
+      "Operations console",
+      entry.state,
+      entry.closedAt || entry.startedAt,
+      {
+        completedChecks,
+        incidentIds: Array.isArray(entry.incidentIds) ? entry.incidentIds.slice() : [],
+        orderIds: Array.isArray(entry.orderIds) ? entry.orderIds.slice() : [],
+        receiptRoot: entry.receiptRoot || "",
+        runDate: entry.runDate || "",
+        startedAt: entry.startedAt || "",
+        stopRules: entry.activeRules || []
       }
     );
   });
@@ -5705,6 +6120,19 @@ function setupOperations() {
   const copyAllButton = document.querySelector("#copyAllLedgerRows");
   if (copyAllButton) {
     copyAllButton.addEventListener("click", () => copyAllLedgerRows(copyAllButton));
+  }
+
+  const startRunButton = document.querySelector("#startDailyPilotRun");
+  const closeRunButton = document.querySelector("#closeDailyPilotRun");
+  const resetRunButton = document.querySelector("#resetDailyPilotRun");
+  if (startRunButton) {
+    startRunButton.addEventListener("click", startDailyPilotRun);
+  }
+  if (closeRunButton) {
+    closeRunButton.addEventListener("click", closeDailyPilotRun);
+  }
+  if (resetRunButton) {
+    resetRunButton.addEventListener("click", resetDailyPilotRun);
   }
 }
 

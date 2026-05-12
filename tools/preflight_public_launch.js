@@ -86,7 +86,9 @@ function checkPublicSurface() {
     ["private Decisions label", /\bDecisions\b/],
     ["private External Signals console", /\bExternal Signals\b/],
     ["private Sheet ledger bridge", /\bSheet ledger bridge\b/i],
+    ["private Daily pilot run console", /\bDaily pilot run\b/i],
     ["ledger bridge form id", /operationsLedgerBridgeForm/],
+    ["daily run storage key", /strange-company-daily-pilot-run/],
     ["plugin workflow UI", /\b(Alpaca|Binance|Zotero|Life Science Research|GitHub signal)\b/],
     ["automatic network submit", /\bfetch\s*\(/]
   ];
@@ -255,6 +257,74 @@ function checkOrderLifecycleContract() {
   }
 }
 
+function checkDailyPilotRunContract() {
+  const script = read("script.js");
+  const indexHtml = read("index.html");
+  const runbook = read("OPERATIONS_RUNBOOK.md");
+  const livePilot = read("RUN_LIVE_PILOT.md");
+  const publicHtml = read("public.html");
+  const publicJs = read("public.js");
+  const publicConfig = read("public-config.js");
+
+  const required = [
+    ["daily run storage key", 'const DAILY_PILOT_RUN_KEY = "strange-company-daily-pilot-run"'],
+    ["daily run checks", "const DAILY_RUN_CHECKS = ["],
+    ["daily run stop rules", "const DAILY_RUN_STOP_RULES = ["],
+    ["daily run loader", "function loadDailyPilotRun"],
+    ["daily run saver", "function saveDailyPilotRun"],
+    ["daily run normalizer", "function normalizeDailyRunRecord"],
+    ["active stop rules helper", "function activeStopRules"],
+    ["paused reason helper", "function dailyRunPausedReason"],
+    ["start run handler", "function startDailyPilotRun"],
+    ["close run handler", "function closeDailyPilotRun"],
+    ["check toggle handler", "function toggleDailyRunCheck"],
+    ["stop-rule toggle handler", "function toggleDailyRunStopRule"],
+    ["incident id handler", "function updateDailyRunIncidentIds"],
+    ["reset run handler", "function resetDailyPilotRun"],
+    ["daily run renderer", "function renderDailyPilotRun"],
+    ["touched order collector", "function collectDailyRunOrderIds"],
+    ["receipt root captured at close", "const chain = buildReceiptChain()"],
+    ["paused state in Operations model", 'state: "Paused"'],
+    ["Draft to Sent paused block", 'order.status === "Draft" && pausedReason'],
+    ["Run receipt type", '"Run",'],
+    ["Run receipt carries receiptRoot", "receiptRoot: entry.receiptRoot"],
+    ["Run receipt carries completedChecks", "completedChecks,"],
+    ["Run receipt carries stopRules", "stopRules: entry.activeRules"]
+  ];
+  for (const [label, snippet] of required) {
+    assert(script.includes(snippet), `script.js is missing ${label}.`);
+  }
+
+  const indexExpectations = [
+    ["daily run panel container", 'id="operationsDailyRun"'],
+    ["start run button", 'id="startDailyPilotRun"'],
+    ["close run button", 'id="closeDailyPilotRun"'],
+    ["reset run button", 'id="resetDailyPilotRun"']
+  ];
+  for (const [label, snippet] of indexExpectations) {
+    assert(indexHtml.includes(snippet), `index.html is missing ${label}.`);
+  }
+
+  assert(
+    runbook.includes("Daily Pilot Run Console"),
+    "OPERATIONS_RUNBOOK.md must document the Daily Pilot Run Console."
+  );
+  assert(
+    livePilot.includes("Run the daily pilot console"),
+    "RUN_LIVE_PILOT.md must document the daily pilot console step."
+  );
+
+  for (const [file, contents] of [
+    ["public.html", publicHtml],
+    ["public.js", publicJs],
+    ["public-config.js", publicConfig]
+  ]) {
+    assert(!/Daily pilot run/i.test(contents), `${file} exposes Daily pilot run text.`);
+    assert(!/strange-company-daily-pilot-run/.test(contents), `${file} exposes daily run storage key.`);
+    assert(!/operationsDailyRun/.test(contents), `${file} exposes daily run private UI.`);
+  }
+}
+
 function checkConfig() {
   const config = loadPublicConfig();
   const formUrl = String(config.googleFormUrl || "").trim();
@@ -300,6 +370,7 @@ checkPrivateUrlAllowlists();
 checkOutcomeEvidenceContract();
 checkLedgerBridgeContract();
 checkOrderLifecycleContract();
+checkDailyPilotRunContract();
 checkConfig();
 
 if (failures.length) {
