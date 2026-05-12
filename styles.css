@@ -275,6 +275,9 @@ h3 {
 .ops-packet-output,
 .ops-control,
 .ops-order,
+.ops-daily-current,
+.ops-daily-empty,
+.ops-daily-history-card,
 .ops-launch-item,
 .ops-config-form,
 .order-handoff-card,
@@ -1146,9 +1149,6 @@ h3 {
 .ops-daily-empty,
 .ops-daily-history-card {
   padding: 16px 18px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
 }
 
 .ops-daily-current.paused {
@@ -1159,6 +1159,14 @@ h3 {
 .ops-daily-header h4 {
   margin: 6px 0 4px;
   font-size: 18px;
+}
+
+.ops-daily-header p,
+.ops-daily-empty p,
+.ops-daily-history-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .ops-daily-paused-line {
@@ -1254,8 +1262,7 @@ h3 {
 }
 
 .ops-daily-history-card p {
-  margin: 0 0 4px;
-  color: var(--muted);
+  margin-bottom: 4px;
   font-size: 12px;
 }
 
@@ -1266,6 +1273,84 @@ h3 {
   background: #f3efe8;
   color: var(--ink);
   font-size: 12px;
+}
+
+.ops-bridge-hint {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ops-bridge-form {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  margin-bottom: 18px;
+}
+
+.ops-bridge-form textarea {
+  min-height: 140px;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ops-bridge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ops-bridge-output {
+  display: grid;
+  gap: 8px;
+}
+
+.ops-bridge-output-card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.ops-bridge-output-card details {
+  margin-top: 8px;
+}
+
+.ops-bridge-output-card summary {
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ops-bridge-rejected,
+.ops-bridge-valid {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ops-bridge-rejected li {
+  color: var(--red);
+}
+
+.icon-button.ledger-copy-ok {
+  border-color: var(--green);
+  background: rgba(38, 122, 85, 0.12);
+}
+
+.icon-button.ledger-copy-fail {
+  border-color: var(--red);
+  background: rgba(189, 61, 42, 0.12);
 }
 
 .ops-control {
@@ -2685,13 +2770,71 @@ input[type="range"] {
   color: var(--muted);
 }
 
-.ops-order-fields input {
+.ops-order-fields input,
+.ops-order-fields textarea {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 8px 10px;
   background: var(--surface);
   color: var(--ink);
   font-size: 13px;
+  font-family: inherit;
+}
+
+.ops-order-fields textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.ops-order-artifact {
+  color: var(--blue);
+  font-weight: 700;
+}
+
+.ops-order-acceptance,
+.ops-order-incidents {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ops-order-acceptance-missing {
+  color: var(--red);
+}
+
+.ops-order-block {
+  margin-top: 6px;
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ops-incident-form {
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  margin-top: 10px;
+}
+
+.ops-incident-form select,
+.ops-incident-form textarea {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.ops-incident-form textarea {
+  resize: vertical;
+  min-height: 60px;
 }
 
 @media (max-width: 720px) {

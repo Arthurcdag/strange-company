@@ -85,7 +85,9 @@ function checkPublicSurface() {
     ["private Treasury label", /\bTreasury\b/],
     ["private Decisions label", /\bDecisions\b/],
     ["private External Signals console", /\bExternal Signals\b/],
+    ["private Sheet ledger bridge", /\bSheet ledger bridge\b/i],
     ["private Daily pilot run console", /\bDaily pilot run\b/i],
+    ["ledger bridge form id", /operationsLedgerBridgeForm/],
     ["daily run storage key", /strange-company-daily-pilot-run/],
     ["plugin workflow UI", /\b(Alpaca|Binance|Zotero|Life Science Research|GitHub signal)\b/],
     ["automatic network submit", /\bfetch\s*\(/]
@@ -161,32 +163,130 @@ function checkOutcomeEvidenceContract() {
   }
 }
 
+function checkLedgerBridgeContract() {
+  const script = read("script.js");
+  const indexHtml = read("index.html");
+  const ledgerDoc = read("GOOGLE_SHEET_LEDGER.md");
+  const required = [
+    ["LEDGER_HEADERS constant", "const LEDGER_HEADERS = ["],
+    ["LEDGER_STATUSES constant", 'const LEDGER_STATUSES = ["Draft", "Sent", "Paid", "Delivered"]'],
+    ["parseLedgerTsv parser", "function parseLedgerTsv"],
+    ["validateLedgerRow validator", "function validateLedgerRow"],
+    ["importLedger upsert", "function importLedger"],
+    ["upsert reads operations.orders", "operations.orders || []"],
+    ["non-blank preservation for customer", "customer: incoming.customer || existing.customer"],
+    ["extra column rejection", "expected ${LEDGER_HEADERS.length}. Remove extra Sheet columns before import."],
+    ["positive amount required", "amount must be a finite, positive number."],
+    ["sensitive-data scan in row validator", "findSensitiveData(joined)"],
+    ["status whitelist applied", "LEDGER_STATUSES.includes(status)"],
+    ["stripe URL allowlist applied", "safeExternalUrl(stripeRaw, STRIPE_INVOICE_URLS)"],
+    ["per-row export helper", "function orderToLedgerRow"],
+    ["bulk export helper", "function allOrdersLedgerTsv"],
+    ["per-row copy handler", "function copyOrderLedgerRow"],
+    ["bulk copy handler", "function copyAllLedgerRows"],
+    ["per-row copy attribute", "data-copy-ledger-row="]
+  ];
+  for (const [label, snippet] of required) {
+    assert(script.includes(snippet), `script.js is missing ${label}.`);
+  }
+
+  const indexExpectations = [
+    ["bridge form", 'id="operationsLedgerBridgeForm"'],
+    ["bridge textarea", 'id="operationsLedgerTsv"'],
+    ["preview button", 'id="operationsLedgerPreview"'],
+    ["apply button", 'id="operationsLedgerImport"'],
+    ["bulk copy button", 'id="copyAllLedgerRows"']
+  ];
+  for (const [label, snippet] of indexExpectations) {
+    assert(indexHtml.includes(snippet), `index.html is missing ${label}.`);
+  }
+
+  assert(
+    ledgerDoc.includes("Private Ledger Bridge"),
+    "GOOGLE_SHEET_LEDGER.md must document the Private Ledger Bridge."
+  );
+}
+
+function checkOrderLifecycleContract() {
+  const script = read("script.js");
+  const runbook = read("OPERATIONS_RUNBOOK.md");
+  const publicHtml = read("public.html");
+  const publicJs = read("public.js");
+
+  const required = [
+    ["incident storage key", 'const OPERATION_INCIDENTS_KEY = "strange-company-operation-incidents"'],
+    ["incident severities", 'const INCIDENT_SEVERITIES = ["info", "low", "medium", "high"]'],
+    ["incident statuses", 'const INCIDENT_STATUSES = ["open", "mitigating", "resolved", "closed"]'],
+    ["normalizeOperationIncident", "function normalizeOperationIncident"],
+    ["loadOperationIncidents", "function loadOperationIncidents"],
+    ["saveOperationIncidents", "function saveOperationIncidents"],
+    ["operation incident state", "let operationIncidents"],
+    ["order normalizer for delivery artifact", "deliveryArtifactUrl: artifactRaw ? safeHttpsUrl(artifactRaw)"],
+    ["order normalizer for acceptance note", "acceptanceNote: typeof order.acceptanceNote === \"string\""],
+    ["order normalizer for incidentIds", "incidentIds: Array.isArray(order.incidentIds)"],
+    ["order advance block helper", "function orderAdvanceBlock"],
+    ["delivery artifact gate", "Attach an https:// delivery artifact URL before marking Delivered."],
+    ["acceptance note gate", "Record an acceptance note before marking Delivered."],
+    ["acceptance note sensitive scan", "findSensitiveData(String(order.acceptanceNote"],
+    ["invoiceSentAt stamp", "next.invoiceSentAt = now"],
+    ["paidAt stamp", "next.paidAt = now"],
+    ["deliveredAt stamp", "next.deliveredAt = now"],
+    ["incident submit handler", "function submitOrderIncident"],
+    ["incident push to chain", 'operationIncidents.forEach((incident) => {'],
+    ["incident receipt type", '"Incident",'],
+    ["order chain payload carries acceptance", "acceptanceNote: order.acceptanceNote"],
+    ["order chain payload carries delivery artifact", "deliveryArtifactUrl: safeHttpsUrl(order.deliveryArtifactUrl"],
+    ["order chain payload carries timestamps", "invoiceSentAt: order.invoiceSentAt"],
+    ["order chain payload carries incidentIds", "incidentIds: Array.isArray(order.incidentIds)"]
+  ];
+  for (const [label, snippet] of required) {
+    assert(script.includes(snippet), `script.js is missing ${label}.`);
+  }
+
+  assert(
+    runbook.includes("Order Lifecycle Receipts"),
+    "OPERATIONS_RUNBOOK.md must document Order Lifecycle Receipts."
+  );
+  assert(runbook.includes("Incidents"), "OPERATIONS_RUNBOOK.md must document Incidents.");
+
+  for (const [file, contents] of [["public.html", publicHtml], ["public.js", publicJs]]) {
+    assert(!/data-incident-form/.test(contents), `${file} exposes incident form attribute.`);
+    assert(!/operationIncidents/.test(contents), `${file} exposes operationIncidents state.`);
+    assert(!/deliveryArtifactUrl/.test(contents), `${file} exposes deliveryArtifactUrl field.`);
+    assert(!/acceptanceNote/.test(contents), `${file} exposes acceptanceNote field.`);
+  }
+}
+
 function checkDailyPilotRunContract() {
   const script = read("script.js");
   const indexHtml = read("index.html");
   const runbook = read("OPERATIONS_RUNBOOK.md");
   const livePilot = read("RUN_LIVE_PILOT.md");
+  const publicHtml = read("public.html");
+  const publicJs = read("public.js");
+  const publicConfig = read("public-config.js");
 
   const required = [
-    ["DAILY_PILOT_RUN_KEY", 'const DAILY_PILOT_RUN_KEY = "strange-company-daily-pilot-run"'],
-    ["DAILY_RUN_CHECKS constant", "const DAILY_RUN_CHECKS = ["],
-    ["DAILY_RUN_STOP_RULES constant", "const DAILY_RUN_STOP_RULES = ["],
-    ["loadDailyPilotRun", "function loadDailyPilotRun"],
-    ["saveDailyPilotRun", "function saveDailyPilotRun"],
-    ["normalizeDailyRunRecord", "function normalizeDailyRunRecord"],
-    ["activeStopRules helper", "function activeStopRules"],
-    ["dailyRunPausedReason helper", "function dailyRunPausedReason"],
-    ["startDailyPilotRun", "function startDailyPilotRun"],
-    ["closeDailyPilotRun", "function closeDailyPilotRun"],
-    ["toggleDailyRunCheck", "function toggleDailyRunCheck"],
-    ["toggleDailyRunStopRule", "function toggleDailyRunStopRule"],
-    ["resetDailyPilotRun", "function resetDailyPilotRun"],
-    ["renderDailyPilotRun", "function renderDailyPilotRun"],
-    ["collectDailyRunOrderIds", "function collectDailyRunOrderIds"],
-    ["receipt root captured at close", "buildReceiptChain()"],
+    ["daily run storage key", 'const DAILY_PILOT_RUN_KEY = "strange-company-daily-pilot-run"'],
+    ["daily run checks", "const DAILY_RUN_CHECKS = ["],
+    ["daily run stop rules", "const DAILY_RUN_STOP_RULES = ["],
+    ["daily run loader", "function loadDailyPilotRun"],
+    ["daily run saver", "function saveDailyPilotRun"],
+    ["daily run normalizer", "function normalizeDailyRunRecord"],
+    ["active stop rules helper", "function activeStopRules"],
+    ["paused reason helper", "function dailyRunPausedReason"],
+    ["start run handler", "function startDailyPilotRun"],
+    ["close run handler", "function closeDailyPilotRun"],
+    ["check toggle handler", "function toggleDailyRunCheck"],
+    ["stop-rule toggle handler", "function toggleDailyRunStopRule"],
+    ["incident id handler", "function updateDailyRunIncidentIds"],
+    ["reset run handler", "function resetDailyPilotRun"],
+    ["daily run renderer", "function renderDailyPilotRun"],
+    ["touched order collector", "function collectDailyRunOrderIds"],
+    ["receipt root captured at close", "const chain = buildReceiptChain()"],
     ["paused state in Operations model", 'state: "Paused"'],
-    ["Draft to Sent paused block", "order.status === \"Draft\" && pausedReason"],
-    ["Run receipt push", 'push(\n      "Run",'],
+    ["Draft to Sent paused block", 'order.status === "Draft" && pausedReason'],
+    ["Run receipt type", '"Run",'],
     ["Run receipt carries receiptRoot", "receiptRoot: entry.receiptRoot"],
     ["Run receipt carries completedChecks", "completedChecks,"],
     ["Run receipt carries stopRules", "stopRules: entry.activeRules"]
@@ -213,6 +313,16 @@ function checkDailyPilotRunContract() {
     livePilot.includes("Run the daily pilot console"),
     "RUN_LIVE_PILOT.md must document the daily pilot console step."
   );
+
+  for (const [file, contents] of [
+    ["public.html", publicHtml],
+    ["public.js", publicJs],
+    ["public-config.js", publicConfig]
+  ]) {
+    assert(!/Daily pilot run/i.test(contents), `${file} exposes Daily pilot run text.`);
+    assert(!/strange-company-daily-pilot-run/.test(contents), `${file} exposes daily run storage key.`);
+    assert(!/operationsDailyRun/.test(contents), `${file} exposes daily run private UI.`);
+  }
 }
 
 function checkConfig() {
@@ -258,6 +368,8 @@ compileJavaScript("script.js");
 checkPublicSurface();
 checkPrivateUrlAllowlists();
 checkOutcomeEvidenceContract();
+checkLedgerBridgeContract();
+checkOrderLifecycleContract();
 checkDailyPilotRunContract();
 checkConfig();
 

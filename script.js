@@ -568,6 +568,20 @@ const pilotStages = ["Prospect", "Contacted", "Call booked", "Committed", "Ready
 const operationStages = ["Draft", "Sent", "Paid", "Delivered"];
 const signalSources = ["Alpaca", "Binance", "Zotero", "Life Science Research", "GitHub"];
 const signalStatuses = ["observed", "triaged", "routed", "rejected"];
+const LEDGER_HEADERS = [
+  "created_at",
+  "source",
+  "invoice_id",
+  "customer",
+  "contact",
+  "service",
+  "amount",
+  "status",
+  "stripe_invoice_url",
+  "delivery_due",
+  "notes"
+];
+const LEDGER_STATUSES = ["Draft", "Sent", "Paid", "Delivered"];
 
 const gateChecks = [
   {
@@ -620,8 +634,11 @@ const RECEIPT_SEAL_KEY = "strange-company-receipt-seal";
 const REVENUE_PILOT_KEY = "strange-company-revenue-pilot";
 const SATELLITE_COMPANY_KEY = "strange-company-satellite-company";
 const OPERATIONS_KEY = "strange-company-operations";
+const OPERATION_INCIDENTS_KEY = "strange-company-operation-incidents";
 const DAILY_PILOT_RUN_KEY = "strange-company-daily-pilot-run";
 const EXTERNAL_SIGNALS_KEY = "strange-company-external-signals";
+const INCIDENT_SEVERITIES = ["info", "low", "medium", "high"];
+const INCIDENT_STATUSES = ["open", "mitigating", "resolved", "closed"];
 const DAILY_RUN_CHECKS = [
   { id: "review-requests", title: "Review new requests", detail: "Sheet Requests tab, support inbox, and Order Desk submissions." },
   { id: "qualify-customer", title: "Qualify customer", detail: "Real US business, allowed service, no regulated data in the request." },
@@ -656,6 +673,7 @@ let receiptSeal = loadReceiptSeal();
 let revenuePilot = loadRevenuePilot();
 let satelliteCompany = loadSatelliteCompany();
 let operations = loadOperations();
+let operationIncidents = loadOperationIncidents();
 let dailyPilotRun = loadDailyPilotRun();
 let externalSignals = loadExternalSignals();
 
@@ -2374,32 +2392,38 @@ function loadOperations() {
 }
 
 function normalizeOperationOrder(order) {
+  const artifactRaw = order.deliveryArtifactUrl || "";
   return {
     ...order,
-    stripeInvoiceUrl: safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS)
+    stripeInvoiceUrl: safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS),
+    deliveryArtifactUrl: artifactRaw ? safeHttpsUrl(artifactRaw) : "",
+    acceptanceNote: typeof order.acceptanceNote === "string" ? order.acceptanceNote : "",
+    invoiceSentAt: typeof order.invoiceSentAt === "string" ? order.invoiceSentAt : "",
+    paidAt: typeof order.paidAt === "string" ? order.paidAt : "",
+    deliveredAt: typeof order.deliveredAt === "string" ? order.deliveredAt : "",
+    incidentIds: Array.isArray(order.incidentIds) ? order.incidentIds.filter((id) => typeof id === "string" && id) : []
   };
 }
 
-function mergeChecklist(baseList, storedList) {
-  if (!Array.isArray(storedList) || !storedList.length) {
-    return baseList;
-  }
-  return baseList.map((item) => {
-    const match = storedList.find((entry) => entry && entry.id === item.id);
-    if (!match) {
-      return item;
-    }
-    return {
-      ...item,
-      done: Boolean(match.done),
-      completedAt: typeof match.completedAt === "string" ? match.completedAt : ""
-    };
-  });
+function defaultOperationIncidents() {
+  return [];
 }
 
-function saveOperations() {
+function loadOperationIncidents() {
   try {
-    localStorage.setItem(OPERATIONS_KEY, JSON.stringify(operations));
+    const stored = JSON.parse(localStorage.getItem(OPERATION_INCIDENTS_KEY) || "null");
+    if (Array.isArray(stored)) {
+      return stored.map((incident) => normalizeOperationIncident(incident)).filter(Boolean);
+    }
+  } catch {
+    // Fall through to default.
+  }
+  return defaultOperationIncidents();
+}
+
+function saveOperationIncidents() {
+  try {
+    localStorage.setItem(OPERATION_INCIDENTS_KEY, JSON.stringify(operationIncidents));
   } catch {
     // Local storage can be unavailable in hardened browser contexts.
   }
@@ -2446,9 +2470,10 @@ function normalizeDailyRunRecord(record) {
     : [];
   return {
     id: typeof record.id === "string" && record.id ? record.id : `run-${Date.now().toString(36)}`,
-    runDate: typeof record.runDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(record.runDate)
-      ? record.runDate
-      : new Date().toISOString().slice(0, 10),
+    runDate:
+      typeof record.runDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(record.runDate)
+        ? record.runDate
+        : new Date().toISOString().slice(0, 10),
     startedAt: typeof record.startedAt === "string" ? record.startedAt : new Date().toISOString(),
     closedAt: typeof record.closedAt === "string" ? record.closedAt : "",
     receiptRoot: typeof record.receiptRoot === "string" ? record.receiptRoot : "",
@@ -2512,6 +2537,7 @@ function startDailyPilotRun() {
   saveDailyPilotRun();
   renderDailyPilotRun();
   renderOperations();
+  renderReceiptChain();
   renderLogs();
 }
 
@@ -2525,6 +2551,8 @@ function toggleDailyRunCheck(checkId, done) {
   dailyPilotRun.current.checks[checkId] = Boolean(done);
   saveDailyPilotRun();
   renderDailyPilotRun();
+  renderReceiptChain();
+  renderLogs();
 }
 
 function toggleDailyRunStopRule(ruleId, active) {
@@ -2538,6 +2566,7 @@ function toggleDailyRunStopRule(ruleId, active) {
   saveDailyPilotRun();
   renderDailyPilotRun();
   renderOperations();
+  renderReceiptChain();
   renderLogs();
 }
 
@@ -2551,6 +2580,8 @@ function updateDailyRunIncidentIds(value) {
     .filter(Boolean);
   dailyPilotRun.current.incidentIds = Array.from(new Set(ids));
   saveDailyPilotRun();
+  renderReceiptChain();
+  renderLogs();
 }
 
 function collectDailyRunOrderIds() {
@@ -2594,7 +2625,53 @@ function resetDailyPilotRun() {
   saveDailyPilotRun();
   renderDailyPilotRun();
   renderOperations();
+  renderReceiptChain();
   renderLogs();
+}
+
+function normalizeOperationIncident(incident) {
+  if (!incident || typeof incident !== "object") {
+    return null;
+  }
+  const severity = INCIDENT_SEVERITIES.includes(incident.severity) ? incident.severity : "low";
+  const status = INCIDENT_STATUSES.includes(incident.status) ? incident.status : "open";
+  const id = typeof incident.id === "string" && incident.id ? incident.id : `incident-${Date.now()}`;
+  return {
+    id,
+    orderId: typeof incident.orderId === "string" ? incident.orderId : "",
+    invoiceNumber: typeof incident.invoiceNumber === "string" ? incident.invoiceNumber : "",
+    severity,
+    status,
+    summary: typeof incident.summary === "string" ? incident.summary : "",
+    response: typeof incident.response === "string" ? incident.response : "",
+    createdAt: typeof incident.createdAt === "string" ? incident.createdAt : new Date().toISOString(),
+    updatedAt: typeof incident.updatedAt === "string" ? incident.updatedAt : new Date().toISOString()
+  };
+}
+
+function mergeChecklist(baseList, storedList) {
+  if (!Array.isArray(storedList) || !storedList.length) {
+    return baseList;
+  }
+  return baseList.map((item) => {
+    const match = storedList.find((entry) => entry && entry.id === item.id);
+    if (!match) {
+      return item;
+    }
+    return {
+      ...item,
+      done: Boolean(match.done),
+      completedAt: typeof match.completedAt === "string" ? match.completedAt : ""
+    };
+  });
+}
+
+function saveOperations() {
+  try {
+    localStorage.setItem(OPERATIONS_KEY, JSON.stringify(operations));
+  } catch {
+    // Local storage can be unavailable in hardened browser contexts.
+  }
 }
 
 function loadExternalSignals() {
@@ -3186,8 +3263,8 @@ function buildOperationsModel() {
   if (!stripeReady) integrationGaps.push("Stripe dashboard link");
   if (!termsReviewed) integrationGaps.push("terms reviewed date");
   if (!privacyReviewed) integrationGaps.push("privacy reviewed date");
-
   const pausedReason = dailyRunPausedReason();
+
   const baseModel = {
     controls,
     orders,
@@ -3426,11 +3503,10 @@ function renderOperations() {
       .map((order) => {
         const tone = toneForOperationStatus(order.status);
         const canAdvance = order.status !== "Delivered";
-        const paymentBlocked = order.status === "Sent" && model.openCriticalControls.length > 0;
-        const stripeNeeded = order.status === "Draft" || order.status === "Sent" || order.status === "Paid" || order.status === "Delivered";
+        const blockReason = orderAdvanceBlock(order, model);
         const safeStripeInvoiceUrl = safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS);
-        const stripeMissing = stripeNeeded && !safeStripeInvoiceUrl;
-        const invoiceBlocked = order.status === "Draft" && stripeMissing;
+        const stripeMissing = order.status === "Draft" && !safeStripeInvoiceUrl;
+        const safeArtifact = safeHttpsUrl(order.deliveryArtifactUrl || "");
         const stripeLine = safeStripeInvoiceUrl
           ? `<a href="${escapeHtml(safeStripeInvoiceUrl)}" target="_blank" rel="noreferrer">Hosted invoice</a>`
           : stripeMissing
@@ -3439,6 +3515,32 @@ function renderOperations() {
         const dueLine = order.deliveryDue
           ? `Delivery due ${escapeHtml(order.deliveryDue)}`
           : "Delivery date not set";
+        const timeline = [];
+        if (order.invoiceSentAt) timeline.push(`Sent ${escapeHtml(formatReceiptDate(order.invoiceSentAt))}`);
+        if (order.paidAt) timeline.push(`Paid ${escapeHtml(formatReceiptDate(order.paidAt))}`);
+        if (order.deliveredAt) timeline.push(`Delivered ${escapeHtml(formatReceiptDate(order.deliveredAt))}`);
+        const timelineLine = timeline.length ? `<p class="ops-order-meta">${timeline.join(" / ")}</p>` : "";
+        const artifactLine = safeArtifact
+          ? `<a class="ops-order-artifact" href="${escapeHtml(safeArtifact)}" target="_blank" rel="noreferrer noopener">Delivery artifact</a>`
+          : order.status === "Paid" || order.status === "Delivered"
+            ? `<span class="state amber">No https artifact attached</span>`
+            : "";
+        const acceptanceLine = order.acceptanceNote
+          ? `<p class="ops-order-acceptance"><strong>Acceptance:</strong> ${escapeHtml(order.acceptanceNote)}</p>`
+          : order.status === "Paid" || order.status === "Delivered"
+            ? `<p class="ops-order-acceptance ops-order-acceptance-missing">No acceptance note yet.</p>`
+            : "";
+        const linkedIncidents = (order.incidentIds || [])
+          .map((incidentId) => operationIncidents.find((entry) => entry.id === incidentId))
+          .filter(Boolean);
+        const incidentLine = linkedIncidents.length
+          ? `<p class="ops-order-incidents"><strong>Incidents:</strong> ${linkedIncidents
+              .map((entry) => `${escapeHtml(entry.severity)} ${escapeHtml(entry.status)}: ${escapeHtml((entry.summary || "").slice(0, 80))}`)
+              .join(" / ")}</p>`
+          : "";
+        const blockLine = blockReason && canAdvance
+          ? `<p class="ops-order-block">${escapeHtml(blockReason)}</p>`
+          : "";
         return `
           <article class="ops-order">
             <div>
@@ -3446,6 +3548,11 @@ function renderOperations() {
               <h4>${escapeHtml(order.customer)}</h4>
               <p>${escapeHtml(order.serviceTitle)} / ${escapeHtml(order.need || "Need not recorded")}</p>
               <p class="ops-order-meta">${escapeHtml(dueLine)} / ${stripeLine}</p>
+              ${timelineLine}
+              ${artifactLine ? `<p class="ops-order-meta">${artifactLine}</p>` : ""}
+              ${acceptanceLine}
+              ${incidentLine}
+              ${blockLine}
             </div>
             <strong>${money.format(Number(order.amount || 0))}</strong>
             <span class="state ${tone}">${escapeHtml(order.status)}</span>
@@ -3458,13 +3565,54 @@ function renderOperations() {
                 <span>Delivery due</span>
                 <input type="date" value="${escapeHtml(order.deliveryDue || "")}" data-delivery-due-order="${escapeHtml(order.id)}" />
               </label>
+              <label>
+                <span>Delivery artifact URL (https)</span>
+                <input type="url" inputmode="url" placeholder="https://..." value="${escapeHtml(order.deliveryArtifactUrl || "")}" data-artifact-url-order="${escapeHtml(order.id)}" />
+              </label>
+              <label>
+                <span>Acceptance note</span>
+                <textarea rows="2" placeholder="What the customer accepted; what was delivered." data-acceptance-note-order="${escapeHtml(order.id)}">${escapeHtml(order.acceptanceNote || "")}</textarea>
+              </label>
             </div>
             <div class="ops-actions">
               <button type="button" data-copy-operation-packet="${escapeHtml(order.id)}">Packet</button>
+              <button type="button" data-copy-ledger-row="${escapeHtml(order.id)}">Copy row</button>
               <button type="button" data-save-stripe-order="${escapeHtml(order.id)}">Save URL</button>
-              <button type="button" data-advance-operation-order="${escapeHtml(order.id)}" ${canAdvance && !paymentBlocked && !invoiceBlocked ? "" : "disabled"}>${nextOperationAction(order.status)}</button>
+              <button type="button" data-save-delivery-order="${escapeHtml(order.id)}">Save delivery</button>
+              <button type="button" data-advance-operation-order="${escapeHtml(order.id)}" ${canAdvance && !blockReason ? "" : "disabled"}>${nextOperationAction(order.status)}</button>
+              <button type="button" data-open-incident-form="${escapeHtml(order.id)}">Log incident</button>
               <button type="button" data-remove-operation-order="${escapeHtml(order.id)}">Remove</button>
             </div>
+            <form class="ops-incident-form" data-incident-form="${escapeHtml(order.id)}" hidden autocomplete="off">
+              <p class="evidence-form-kicker">Incident receipt</p>
+              <div class="field-row">
+                <label class="field">
+                  <span>Severity</span>
+                  <select name="severity">
+                    ${INCIDENT_SEVERITIES.map((sev) => `<option value="${escapeHtml(sev)}" ${sev === "low" ? "selected" : ""}>${escapeHtml(sev)}</option>`).join("")}
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Status</span>
+                  <select name="status">
+                    ${INCIDENT_STATUSES.map((st) => `<option value="${escapeHtml(st)}" ${st === "open" ? "selected" : ""}>${escapeHtml(st)}</option>`).join("")}
+                  </select>
+                </label>
+              </div>
+              <label class="field">
+                <span>Summary</span>
+                <textarea name="summary" rows="2" required placeholder="What went wrong, observed from outside."></textarea>
+              </label>
+              <label class="field">
+                <span>Response</span>
+                <textarea name="response" rows="2" required placeholder="What the operator did; what the customer was told."></textarea>
+              </label>
+              <div class="evidence-form-actions">
+                <button class="primary-action" type="submit">Record incident</button>
+                <button type="button" data-cancel-incident-form="${escapeHtml(order.id)}">Cancel</button>
+                <p class="evidence-form-error" data-incident-error="${escapeHtml(order.id)}" hidden></p>
+              </div>
+            </form>
           </article>
         `;
       })
@@ -3476,6 +3624,9 @@ function renderOperations() {
   });
   document.querySelectorAll("[data-copy-operation-packet]").forEach((button) => {
     button.addEventListener("click", () => copyOperationPacket(button.dataset.copyOperationPacket));
+  });
+  document.querySelectorAll("[data-copy-ledger-row]").forEach((button) => {
+    button.addEventListener("click", () => copyOrderLedgerRow(button.dataset.copyLedgerRow, button));
   });
   document.querySelectorAll("[data-save-stripe-order]").forEach((button) => {
     button.addEventListener("click", () => saveOrderStripeUrl(button.dataset.saveStripeOrder));
@@ -3494,6 +3645,42 @@ function renderOperations() {
   });
   document.querySelectorAll("[data-delivery-due-order]").forEach((input) => {
     input.addEventListener("change", () => updateOrderField(input.dataset.deliveryDueOrder, "deliveryDue", input.value));
+  });
+  document.querySelectorAll("[data-artifact-url-order]").forEach((input) => {
+    input.addEventListener("change", () => updateOrderField(input.dataset.artifactUrlOrder, "deliveryArtifactUrl", input.value));
+  });
+  document.querySelectorAll("[data-acceptance-note-order]").forEach((textarea) => {
+    textarea.addEventListener("change", () => updateOrderField(textarea.dataset.acceptanceNoteOrder, "acceptanceNote", textarea.value));
+  });
+  document.querySelectorAll("[data-save-delivery-order]").forEach((button) => {
+    button.addEventListener("click", () => saveOrderDeliveryFields(button.dataset.saveDeliveryOrder, button));
+  });
+  document.querySelectorAll("[data-open-incident-form]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const orderId = button.dataset.openIncidentForm;
+      const form = document.querySelector(`[data-incident-form="${CSS.escape(orderId)}"]`);
+      if (form) {
+        form.hidden = false;
+        const summary = form.querySelector("[name='summary']");
+        if (summary) summary.focus();
+      }
+    });
+  });
+  document.querySelectorAll("[data-cancel-incident-form]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const orderId = button.dataset.cancelIncidentForm;
+      const form = document.querySelector(`[data-incident-form="${CSS.escape(orderId)}"]`);
+      if (form) {
+        form.hidden = true;
+        form.reset();
+      }
+    });
+  });
+  document.querySelectorAll("[data-incident-form]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitOrderIncident(form);
+    });
   });
 
   renderDailyPilotRun();
@@ -3592,7 +3779,7 @@ function renderDailyPilotRun() {
       <article class="ops-daily-empty">
         <span class="metric-label">No run in progress</span>
         <h4>Start a run for today.</h4>
-        <p>The run captures which checks were ticked, which stop rules were active, which orders moved, and the receipt-chain root at close. While a run is open, any active stop rule pauses Draft to Sent transitions.</p>
+        <p>The run captures checks, stop rules, orders moved, linked incidents, and the receipt-chain root at close. While a run is open, any active stop rule pauses Draft to Sent transitions.</p>
       </article>
     `;
 
@@ -3609,7 +3796,7 @@ function renderDailyPilotRun() {
               <span class="metric-label">${escapeHtml(entry.runDate)}</span>
               <h4>${stopCount ? "Closed with stop rules" : "Closed clean"}</h4>
               <p>${doneCount}/${DAILY_RUN_CHECKS.length} checks. ${stopCount} stop rule${stopCount === 1 ? "" : "s"}. ${entry.orderIds.length} order${entry.orderIds.length === 1 ? "" : "s"} touched. ${entry.incidentIds.length} incident id${entry.incidentIds.length === 1 ? "" : "s"} attached.</p>
-              <p>Closed ${escapeHtml(formatReceiptDate(entry.closedAt))} · Root ${root}</p>
+              <p>Closed ${escapeHtml(formatReceiptDate(entry.closedAt))} / Root ${root}</p>
             </article>
           `;
         })
@@ -3663,13 +3850,118 @@ function toggleLaunchItem(itemId, done) {
 }
 
 function updateOrderField(orderId, field, value) {
-  const nextValue = field === "stripeInvoiceUrl" ? cleanConfiguredUrl(value, STRIPE_INVOICE_URLS) : value;
+  let nextValue = value;
+  if (field === "stripeInvoiceUrl") {
+    nextValue = cleanConfiguredUrl(value, STRIPE_INVOICE_URLS);
+  } else if (field === "deliveryArtifactUrl") {
+    nextValue = safeHttpsUrl(value);
+  } else if (field === "acceptanceNote") {
+    nextValue = String(value || "");
+  }
   operations.orders = operations.orders.map((order) =>
     order.id === orderId
       ? { ...order, [field]: nextValue, updatedAt: new Date().toISOString() }
       : order
   );
   saveOperations();
+  renderOperations();
+  renderLogs();
+}
+
+async function saveOrderDeliveryFields(orderId, button) {
+  const order = (operations.orders || []).find((entry) => entry.id === orderId);
+  if (!order || !button) {
+    return;
+  }
+  const artifactInput = document.querySelector(`[data-artifact-url-order="${CSS.escape(orderId)}"]`);
+  const noteInput = document.querySelector(`[data-acceptance-note-order="${CSS.escape(orderId)}"]`);
+  const previous = button.textContent;
+  if (artifactInput) {
+    updateOrderField(orderId, "deliveryArtifactUrl", artifactInput.value);
+  }
+  if (noteInput) {
+    updateOrderField(orderId, "acceptanceNote", noteInput.value);
+  }
+  button.textContent = "Saved";
+  setTimeout(() => {
+    button.textContent = previous;
+  }, 1500);
+}
+
+function submitOrderIncident(form) {
+  const orderId = form.dataset.incidentForm;
+  const order = (operations.orders || []).find((entry) => entry.id === orderId);
+  const errorBox = document.querySelector(`[data-incident-error="${CSS.escape(orderId)}"]`);
+  const showError = (message) => {
+    if (!errorBox) return;
+    errorBox.textContent = message;
+    errorBox.hidden = false;
+  };
+  const clearError = () => {
+    if (errorBox) {
+      errorBox.textContent = "";
+      errorBox.hidden = true;
+    }
+  };
+  if (!order) {
+    showError("Order no longer exists.");
+    return;
+  }
+  const formData = new FormData(form);
+  const severity = String(formData.get("severity") || "low");
+  const status = String(formData.get("status") || "open");
+  const summary = String(formData.get("summary") || "").trim();
+  const response = String(formData.get("response") || "").trim();
+
+  if (!INCIDENT_SEVERITIES.includes(severity)) {
+    showError("Severity must be one of " + INCIDENT_SEVERITIES.join(", ") + ".");
+    return;
+  }
+  if (!INCIDENT_STATUSES.includes(status)) {
+    showError("Status must be one of " + INCIDENT_STATUSES.join(", ") + ".");
+    return;
+  }
+  if (!summary) {
+    showError("Summary is required.");
+    return;
+  }
+  if (!response) {
+    showError("Response is required.");
+    return;
+  }
+  const sensitive = findSensitiveData(`${summary}\n${response}`);
+  if (sensitive.length) {
+    showError(`Incident text contains ${sensitive.join(", ")}. Strip and retry.`);
+    return;
+  }
+
+  clearError();
+  const now = new Date().toISOString();
+  const incident = normalizeOperationIncident({
+    id: `incident-${slugify(order.invoiceNumber || order.id)}-${Date.now().toString(36)}`,
+    orderId: order.id,
+    invoiceNumber: order.invoiceNumber || "",
+    severity,
+    status,
+    summary,
+    response,
+    createdAt: now,
+    updatedAt: now
+  });
+  operationIncidents.unshift(incident);
+  saveOperationIncidents();
+  operations.orders = operations.orders.map((entry) =>
+    entry.id === order.id
+      ? {
+          ...entry,
+          incidentIds: Array.from(new Set([...(entry.incidentIds || []), incident.id])),
+          updatedAt: now
+        }
+      : entry
+  );
+  saveOperations();
+  form.reset();
+  form.hidden = true;
   renderOperations();
   renderLogs();
 }
@@ -3892,48 +4184,307 @@ function addOperationOrder(form) {
   renderLogs();
 }
 
+function orderAdvanceBlock(order, model) {
+  const pausedReason = model.pausedReason || dailyRunPausedReason();
+  if (order.status === "Draft" && pausedReason) {
+    return pausedReason;
+  }
+  if (order.status === "Draft" && !safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS)) {
+    return "Paste a Stripe Hosted Invoice URL before marking Sent.";
+  }
+  if (order.status === "Sent" && model.openCriticalControls.length > 0) {
+    return `Close ${model.openCriticalControls.length} critical control${model.openCriticalControls.length === 1 ? "" : "s"} before marking Paid.`;
+  }
+  if (order.status === "Paid") {
+    if (!safeHttpsUrl(order.deliveryArtifactUrl || "")) {
+      return "Attach an https:// delivery artifact URL before marking Delivered.";
+    }
+    if (!String(order.acceptanceNote || "").trim()) {
+      return "Record an acceptance note before marking Delivered.";
+    }
+    const sensitive = findSensitiveData(String(order.acceptanceNote || ""));
+    if (sensitive.length) {
+      return `Acceptance note contains ${sensitive.join(", ")}; remove and resubmit.`;
+    }
+  }
+  return "";
+}
+
 function advanceOperationOrder(orderId) {
   const model = buildOperationsModel();
-  const pausedReason = dailyRunPausedReason();
+  const now = new Date().toISOString();
   operations.orders = operations.orders.map((order) => {
     if (order.id !== orderId) {
       return order;
     }
+    const blockReason = orderAdvanceBlock(order, model);
+    if (blockReason) {
+      return {
+        ...order,
+        blockedAt: now,
+        blockReason,
+        updatedAt: now
+      };
+    }
     const currentIndex = operationStages.indexOf(order.status);
     const nextStatus = operationStages[Math.min(currentIndex + 1, operationStages.length - 1)];
-    if (order.status === "Draft" && pausedReason) {
-      return {
-        ...order,
-        blockedAt: new Date().toISOString(),
-        blockReason: pausedReason,
-        updatedAt: new Date().toISOString()
-      };
-    }
-    if (order.status === "Draft" && !safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS)) {
-      return {
-        ...order,
-        blockedAt: new Date().toISOString(),
-        notes: "Blocked: paste a Stripe Hosted Invoice URL before marking sent.",
-        updatedAt: new Date().toISOString()
-      };
-    }
-    if (order.status === "Sent" && model.openCriticalControls.length > 0) {
-      return {
-        ...order,
-        blockedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-    }
-    return {
+    const next = {
       ...order,
       status: nextStatus,
-      updatedAt: new Date().toISOString()
+      blockedAt: "",
+      blockReason: "",
+      updatedAt: now
     };
+    if (order.status === "Draft" && nextStatus === "Sent") {
+      next.invoiceSentAt = now;
+    } else if (order.status === "Sent" && nextStatus === "Paid") {
+      next.paidAt = now;
+    } else if (order.status === "Paid" && nextStatus === "Delivered") {
+      next.deliveredAt = now;
+    }
+    return next;
   });
   saveOperations();
   renderOperations();
   renderOrderDesk();
   renderLogs();
+}
+
+function parseLedgerTsv(text) {
+  const normalized = String(text || "").replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+  const lines = normalized.split("\n").map((line) => line.replace(/\s+$/, "")).filter((line) => line.length > 0);
+  if (!lines.length) {
+    return { headers: LEDGER_HEADERS.slice(), rows: [], skippedHeader: false };
+  }
+
+  let cursor = 0;
+  const firstCells = lines[0].split("\t").map((cell) => cell.trim().toLowerCase());
+  const headerMatches =
+    firstCells.length === LEDGER_HEADERS.length && LEDGER_HEADERS.every((header, index) => firstCells[index] === header);
+  if (headerMatches) {
+    cursor = 1;
+  }
+
+  const rows = [];
+  for (let lineIndex = cursor; lineIndex < lines.length; lineIndex += 1) {
+    const cells = lines[lineIndex].split("\t");
+    const columnCount = cells.length;
+    if (cells.length < LEDGER_HEADERS.length) {
+      while (cells.length < LEDGER_HEADERS.length) {
+        cells.push("");
+      }
+    }
+    if (cells.length > LEDGER_HEADERS.length) {
+      cells.length = LEDGER_HEADERS.length;
+    }
+    const row = {};
+    LEDGER_HEADERS.forEach((header, index) => {
+      row[header] = String(cells[index] || "").trim();
+    });
+    row.__columnCount = columnCount;
+    rows.push({ lineNumber: lineIndex + 1, raw: row });
+  }
+  return { headers: LEDGER_HEADERS.slice(), rows, skippedHeader: cursor === 1 };
+}
+
+function validateLedgerRow(raw) {
+  const errors = [];
+  const invoiceId = String(raw.invoice_id || "").trim();
+  const customer = String(raw.customer || "").trim();
+  const contact = String(raw.contact || "").trim();
+  const service = String(raw.service || "").trim();
+  const amountRaw = String(raw.amount || "").trim();
+  const status = String(raw.status || "").trim();
+  const stripeRaw = String(raw.stripe_invoice_url || "").trim();
+  const deliveryDue = String(raw.delivery_due || "").trim();
+  const notes = String(raw.notes || "").trim();
+  const source = String(raw.source || "").trim();
+  const createdAt = String(raw.created_at || "").trim();
+  const columnCount = Number(raw.__columnCount || 0);
+
+  if (columnCount > LEDGER_HEADERS.length) {
+    errors.push(`row has ${columnCount} columns; expected ${LEDGER_HEADERS.length}. Remove extra Sheet columns before import.`);
+  }
+
+  if (!invoiceId) {
+    errors.push("invoice_id is required as the upsert key.");
+  }
+  if (!customer) {
+    errors.push("customer is required.");
+  }
+  const amountNumber = Number(amountRaw.replace(/[$,\s]/g, ""));
+  if (!amountRaw) {
+    errors.push("amount is required.");
+  } else if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
+    errors.push("amount must be a finite, positive number.");
+  }
+  if (!status) {
+    errors.push("status is required.");
+  } else if (!LEDGER_STATUSES.includes(status)) {
+    errors.push(`status must be one of ${LEDGER_STATUSES.join(", ")}.`);
+  }
+  if (contact && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact)) {
+    errors.push("contact must be a valid email when set.");
+  }
+  let stripeUrl = "";
+  if (stripeRaw) {
+    stripeUrl = safeExternalUrl(stripeRaw, STRIPE_INVOICE_URLS);
+    if (!stripeUrl) {
+      errors.push("stripe_invoice_url must be an https://invoice.stripe.com/ URL.");
+    }
+  }
+  if (deliveryDue && !/^\d{4}-\d{2}-\d{2}$/.test(deliveryDue)) {
+    errors.push("delivery_due must be blank or YYYY-MM-DD.");
+  }
+  if (createdAt) {
+    const parsed = new Date(createdAt);
+    if (Number.isNaN(parsed.valueOf())) {
+      errors.push("created_at must be blank or an ISO date.");
+    }
+  }
+  const joined = [customer, contact, service, notes, source, raw.invoice_id || ""].join("\n");
+  const sensitive = findSensitiveData(joined);
+  if (sensitive.length) {
+    errors.push(`row contains ${sensitive.join(", ")}.`);
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
+    normalized: {
+      invoiceId,
+      customer,
+      contact,
+      service,
+      amount: amountNumber,
+      status,
+      stripeInvoiceUrl: stripeUrl,
+      deliveryDue,
+      notes,
+      source,
+      createdAt
+    }
+  };
+}
+
+function previewLedgerImport(text) {
+  const parsed = parseLedgerTsv(text);
+  const summary = {
+    totalRows: parsed.rows.length,
+    skippedHeader: parsed.skippedHeader,
+    willCreate: 0,
+    willUpdate: 0,
+    rejected: [],
+    valid: []
+  };
+  if (!parsed.rows.length) {
+    return summary;
+  }
+  const seenInvoiceIds = new Set();
+  parsed.rows.forEach((entry) => {
+    const result = validateLedgerRow(entry.raw);
+    if (!result.ok) {
+      summary.rejected.push({ lineNumber: entry.lineNumber, errors: result.errors });
+      return;
+    }
+    if (seenInvoiceIds.has(result.normalized.invoiceId)) {
+      summary.rejected.push({
+        lineNumber: entry.lineNumber,
+        errors: [`invoice_id ${result.normalized.invoiceId} appears more than once in the paste; resolve in the Sheet first.`]
+      });
+      return;
+    }
+    seenInvoiceIds.add(result.normalized.invoiceId);
+    const existing = (operations.orders || []).find((order) => order.invoiceNumber === result.normalized.invoiceId);
+    if (existing) {
+      summary.willUpdate += 1;
+    } else {
+      summary.willCreate += 1;
+    }
+    summary.valid.push({ lineNumber: entry.lineNumber, normalized: result.normalized });
+  });
+  return summary;
+}
+
+function importLedger(text) {
+  const preview = previewLedgerImport(text);
+  if (!preview.valid.length) {
+    return preview;
+  }
+  const now = new Date().toISOString();
+  const services = operationServices();
+  const orders = operations.orders || [];
+  preview.valid.forEach((entry) => {
+    const incoming = entry.normalized;
+    const existingIndex = orders.findIndex((order) => order.invoiceNumber === incoming.invoiceId);
+    const matchedService = services.find((service) => service.title === incoming.service || service.id === incoming.service);
+    if (existingIndex >= 0) {
+      const existing = orders[existingIndex];
+      orders[existingIndex] = {
+        ...existing,
+        customer: incoming.customer || existing.customer,
+        contact: incoming.contact || existing.contact,
+        serviceId: matchedService?.id || existing.serviceId,
+        serviceTitle: incoming.service || existing.serviceTitle,
+        amount: Number.isFinite(incoming.amount) && incoming.amount > 0 ? incoming.amount : existing.amount,
+        status: incoming.status || existing.status,
+        stripeInvoiceUrl: incoming.stripeInvoiceUrl || existing.stripeInvoiceUrl,
+        deliveryDue: incoming.deliveryDue || existing.deliveryDue,
+        notes: incoming.notes || existing.notes,
+        source: incoming.source || existing.source,
+        ledgerSyncedAt: now,
+        updatedAt: now
+      };
+    } else {
+      orders.unshift({
+        id: `order-ledger-${slugify(incoming.invoiceId)}-${Date.now()}`,
+        invoiceNumber: incoming.invoiceId,
+        customer: incoming.customer,
+        contact: incoming.contact,
+        serviceId: matchedService?.id || "imported",
+        serviceTitle: incoming.service || "Sheet import",
+        need: "Imported from Sheet ledger.",
+        amount: Number.isFinite(incoming.amount) ? incoming.amount : 0,
+        status: incoming.status,
+        source: incoming.source || "Sheet ledger",
+        stripeInvoiceUrl: incoming.stripeInvoiceUrl,
+        deliveryDue: incoming.deliveryDue,
+        notes: incoming.notes,
+        createdAt: incoming.createdAt || now,
+        updatedAt: now,
+        ledgerSyncedAt: now
+      });
+    }
+  });
+  operations.orders = orders;
+  saveOperations();
+  return preview;
+}
+
+function orderToLedgerCells(order) {
+  return [
+    order.createdAt || "",
+    order.source || "Operations console",
+    order.invoiceNumber || "",
+    order.customer || "",
+    order.contact || "",
+    order.serviceTitle || "",
+    String(Number(order.amount || 0)),
+    order.status || "Draft",
+    order.stripeInvoiceUrl || "",
+    order.deliveryDue || "",
+    (order.notes || "").replace(/[\t\r\n]+/g, " ")
+  ];
+}
+
+function orderToLedgerRow(order) {
+  return orderToLedgerCells(order).join("\t");
+}
+
+function allOrdersLedgerTsv() {
+  const header = LEDGER_HEADERS.join("\t");
+  const rows = (operations.orders || []).map((order) => orderToLedgerRow(order));
+  return [header, ...rows].join("\n");
 }
 
 function removeOperationOrder(orderId) {
@@ -4003,6 +4554,47 @@ async function copyOperationPacket(orderId) {
     </div>
     <pre>${escapeHtml(packet)}</pre>
   `;
+}
+
+async function copyOrderLedgerRow(orderId, button) {
+  const order = (operations.orders || []).find((item) => item.id === orderId);
+  if (!order || !button) {
+    return;
+  }
+  const row = orderToLedgerRow(order);
+  const previous = button.textContent;
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(row);
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  button.textContent = copied ? "Row copied" : "Copy failed";
+  setTimeout(() => {
+    button.textContent = previous;
+  }, 1500);
+}
+
+async function copyAllLedgerRows(button) {
+  if (!button) {
+    return;
+  }
+  const tsv = allOrdersLedgerTsv();
+  const previous = button.getAttribute("aria-label") || "";
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(tsv);
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  button.setAttribute("aria-label", copied ? "All orders copied as TSV" : "Copy failed");
+  button.classList.add(copied ? "ledger-copy-ok" : "ledger-copy-fail");
+  setTimeout(() => {
+    button.setAttribute("aria-label", previous);
+    button.classList.remove("ledger-copy-ok", "ledger-copy-fail");
+  }, 1500);
 }
 
 function submitOrderRequest(form) {
@@ -4281,34 +4873,63 @@ function collectReceiptEvents() {
 
   operations.orders.forEach((order) => {
     push("Order", order.id, order.customer, "Operations console", order.status, order.updatedAt || order.createdAt, {
+      acceptanceNote: order.acceptanceNote || "",
       amount: Number(order.amount || 0),
       contact: order.contact || "",
+      deliveredAt: order.deliveredAt || "",
+      deliveryArtifactUrl: safeHttpsUrl(order.deliveryArtifactUrl || ""),
+      incidentIds: Array.isArray(order.incidentIds) ? order.incidentIds.slice() : [],
       invoiceNumber: order.invoiceNumber || "",
+      invoiceSentAt: order.invoiceSentAt || "",
+      paidAt: order.paidAt || "",
       source: order.source || "",
       serviceTitle: order.serviceTitle || ""
     });
   });
 
-  const runHistory = dailyPilotRun.history || [];
+  operationIncidents.forEach((incident) => {
+    push(
+      "Incident",
+      incident.id,
+      incident.summary || incident.invoiceNumber || incident.orderId,
+      "Operations console",
+      `${incident.severity} ${incident.status}`,
+      incident.updatedAt || incident.createdAt,
+      {
+        invoiceNumber: incident.invoiceNumber || "",
+        orderId: incident.orderId || "",
+        response: incident.response || "",
+        severity: incident.severity,
+        status: incident.status,
+        summary: incident.summary || ""
+      }
+    );
+  });
+
   const runEvents = [];
   if (dailyPilotRun.current) {
     const activeRules = activeStopRules().map((rule) => rule.id);
     runEvents.push({
       ...dailyPilotRun.current,
+      orderIds: collectDailyRunOrderIds(),
       state: activeRules.length ? "Paused" : "Active",
       activeRules
     });
   }
-  for (const entry of runHistory) {
-    const stopRules = Object.entries(entry.stopRules || {}).filter(([, on]) => on).map(([id]) => id);
+  (dailyPilotRun.history || []).forEach((entry) => {
+    const stopRules = Object.entries(entry.stopRules || [])
+      .filter(([, on]) => on)
+      .map(([id]) => id);
     runEvents.push({
       ...entry,
       state: stopRules.length ? "Closed with stop rules" : "Closed clean",
       activeRules: stopRules
     });
-  }
-  for (const entry of runEvents) {
-    const completedChecks = Object.entries(entry.checks || {}).filter(([, on]) => on).map(([id]) => id);
+  });
+  runEvents.forEach((entry) => {
+    const completedChecks = Object.entries(entry.checks || {})
+      .filter(([, on]) => on)
+      .map(([id]) => id);
     push(
       "Run",
       entry.id,
@@ -4326,7 +4947,7 @@ function collectReceiptEvents() {
         stopRules: entry.activeRules || []
       }
     );
-  }
+  });
 
   externalSignals.forEach((signal) => {
     push("Signal", signal.id, signal.subject, signal.source, signalLabel(signal.status), signal.updatedAt || signal.observed_at, {
@@ -4513,7 +5134,9 @@ function toneForReceiptEvent(receipt) {
     state.includes("online") ||
     state.includes("paid sandbox") ||
     state.includes("passed") ||
-    state.includes("scale")
+    state.includes("scale") ||
+    state.includes("resolved") ||
+    state.includes("closed")
   ) {
     return "green";
   }
@@ -4524,7 +5147,9 @@ function toneForReceiptEvent(receipt) {
     state.includes("kill") ||
     state.includes("offline") ||
     state.includes("reject") ||
-    state.includes("weak")
+    state.includes("weak") ||
+    state.includes("high open") ||
+    state.includes("high mitigating")
   ) {
     return "red";
   }
@@ -5386,11 +6011,115 @@ function setupOperations() {
   if (resetButton) {
     resetButton.addEventListener("click", () => {
       operations = defaultOperations();
+      operationIncidents = defaultOperationIncidents();
       saveOperations();
+      saveOperationIncidents();
       renderOperations();
       renderOrderDesk();
       renderLogs();
     });
+  }
+
+  const bridgeForm = document.querySelector("#operationsLedgerBridgeForm");
+  const bridgeTextarea = document.querySelector("#operationsLedgerTsv");
+  const bridgeOutput = document.querySelector("#operationsLedgerOutput");
+  const bridgePreview = document.querySelector("#operationsLedgerPreview");
+  const bridgeImport = document.querySelector("#operationsLedgerImport");
+  const bridgeClear = document.querySelector("#operationsLedgerClear");
+
+  const renderBridgeOutput = (preview, tone = "amber", label = "Preview") => {
+    if (!bridgeOutput) {
+      return;
+    }
+    if (!preview || preview.totalRows === 0) {
+      bridgeOutput.innerHTML = `
+        <article class="ops-bridge-output-card">
+          <span class="metric-label">${escapeHtml(label)}</span>
+          <p>No TSV rows detected. Paste rows copied from the Sheet, with or without the header line.</p>
+        </article>
+      `;
+      if (bridgeImport) {
+        bridgeImport.disabled = true;
+      }
+      return;
+    }
+    const rejectedList = preview.rejected
+      .map(
+        (entry) => `
+          <li>
+            <strong>Line ${entry.lineNumber}:</strong> ${escapeHtml(entry.errors.join(" "))}
+          </li>
+        `
+      )
+      .join("");
+    const validList = preview.valid
+      .map(
+        (entry) => `
+          <li>
+            Line ${entry.lineNumber}: ${escapeHtml(entry.normalized.invoiceId)} / ${escapeHtml(entry.normalized.customer)}
+            (${escapeHtml(entry.normalized.status)})
+          </li>
+        `
+      )
+      .join("");
+    bridgeOutput.innerHTML = `
+      <article class="ops-bridge-output-card">
+        <span class="metric-label">${escapeHtml(label)}</span>
+        <p>
+          Rows parsed: ${preview.totalRows}.
+          Will create: ${preview.willCreate}.
+          Will update: ${preview.willUpdate}.
+          Rejected: ${preview.rejected.length}.
+          ${preview.skippedHeader ? "Header row detected and skipped." : ""}
+        </p>
+        ${preview.rejected.length ? `<details open><summary>Rejected rows</summary><ul class="ops-bridge-rejected">${rejectedList}</ul></details>` : ""}
+        ${preview.valid.length ? `<details><summary>Valid rows</summary><ul class="ops-bridge-valid">${validList}</ul></details>` : ""}
+      </article>
+    `;
+    if (bridgeImport) {
+      bridgeImport.disabled = preview.valid.length === 0;
+    }
+  };
+
+  if (bridgePreview) {
+    bridgePreview.addEventListener("click", () => {
+      const text = bridgeTextarea ? bridgeTextarea.value : "";
+      const preview = previewLedgerImport(text);
+      renderBridgeOutput(preview, "amber", "Preview");
+    });
+  }
+
+  if (bridgeForm) {
+    bridgeForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const text = bridgeTextarea ? bridgeTextarea.value : "";
+      const preview = importLedger(text);
+      renderBridgeOutput(preview, "green", "Imported");
+      if (bridgeTextarea && preview.valid.length) {
+        bridgeTextarea.value = "";
+      }
+      if (preview.valid.length) {
+        renderOperations();
+        renderOrderDesk();
+        renderLogs();
+      }
+    });
+  }
+
+  if (bridgeClear) {
+    bridgeClear.addEventListener("click", () => {
+      if (bridgeOutput) {
+        bridgeOutput.innerHTML = "";
+      }
+      if (bridgeImport) {
+        bridgeImport.disabled = true;
+      }
+    });
+  }
+
+  const copyAllButton = document.querySelector("#copyAllLedgerRows");
+  if (copyAllButton) {
+    copyAllButton.addEventListener("click", () => copyAllLedgerRows(copyAllButton));
   }
 
   const startRunButton = document.querySelector("#startDailyPilotRun");

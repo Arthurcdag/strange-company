@@ -56,16 +56,43 @@ Do not accept protected health information, payment credentials, passwords, or r
 
 ## Daily Pilot Run Console
 
-The Operations view has a `Daily pilot run` panel that captures one workday of the loop as a single receipt.
+The Operations view has a `Daily pilot run` panel that captures one workday of the manual loop as a single private receipt.
 
 The operator presses `Start run` once per day. While the run is open, the panel surfaces:
 
-- A checklist for review-requests, qualify-customer, create-Stripe-invoice, update-ledger, track-payment, deliver, log-incidents, and seal-chain. Each item can be ticked independently; tick state is local until the run is closed.
-- Stop-rule toggles for Stripe hold, business bank restricted, regulated-data submitted, Sheet ledger outage, support-inbox outage, and terms-or-privacy change. Any active stop rule paints the panel red, sets the Operations console state to `Paused`, and blocks `Draft -> Sent` transitions for new orders. Active drafts can still receive Stripe URLs and acceptance notes, but no new invoices may be marked sent until the stop rule clears.
-- A live list of orders whose `updatedAt` is later than the run's `startedAt`. This is captured as `orderIds` when the run closes.
-- A freeform textarea for incident ids. Operators paste the ids of incidents the run touched, comma or whitespace separated. The ids are persisted on close.
+- checklist items for reviewing requests, qualifying customers, creating the Stripe invoice, updating the ledger, tracking payment, delivering, logging incidents, and sealing the chain;
+- stop-rule toggles for Stripe holds, bank restrictions, regulated-data submissions, Sheet outages, support inbox outages, and terms or privacy changes;
+- a live list of orders whose `updatedAt` is later than the run's `startedAt`;
+- a field for incident ids touched during the run.
 
-Pressing `Close run` snapshots the current receipt-chain root (the same root `Seal chain` would record), copies the checklist state and active stop rules into a history entry, and clears the active run. Closed runs are immutable in the local store. The receipt chain carries a `Run` receipt for the active run (state `Active` or `Paused`) and one for every closed run (state `Closed clean` or `Closed with stop rules`), so the audit surface preserves both the in-progress and historical views.
+Any active stop rule turns Operations to `Paused` and blocks `Draft -> Sent`. It does not approve or reject spending, does not replace the Google Sheet ledger, and does not automate Stripe. Existing draft metadata can still be edited, but no new invoice can be marked sent until the stop rule clears.
+
+Pressing `Close run` snapshots the current receipt-chain root, stores the completed checks, active stop rules, touched orders, and linked incidents, then clears the active run. Closed runs are local operator receipts, not accounting records or autonomous authority.
+
+## Order Lifecycle Receipts
+
+Every order state transition is now stamped with a timestamp and gated by evidence:
+
+- `Draft -> Sent` requires a Stripe Hosted Invoice URL pasted on the order. The transition stamps `invoiceSentAt`.
+- `Sent -> Paid` requires every critical commercial control to be closed. The transition stamps `paidAt`.
+- `Paid -> Delivered` requires an `https://` delivery artifact URL and an acceptance note on the order. The acceptance note is scanned for PHI, payment card data, secrets, and private key material; rows that flag are blocked. The transition stamps `deliveredAt`.
+
+The order card shows the timeline (`Sent / Paid / Delivered` with dates), the artifact link, the acceptance note, and any linked incidents. The advance button is disabled and the block reason is rendered inline whenever one of these conditions is unmet.
+
+The receipt-chain canonical form now carries `invoiceSentAt`, `paidAt`, `deliveredAt`, `deliveryArtifactUrl`, `acceptanceNote`, and `incidentIds` on every Order receipt. Sealing the chain after a transition preserves the proof that the gate was satisfied.
+
+## Incidents
+
+Every order card has a `Log incident` button. The form captures:
+
+- severity (`info`, `low`, `medium`, `high`),
+- status (`open`, `mitigating`, `resolved`, `closed`),
+- a summary,
+- and the operator response.
+
+Submission is blocked if either text field is empty or if the sensitive-data scan flags PHI, payment card data, secrets, or private key material. Accepted incidents are stored locally, linked back to the order via `incidentIds`, and emit a dedicated `Incident` receipt in the decision and audit chain. `high open` and `high mitigating` incidents render red in the chain to make them obvious in the audit surface.
+
+Refunds, disputes, regulated-data submissions, Sheet outages, and Stripe holds should all become incidents before they become quiet operator memory.
 
 ## Weekly Operating Loop
 
