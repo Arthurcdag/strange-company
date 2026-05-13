@@ -3583,6 +3583,7 @@ function renderOperations() {
               <button type="button" data-open-incident-form="${escapeHtml(order.id)}">Log incident</button>
               <button type="button" data-remove-operation-order="${escapeHtml(order.id)}">Remove</button>
             </div>
+            ${renderOrderTimeline(order)}
             <form class="ops-incident-form" data-incident-form="${escapeHtml(order.id)}" hidden autocomplete="off">
               <p class="evidence-form-kicker">Incident receipt</p>
               <div class="field-row">
@@ -4121,6 +4122,149 @@ function nextOperationAction(status) {
     return "Deliver";
   }
   return "Done";
+}
+
+function buildOrderTimeline(order) {
+  const events = [];
+  if (order.createdAt) {
+    const evidence = [];
+    if (order.invoiceNumber) evidence.push({ label: "Invoice", value: order.invoiceNumber });
+    if (order.serviceTitle) evidence.push({ label: "Service", value: order.serviceTitle });
+    if (order.amount) evidence.push({ label: "Amount", value: money.format(Number(order.amount)) });
+    if (order.contact) evidence.push({ label: "Contact", value: order.contact });
+    events.push({
+      at: order.createdAt,
+      actor: order.source || "Operations console",
+      transition: "Created → Draft",
+      tone: "amber",
+      evidence
+    });
+  }
+  if (order.invoiceSentAt) {
+    const stripeUrl = safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS);
+    const evidence = [];
+    if (stripeUrl) evidence.push({ label: "Stripe URL", value: stripeUrl, href: stripeUrl });
+    if (order.deliveryDue) evidence.push({ label: "Delivery due", value: order.deliveryDue });
+    events.push({
+      at: order.invoiceSentAt,
+      actor: "Operations console",
+      transition: "Draft → Sent",
+      tone: "amber",
+      evidence
+    });
+  }
+  if (order.paidAt) {
+    const stripeUrl = safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS);
+    const evidence = [];
+    if (stripeUrl) evidence.push({ label: "Stripe URL", value: stripeUrl, href: stripeUrl });
+    events.push({
+      at: order.paidAt,
+      actor: "Operations console",
+      transition: "Sent → Paid",
+      tone: "green",
+      evidence
+    });
+  }
+  if (order.deliveredAt) {
+    const artifact = safeHttpsUrl(order.deliveryArtifactUrl || "");
+    const evidence = [];
+    if (artifact) evidence.push({ label: "Artifact", value: artifact, href: artifact });
+    if (order.acceptanceNote) evidence.push({ label: "Acceptance", value: order.acceptanceNote });
+    events.push({
+      at: order.deliveredAt,
+      actor: "Operations console",
+      transition: "Paid → Delivered",
+      tone: "green",
+      evidence
+    });
+  }
+  if (order.blockedAt && order.blockReason) {
+    events.push({
+      at: order.blockedAt,
+      actor: "Operations console",
+      transition: `Blocked at ${order.status}`,
+      tone: "red",
+      evidence: [{ label: "Reason", value: order.blockReason }]
+    });
+  }
+  (order.incidentIds || []).forEach((incidentId) => {
+    const incident = operationIncidents.find((entry) => entry.id === incidentId);
+    if (!incident) return;
+    const baseEvidence = [];
+    if (incident.summary) baseEvidence.push({ label: "Summary", value: incident.summary });
+    if (incident.response) baseEvidence.push({ label: "Response", value: incident.response });
+    const tone = incident.severity === "high" ? "red" : incident.severity === "medium" ? "amber" : "";
+    events.push({
+      at: incident.createdAt,
+      actor: "Operations console",
+      transition: `Incident logged (${incident.severity} · ${incident.status})`,
+      tone,
+      evidence: baseEvidence
+    });
+    if (incident.updatedAt && incident.updatedAt !== incident.createdAt) {
+      events.push({
+        at: incident.updatedAt,
+        actor: "Operations console",
+        transition: `Incident → ${incident.severity} · ${incident.status}`,
+        tone,
+        evidence: baseEvidence
+      });
+    }
+  });
+  return events.sort((a, b) => String(a.at || "").localeCompare(String(b.at || "")));
+}
+
+function renderOrderTimeline(order) {
+  const events = buildOrderTimeline(order);
+  const summaryLabel = events.length
+    ? `${events.length} event${events.length === 1 ? "" : "s"}`
+    : "No events yet";
+  if (!events.length) {
+    return `
+      <details class="ops-order-timeline">
+        <summary>
+          <span class="metric-label">Receipt chain timeline</span>
+          <span>${escapeHtml(summaryLabel)}</span>
+        </summary>
+        <p class="ops-order-timeline-empty">No state transitions recorded for this order yet.</p>
+      </details>
+    `;
+  }
+  const items = events
+    .map((event) => {
+      const stamp = event.at ? formatReceiptDate(event.at) : "baseline";
+      const evidenceMarkup = event.evidence.length
+        ? `<ul class="ops-order-timeline-evidence">${event.evidence
+            .map((entry) => {
+              const label = `<span class="ops-order-timeline-evidence-label">${escapeHtml(entry.label)}</span>`;
+              if (entry.href) {
+                return `<li>${label}<a href="${escapeHtml(entry.href)}" target="_blank" rel="noreferrer noopener">${escapeHtml(entry.value)}</a></li>`;
+              }
+              return `<li>${label}<span>${escapeHtml(entry.value)}</span></li>`;
+            })
+            .join("")}</ul>`
+        : "";
+      return `
+        <li class="ops-order-timeline-event">
+          <div class="ops-order-timeline-head">
+            <time>${escapeHtml(stamp)}</time>
+            <span class="state ${escapeHtml(event.tone)}">${escapeHtml(event.transition)}</span>
+            <span class="ops-order-timeline-actor">${escapeHtml(event.actor)}</span>
+          </div>
+          ${evidenceMarkup}
+        </li>
+      `;
+    })
+    .join("");
+  return `
+    <details class="ops-order-timeline">
+      <summary>
+        <span class="metric-label">Receipt chain timeline</span>
+        <span>${escapeHtml(summaryLabel)}</span>
+      </summary>
+      <ol class="ops-order-timeline-list">${items}</ol>
+    </details>
+  `;
 }
 
 function toggleOperationControl(controlId, done) {

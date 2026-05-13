@@ -81,6 +81,17 @@ The order card shows the timeline (`Sent / Paid / Delivered` with dates), the ar
 
 The receipt-chain canonical form now carries `invoiceSentAt`, `paidAt`, `deliveredAt`, `deliveryArtifactUrl`, `acceptanceNote`, and `incidentIds` on every Order receipt. Sealing the chain after a transition preserves the proof that the gate was satisfied.
 
+### Receipt Chain Timeline Panel
+
+Every order card includes a collapsed `Receipt chain timeline` panel under the action buttons. Expanding it reveals every state transition recorded for that order in chronological order. Each event shows:
+
+- the timestamp,
+- the actor that produced the transition (intake source for `Created → Draft`, `Operations console` for advance actions),
+- the state transition itself (`Draft → Sent`, `Sent → Paid`, `Paid → Delivered`, `Blocked at <stage>`, or an incident transition),
+- attached evidence and metadata (invoice number, service, amount, Stripe URL, delivery due date, delivery artifact link, acceptance note, block reason, incident severity, status, summary, and response).
+
+Linked incidents contribute both their `created` and `updated` transitions so that severity and status changes are visible inside the order's audit trail. The panel reads directly from the same local state that feeds the receipt chain, so the events shown match what a `Seal chain` press would canonicalize.
+
 ## Incidents
 
 Every order card has a `Log incident` button. The form captures:
