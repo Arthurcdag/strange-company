@@ -11,6 +11,7 @@ Create these tabs:
 - `Customers`
 - `Delivery`
 - `Incidents`
+- `Leads` (optional private paid-pilot pipeline)
 
 ## Required Columns
 
@@ -21,6 +22,14 @@ created_at,source,invoice_id,customer,contact,service,amount,status,stripe_invoi
 ```
 
 Use the same core columns on `Customers`, `Delivery`, and `Incidents` when possible, then add tab-specific fields such as `incident_id`, `severity`, `paid_at`, `delivered_at`, or `receipt_hash`.
+
+Use this header row on the optional `Leads` tab:
+
+```text
+created_at,lead_id,customer,contact,service,amount,source,stage,qualification_note,order_id,notes
+```
+
+`Leads` mirrors the private sales pipeline only. It is not public intake, not a payment record, and not proof of market demand until an external customer pays through the real Stripe invoice route.
 
 ## Public Intake Rule
 
@@ -96,6 +105,8 @@ After import, the paste box is cleared so a stale TSV is not applied twice.
 Each row in the Operations order list now has a `Copy row` button that copies a single TSV row for the operator to paste back into the Sheet's next empty row.
 
 The Operations `Orders` section header has a copy icon that copies the full header plus every order row as TSV, ready to paste into a fresh Sheet tab.
+
+The Operations `Paid pilot pipeline` section has its own copy icon for the optional `Leads` tab. Individual lead cards can also copy a single lead row, a lead qualification packet, or a manual Stripe invoice creation packet. These are operator handoff tools; they do not submit to Google Sheets or Stripe.
 
 ### Boundaries
 

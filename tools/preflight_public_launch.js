@@ -85,6 +85,12 @@ function checkPublicSurface() {
     ["private Treasury label", /\bTreasury\b/],
     ["private Decisions label", /\bDecisions\b/],
     ["private External Signals console", /\bExternal Signals\b/],
+    ["private Profit Readiness panel", /\bProfit readiness\b/i],
+    ["private paid pilot pipeline", /\bPaid pilot pipeline\b/i],
+    ["sales lead form", /salesLeadForm/],
+    ["sales lead storage key", /strange-company-sales-leads/],
+    ["sales lead bulk copy", /copyAllLeadRows/],
+    ["sales pipeline stage internals", /\binvoice_ready\b/],
     ["private Sheet ledger bridge", /\bSheet ledger bridge\b/i],
     ["private Daily pilot run console", /\bDaily pilot run\b/i],
     ["ledger bridge form id", /operationsLedgerBridgeForm/],
@@ -325,6 +331,77 @@ function checkDailyPilotRunContract() {
   }
 }
 
+function checkPaidPilotProfitReadinessContract() {
+  const script = read("script.js");
+  const indexHtml = read("index.html");
+  const ledgerDoc = read("GOOGLE_SHEET_LEDGER.md");
+  const satelliteDoc = read("SATELLITE_COMPANY.md");
+  const runbook = read("OPERATIONS_RUNBOOK.md");
+  const publicHtml = read("public.html");
+  const publicJs = read("public.js");
+  const publicConfigText = read("public-config.js");
+  const publicConfig = loadPublicConfig();
+
+  const requiredScript = [
+    ["sales lead storage key", 'const SALES_LEADS_KEY = "strange-company-sales-leads"'],
+    ["sales lead stages", 'const salesLeadStages = ["prospect", "qualified", "invoice_ready", "invoice_sent", "paid", "delivered", "rejected"]'],
+    ["leads sheet headers", "const LEADS_HEADERS = ["],
+    ["sales lead loader", "function loadSalesLeads"],
+    ["sales lead saver", "function saveSalesLeads"],
+    ["profit readiness model", "function buildProfitReadiness"],
+    ["profit readiness renderer", "function renderProfitReadiness"],
+    ["sales pipeline renderer", "function renderSalesPipeline"],
+    ["sales lead create handler", "function addSalesLead"],
+    ["sales lead order conversion", "function convertSalesLeadToOrder"],
+    ["order stage sync", "function syncSalesLeadsFromOrders"],
+    ["lead qualification copy", "function leadQualificationPacket"],
+    ["lead invoice copy", "function leadInvoicePacket"],
+    ["lead ledger row copy", "function leadToLedgerRow"],
+    ["lead bulk TSV copy", "function copyAllLeadRows"],
+    ["daily closeout copy", "function copyDailyRunSummary"],
+    ["daily closeout summary", "function dailyRunCloseoutSummary"],
+    ["sensitive lead scan", "findSensitiveData([customer, contact, need, qualificationNote]"],
+    ["lead source copied into order", 'source: `Sales pipeline / ${lead.source || "Manual"}`'],
+    ["sales lead receipts", 'push("Sales Lead", lead.id'],
+    ["profit readiness receipt payload", "profitReadinessState: profitReadiness.state"]
+  ];
+  for (const [label, snippet] of requiredScript) {
+    assert(script.includes(snippet), `script.js is missing ${label}.`);
+  }
+
+  const indexExpectations = [
+    ["profit readiness panel", 'id="profitReadinessPanel"'],
+    ["sales lead form", 'id="salesLeadForm"'],
+    ["sales lead list", 'id="salesLeadList"'],
+    ["sales lead bulk copy", 'id="copyAllLeadRows"']
+  ];
+  for (const [label, snippet] of indexExpectations) {
+    assert(indexHtml.includes(snippet), `index.html is missing ${label}.`);
+  }
+
+  assert(ledgerDoc.includes("`Leads`"), "GOOGLE_SHEET_LEDGER.md must document the Leads tab.");
+  assert(
+    ledgerDoc.includes("created_at,lead_id,customer,contact,service,amount,source,stage,qualification_note,order_id,notes"),
+    "GOOGLE_SHEET_LEDGER.md must include the Leads tab header."
+  );
+  assert(satelliteDoc.includes("Profit Readiness"), "SATELLITE_COMPANY.md must document Profit Readiness.");
+  assert(runbook.includes("Paid Pilot Profit Readiness"), "OPERATIONS_RUNBOOK.md must document Paid Pilot Profit Readiness.");
+  assert(publicConfig.liveMode === false, "public-config.js must keep liveMode false by default.");
+
+  for (const [file, contents] of [
+    ["public.html", publicHtml],
+    ["public.js", publicJs],
+    ["public-config.js", publicConfigText]
+  ]) {
+    assert(!/Paid pilot pipeline/i.test(contents), `${file} exposes private paid pilot pipeline text.`);
+    assert(!/Profit readiness/i.test(contents), `${file} exposes private Profit readiness text.`);
+    assert(!/salesLeadForm/.test(contents), `${file} exposes salesLeadForm.`);
+    assert(!/strange-company-sales-leads/.test(contents), `${file} exposes sales lead storage key.`);
+    assert(!/copyAllLeadRows/.test(contents), `${file} exposes lead bulk copy action.`);
+    assert(!/\binvoice_ready\b/.test(contents), `${file} exposes private sales stage internals.`);
+  }
+}
+
 function checkConfig() {
   const config = loadPublicConfig();
   const formUrl = String(config.googleFormUrl || "").trim();
@@ -371,6 +448,7 @@ checkOutcomeEvidenceContract();
 checkLedgerBridgeContract();
 checkOrderLifecycleContract();
 checkDailyPilotRunContract();
+checkPaidPilotProfitReadinessContract();
 checkConfig();
 
 if (failures.length) {
