@@ -379,6 +379,32 @@
 
           <div class="view-header compact-header ops-section-header">
             <div>
+              <p class="section-kicker">Setup evidence</p>
+              <h3>Operator-verified external setup proof</h3>
+            </div>
+            <div class="topbar-actions">
+              <button class="icon-button" id="resetSetupEvidence" type="button" aria-label="Reset setup evidence" title="Reset setup evidence">
+                <i data-lucide="rotate-ccw"></i>
+              </button>
+            </div>
+          </div>
+          <div class="setup-evidence" id="setupEvidencePanel"></div>
+
+          <div class="view-header compact-header ops-section-header">
+            <div>
+              <p class="section-kicker">Customer acquisition</p>
+              <h3>Daily outreach and pipeline conversion</h3>
+            </div>
+            <div class="topbar-actions">
+              <button class="icon-button" id="resetCustomerAcquisition" type="button" aria-label="Reset acquisition log" title="Reset acquisition log">
+                <i data-lucide="rotate-ccw"></i>
+              </button>
+            </div>
+          </div>
+          <div class="customer-acquisition" id="customerAcquisitionPanel"></div>
+
+          <div class="view-header compact-header ops-section-header">
+            <div>
               <p class="section-kicker">Paid pilot pipeline</p>
               <h3>Qualified leads before invoice requests</h3>
             </div>
@@ -410,9 +436,22 @@
                   <input id="salesLeadAmount" name="leadAmount" type="text" inputmode="decimal" value="750" />
                 </div>
               </div>
-              <div class="field">
-                <label for="salesLeadSource">Source</label>
-                <input id="salesLeadSource" name="leadSource" type="text" placeholder="Referral, email, form, operator" />
+              <div class="field-row">
+                <div class="field">
+                  <label for="salesLeadSource">Source detail</label>
+                  <input id="salesLeadSource" name="leadSource" type="text" placeholder="Person, list, or campaign that produced the lead" />
+                </div>
+                <div class="field">
+                  <label for="salesLeadSourceCategory">Source category</label>
+                  <select id="salesLeadSourceCategory" name="leadSourceCategory">
+                    <option value="">unspecified</option>
+                    <option value="referral">referral</option>
+                    <option value="email">email</option>
+                    <option value="form">form</option>
+                    <option value="direct">direct</option>
+                    <option value="partner">partner</option>
+                  </select>
+                </div>
               </div>
               <div class="field">
                 <label for="salesLeadNeed">Need</label>
