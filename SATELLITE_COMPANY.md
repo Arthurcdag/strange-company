@@ -37,6 +37,19 @@ $3,500/month net profit before related-party work is needed.
 
 With the default external mix, the satellite can model about `$4,092/month` net profit. It is still blocked from real launch until the transaction controls are closed.
 
+## Profit Readiness
+
+The private Operations tab now includes a `Profit readiness` panel. It answers one concrete question: can Strange Works Studio sell today without pretending the sealed Strange Company is live?
+
+The panel checks four gates:
+
+- external setup: launch checklist and critical commercial controls are closed,
+- public intake config: support inbox, Sheet/Form route, Stripe, terms, and privacy are configured,
+- qualified customer pipeline: at least one private lead is qualified or already moving through the invoice path,
+- operational order lifecycle: services exist and the daily pilot run is not paused by a stop rule.
+
+It also shows the current external-only profit model, collected MRR from Operations, and how many external compliance proof sprint customers are still needed to reach `$3K` and `$5K` monthly net profit. Related-party work never counts as market proof in this tracker.
+
 ## Clean Transaction Controls
 
 The satellite may go online as a paid operator only when these controls are clear:
@@ -92,6 +105,7 @@ The command center now includes an Operations tab.
 
 That tab is the first functional operating surface:
 
+- private paid-pilot lead pipeline,
 - customer order intake,
 - invoice packet generation,
 - local invoice and delivery ledger,

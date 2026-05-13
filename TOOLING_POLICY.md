@@ -2,6 +2,8 @@
 
 This repository can use external research and market-data tools, but Operational V1.1 keeps them out of the live-money path.
 
+Operational V1.4 adds a private paid-pilot profit readiness pipeline. These tools remain evidence inputs only: no plugin output can qualify a customer, approve an invoice, mark payment received, approve delivery, allocate treasury, or count related-party work as market proof.
+
 ## Market Data
 
 Alpaca and Binance are read-only observability tools.

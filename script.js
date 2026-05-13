@@ -565,6 +565,7 @@ function defaultExternalSignals() {
 }
 
 const pilotStages = ["Prospect", "Contacted", "Call booked", "Committed", "Ready to invoice"];
+const salesLeadStages = ["prospect", "qualified", "invoice_ready", "invoice_sent", "paid", "delivered", "rejected"];
 const operationStages = ["Draft", "Sent", "Paid", "Delivered"];
 const signalSources = ["Alpaca", "Binance", "Zotero", "Life Science Research", "GitHub"];
 const signalStatuses = ["observed", "triaged", "routed", "rejected"];
@@ -582,6 +583,19 @@ const LEDGER_HEADERS = [
   "notes"
 ];
 const LEDGER_STATUSES = ["Draft", "Sent", "Paid", "Delivered"];
+const LEADS_HEADERS = [
+  "created_at",
+  "lead_id",
+  "customer",
+  "contact",
+  "service",
+  "amount",
+  "source",
+  "stage",
+  "qualification_note",
+  "order_id",
+  "notes"
+];
 
 const gateChecks = [
   {
@@ -633,6 +647,7 @@ const LAUNCH_GATE_KEY = "strange-company-launch-gate";
 const RECEIPT_SEAL_KEY = "strange-company-receipt-seal";
 const REVENUE_PILOT_KEY = "strange-company-revenue-pilot";
 const SATELLITE_COMPANY_KEY = "strange-company-satellite-company";
+const SALES_LEADS_KEY = "strange-company-sales-leads";
 const OPERATIONS_KEY = "strange-company-operations";
 const OPERATION_INCIDENTS_KEY = "strange-company-operation-incidents";
 const DAILY_PILOT_RUN_KEY = "strange-company-daily-pilot-run";
@@ -672,6 +687,7 @@ let launchGate = loadLaunchGate();
 let receiptSeal = loadReceiptSeal();
 let revenuePilot = loadRevenuePilot();
 let satelliteCompany = loadSatelliteCompany();
+let salesLeads = loadSalesLeads();
 let operations = loadOperations();
 let operationIncidents = loadOperationIncidents();
 let dailyPilotRun = loadDailyPilotRun();
@@ -2358,6 +2374,57 @@ function saveSatelliteCompany() {
   }
 }
 
+function defaultSalesLeads() {
+  return [];
+}
+
+function normalizeSalesLead(lead) {
+  if (!lead || typeof lead !== "object") {
+    return null;
+  }
+  const stage = salesLeadStages.includes(lead.stage) ? lead.stage : "prospect";
+  const customer = String(lead.customer || lead.name || "").slice(0, 160);
+  if (!customer) {
+    return null;
+  }
+  const amount = Number(lead.amount || lead.value || 0);
+  return {
+    id: typeof lead.id === "string" && lead.id ? lead.id : `sales-lead-${slugify(customer)}-${Date.now()}`,
+    createdAt: typeof lead.createdAt === "string" ? lead.createdAt : new Date().toISOString(),
+    updatedAt: typeof lead.updatedAt === "string" ? lead.updatedAt : new Date().toISOString(),
+    customer,
+    contact: String(lead.contact || "").slice(0, 180),
+    serviceId: String(lead.serviceId || "proof-sprint").slice(0, 80),
+    amount: Number.isFinite(amount) && amount > 0 ? amount : 750,
+    source: String(lead.source || "Manual").slice(0, 120),
+    need: String(lead.need || "Need not recorded").slice(0, 900),
+    stage,
+    qualificationNote: String(lead.qualificationNote || "").slice(0, 900),
+    rejectionReason: String(lead.rejectionReason || "").slice(0, 500),
+    orderId: String(lead.orderId || "").slice(0, 140)
+  };
+}
+
+function loadSalesLeads() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(SALES_LEADS_KEY) || "null");
+    if (Array.isArray(stored)) {
+      return stored.map((lead) => normalizeSalesLead(lead)).filter(Boolean).slice(0, 80);
+    }
+  } catch {
+    // Fall through to default.
+  }
+  return defaultSalesLeads();
+}
+
+function saveSalesLeads() {
+  try {
+    localStorage.setItem(SALES_LEADS_KEY, JSON.stringify(salesLeads.slice(0, 80)));
+  } catch {
+    // Local storage can be unavailable in hardened browser contexts.
+  }
+}
+
 function loadOperations() {
   try {
     const stored = JSON.parse(localStorage.getItem(OPERATIONS_KEY) || "null");
@@ -2981,10 +3048,26 @@ function addPilotLead(form) {
   renderLogs();
 }
 
+function proofSprintUnitProfit() {
+  const service = (satelliteCompany.services || []).find((entry) => entry.id === "proof-sprint")
+    || defaultSatelliteCompany().services.find((entry) => entry.id === "proof-sprint");
+  const unitProfit = Number(service?.price || 0) - Number(service?.unitCost || 0);
+  return unitProfit > 0 ? unitProfit : 540;
+}
+
+function customersNeededForProfit(targetProfit, currentProfit) {
+  const gap = Number(targetProfit || 0) - Number(currentProfit || 0);
+  if (gap <= 0) {
+    return 0;
+  }
+  return Math.ceil(gap / proofSprintUnitProfit());
+}
+
 function buildSatelliteCompanyModel() {
   const services = satelliteCompany.services || [];
   const controls = satelliteCompany.controls || [];
   const activeServices = services.filter((service) => service.active);
+  const externalActiveServices = activeServices.filter((service) => !service.relatedParty);
   const revenue = activeServices.reduce(
     (total, service) => total + Number(service.price || 0) * Number(service.customers || 0),
     0
@@ -2995,9 +3078,15 @@ function buildSatelliteCompanyModel() {
   );
   const netProfit = revenue - costs;
   const margin = revenue > 0 ? netProfit / revenue : 0;
-  const externalRevenue = activeServices
-    .filter((service) => !service.relatedParty)
-    .reduce((total, service) => total + Number(service.price || 0) * Number(service.customers || 0), 0);
+  const externalRevenue = externalActiveServices.reduce(
+    (total, service) => total + Number(service.price || 0) * Number(service.customers || 0),
+    0
+  );
+  const externalCosts = externalActiveServices.reduce(
+    (total, service) => total + Number(service.unitCost || 0) * Number(service.customers || 0),
+    0
+  );
+  const externalProfit = externalRevenue - externalCosts;
   const relatedPartyRevenue = activeServices
     .filter((service) => service.relatedParty)
     .reduce((total, service) => total + Number(service.price || 0) * Number(service.customers || 0), 0);
@@ -3006,69 +3095,9 @@ function buildSatelliteCompanyModel() {
   const externalReady = externalRevenue > 0;
   const controlsReady = openCriticalControls.length === 0;
   const targetReady = netProfit >= targetNetProfit;
-
-  if (!externalReady) {
-    return {
-      state: "No market proof",
-      tone: "red",
-      headline: "The satellite cannot profit until it has external customers.",
-      detail: "Do not count Strange Company payments as profit proof. The second company must survive on normal market revenue first.",
-      services,
-      controls,
-      openCriticalControls,
-      revenue,
-      costs,
-      netProfit,
-      margin,
-      externalRevenue,
-      relatedPartyRevenue,
-      targetNetProfit
-    };
-  }
-
-  if (!controlsReady) {
-    return {
-      state: "Controls open",
-      tone: "red",
-      headline: "The profit math works, but the transaction controls are not ready.",
-      detail: `${openCriticalControls.length} critical control${openCriticalControls.length === 1 ? "" : "s"} must close before the satellite goes online as a paid operator.`,
-      services,
-      controls,
-      openCriticalControls,
-      revenue,
-      costs,
-      netProfit,
-      margin,
-      externalRevenue,
-      relatedPartyRevenue,
-      targetNetProfit
-    };
-  }
-
-  if (!targetReady) {
-    return {
-      state: "Needs volume",
-      tone: "amber",
-      headline: "The satellite can sell cleanly, but it has not hit the profit target.",
-      detail: "Grow external proof-sprint and template revenue before adding related-party service contracts.",
-      services,
-      controls,
-      openCriticalControls,
-      revenue,
-      costs,
-      netProfit,
-      margin,
-      externalRevenue,
-      relatedPartyRevenue,
-      targetNetProfit
-    };
-  }
-
-  return {
-    state: "Profit-ready",
-    tone: "green",
-    headline: "The satellite can go online as the first profit engine.",
-    detail: "External revenue clears the target and controls are closed. Related-party work may be offered only with market pricing and replaceable-vendor rules.",
+  const customersNeededFor3k = customersNeededForProfit(3000, externalProfit);
+  const customersNeededFor5k = customersNeededForProfit(5000, externalProfit);
+  const shared = {
     services,
     controls,
     openCriticalControls,
@@ -3077,14 +3106,57 @@ function buildSatelliteCompanyModel() {
     netProfit,
     margin,
     externalRevenue,
+    externalCosts,
+    externalProfit,
     relatedPartyRevenue,
-    targetNetProfit
+    targetNetProfit,
+    customersNeededFor3k,
+    customersNeededFor5k
+  };
+
+  if (!externalReady) {
+    return {
+      ...shared,
+      state: "No market proof",
+      tone: "red",
+      headline: "The satellite cannot profit until it has external customers.",
+      detail: "Do not count Strange Company payments as profit proof. The second company must survive on normal market revenue first."
+    };
+  }
+
+  if (!controlsReady) {
+    return {
+      ...shared,
+      state: "Controls open",
+      tone: "red",
+      headline: "The profit math works, but the transaction controls are not ready.",
+      detail: `${openCriticalControls.length} critical control${openCriticalControls.length === 1 ? "" : "s"} must close before the satellite goes online as a paid operator.`
+    };
+  }
+
+  if (!targetReady) {
+    return {
+      ...shared,
+      state: "Needs volume",
+      tone: "amber",
+      headline: "The satellite can sell cleanly, but it has not hit the profit target.",
+      detail: "Grow external proof-sprint and template revenue before adding related-party service contracts."
+    };
+  }
+
+  return {
+    ...shared,
+    state: "Profit-ready",
+    tone: "green",
+    headline: "The satellite can go online as the first profit engine.",
+    detail: "External revenue clears the target and controls are closed. Related-party work may be offered only with market pricing and replaceable-vendor rules."
   };
 }
 
 function renderSatelliteCompany() {
   const verdict = document.querySelector("#satelliteVerdict");
   const metrics = document.querySelector("#satelliteMetrics");
+  const profitTracker = document.querySelector("#satelliteProfitTracker");
   const serviceList = document.querySelector("#satelliteServiceList");
   const controlList = document.querySelector("#satelliteControlList");
   if (!verdict || !metrics || !serviceList || !controlList) {
@@ -3109,7 +3181,7 @@ function renderSatelliteCompany() {
 
   metrics.innerHTML = `
     <article class="metric-card">
-      <span class="metric-label">Monthly revenue</span>
+      <span class="metric-label">Modeled MRR</span>
       <strong>${money.format(model.revenue)}</strong>
     </article>
     <article class="metric-card">
@@ -3125,6 +3197,25 @@ function renderSatelliteCompany() {
       <strong>${marginPercent}</strong>
     </article>
   `;
+
+  if (profitTracker) {
+    const collectedMrr = (operations.orders || [])
+      .filter((order) => order.status === "Paid" || order.status === "Delivered")
+      .reduce((total, order) => total + Number(order.amount || 0), 0);
+    profitTracker.innerHTML = `
+      <article class="satellite-profit-card">
+        <span class="metric-label">Profit target tracker</span>
+        <h3>${escapeHtml(satelliteCompany.companyName)} can profit only through external customers first.</h3>
+        <div class="profit-target-grid">
+          <span><strong>${money.format(model.externalProfit)}</strong><small>External-only modeled profit</small></span>
+          <span><strong>${money.format(collectedMrr)}</strong><small>Collected MRR in Operations</small></span>
+          <span><strong>${model.customersNeededFor3k}</strong><small>Proof-sprint customers to $3K</small></span>
+          <span><strong>${model.customersNeededFor5k}</strong><small>Proof-sprint customers to $5K</small></span>
+        </div>
+        <p>Related-party work is never market proof. Keep the first profit evidence tied to normal invoices, external buyers, and the manual Stripe plus Sheet ledger route.</p>
+      </article>
+    `;
+  }
 
   serviceList.innerHTML = model.services
     .map((service) => {
@@ -3235,6 +3326,226 @@ function toggleSatelliteControl(controlId, done) {
 function operationServices() {
   const externalServices = (satelliteCompany.services || []).filter((service) => !service.relatedParty);
   return externalServices.length ? externalServices : defaultSatelliteCompany().services.filter((service) => !service.relatedParty);
+}
+
+function labelForLeadStage(stage) {
+  return String(stage || "prospect").replace(/_/g, " ");
+}
+
+function toneForLeadStage(stage) {
+  if (stage === "rejected") return "red";
+  if (stage === "paid" || stage === "delivered") return "green";
+  if (stage === "invoice_ready" || stage === "invoice_sent") return "amber";
+  return "";
+}
+
+function nextLeadStage(stage) {
+  const sequence = ["prospect", "qualified", "invoice_ready", "invoice_sent", "paid", "delivered"];
+  const index = sequence.indexOf(stage);
+  if (index < 0 || index >= sequence.length - 1) {
+    return stage;
+  }
+  return sequence[index + 1];
+}
+
+function leadService(lead) {
+  return operationServices().find((service) => service.id === lead.serviceId) || operationServices()[0];
+}
+
+function leadStageForOrderStatus(status) {
+  if (status === "Sent") return "invoice_sent";
+  if (status === "Paid") return "paid";
+  if (status === "Delivered") return "delivered";
+  return "invoice_ready";
+}
+
+function syncSalesLeadsFromOrders() {
+  let changed = false;
+  salesLeads = salesLeads.map((lead) => {
+    if (!lead.orderId || lead.stage === "rejected") {
+      return lead;
+    }
+    const order = (operations.orders || []).find((entry) => entry.id === lead.orderId);
+    if (!order) {
+      return lead;
+    }
+    const nextStage = leadStageForOrderStatus(order.status);
+    if (nextStage === lead.stage) {
+      return lead;
+    }
+    changed = true;
+    return {
+      ...lead,
+      stage: nextStage,
+      updatedAt: order.updatedAt || new Date().toISOString()
+    };
+  });
+  if (changed) {
+    saveSalesLeads();
+  }
+}
+
+function leadSensitiveFindings(lead) {
+  return findSensitiveData([
+    lead.customer,
+    lead.contact,
+    lead.need,
+    lead.qualificationNote,
+    lead.rejectionReason
+  ].join("\n"));
+}
+
+function leadToLedgerCells(lead) {
+  const service = leadService(lead);
+  return [
+    lead.createdAt || "",
+    lead.id || "",
+    lead.customer || "",
+    lead.contact || "",
+    service?.title || lead.serviceId || "",
+    String(Number(lead.amount || 0)),
+    lead.source || "",
+    lead.stage || "",
+    lead.qualificationNote || "",
+    lead.orderId || "",
+    lead.need || lead.rejectionReason || ""
+  ].map((cell) => String(cell || "").replace(/\t/g, " ").replace(/\r?\n/g, " ").trim());
+}
+
+function leadToLedgerRow(lead) {
+  return leadToLedgerCells(lead).join("\t");
+}
+
+function allLeadsLedgerTsv() {
+  const rows = salesLeads.map((lead) => leadToLedgerRow(lead));
+  return [LEADS_HEADERS.join("\t"), ...rows].join("\n");
+}
+
+function leadQualificationPacket(lead) {
+  const service = leadService(lead);
+  return [
+    `Lead: ${lead.id}`,
+    `Customer: ${lead.customer}`,
+    `Contact: ${lead.contact || "Not recorded"}`,
+    `Service: ${service?.title || lead.serviceId}`,
+    `Monthly amount: ${money.format(Number(lead.amount || 0))}`,
+    `Stage: ${labelForLeadStage(lead.stage)}`,
+    `Source: ${lead.source || "Manual"}`,
+    "",
+    "Need:",
+    lead.need || "Need not recorded",
+    "",
+    "Qualification:",
+    lead.qualificationNote || "Not qualified yet.",
+    "",
+    "Boundary:",
+    "No protected health information, payment card data, credentials, private keys, or customer-private records accepted in v0."
+  ].join("\n");
+}
+
+function leadInvoicePacket(lead) {
+  const service = leadService(lead);
+  return [
+    `Stripe invoice creation packet for ${lead.customer}`,
+    `Lead id: ${lead.id}`,
+    `Contact: ${lead.contact || "Not recorded"}`,
+    `Service: ${service?.title || lead.serviceId}`,
+    `Monthly amount: ${money.format(Number(lead.amount || 0))}`,
+    `Qualification note: ${lead.qualificationNote || "Not recorded"}`,
+    "",
+    "Manual steps:",
+    "1. Create the Stripe Hosted Invoice manually in the LLC Stripe account.",
+    "2. Copy the hosted invoice URL.",
+    "3. Convert or update the Operations order.",
+    "4. Paste the hosted URL into the order and Sheet ledger.",
+    "5. Mark Sent only after the invoice is actually sent.",
+    "",
+    "Static site boundary: no card data, no auto-created invoices, no customer-private records."
+  ].join("\n");
+}
+
+function dailyRunCloseoutSummary(entry) {
+  if (!entry) {
+    return "";
+  }
+  const completedChecks = Object.entries(entry.checks || {}).filter(([, on]) => on).map(([id]) => id);
+  const stopRules = Object.entries(entry.stopRules || {}).filter(([, on]) => on).map(([id]) => id);
+  return [
+    `Daily run: ${entry.id}`,
+    `Run date: ${entry.runDate || ""}`,
+    `Started: ${entry.startedAt || ""}`,
+    `Closed: ${entry.closedAt || "not closed"}`,
+    `Completed checks: ${completedChecks.join(", ") || "none"}`,
+    `Stop rules: ${stopRules.join(", ") || "none"}`,
+    `Order ids: ${(entry.orderIds || []).join(", ") || "none"}`,
+    `Incident ids: ${(entry.incidentIds || []).join(", ") || "none"}`,
+    `Receipt root: ${entry.receiptRoot || "not captured"}`,
+    "",
+    "Closeout boundary: operator receipt only; not accounting software, spend approval, customer notice, refund approval, or Stripe automation."
+  ].join("\n");
+}
+
+function buildProfitReadiness() {
+  const satelliteModel = buildSatelliteCompanyModel();
+  const operationsModel = buildOperationsModel();
+  const qualifiedLeads = salesLeads.filter((lead) =>
+    ["qualified", "invoice_ready", "invoice_sent", "paid", "delivered"].includes(lead.stage)
+  );
+  const invoiceReadyLeads = salesLeads.filter((lead) => lead.stage === "invoice_ready");
+  const paidOrders = (operations.orders || []).filter((order) => order.status === "Paid" || order.status === "Delivered");
+  const publicIntakeReady = Boolean(
+    operationsModel.sheetReady
+      && operationsModel.intakeReady
+      && operationsModel.stripeReady
+      && operationsModel.termsReviewed
+      && operationsModel.privacyReviewed
+  );
+  const externalSetupReady = operationsModel.openLaunchItems.length === 0 && operationsModel.openCriticalControls.length === 0;
+  const pipelineReady = qualifiedLeads.length > 0;
+  const lifecycleReady = !operationsModel.pausedReason && operationServices().length > 0;
+  const blockers = [];
+  if (!externalSetupReady) blockers.push("external setup");
+  if (!publicIntakeReady) blockers.push("public intake config");
+  if (!pipelineReady) blockers.push("qualified customer pipeline");
+  if (!lifecycleReady) blockers.push("operational order lifecycle");
+  let state = "Blocked";
+  let tone = "red";
+  let nextAction = "Close external setup and public intake blockers before asking for payment.";
+  if (!blockers.length && paidOrders.length > 0) {
+    state = "Profit proving";
+    tone = "green";
+    nextAction = "Reconcile paid orders against Stripe and the Sheet ledger, then close the daily run.";
+  } else if (!blockers.length && invoiceReadyLeads.length > 0) {
+    state = "Invoice ready";
+    tone = "green";
+    nextAction = "Create a manual Stripe Hosted Invoice for the invoice-ready lead.";
+  } else if (!blockers.length) {
+    state = "Sell today";
+    tone = "green";
+    nextAction = "Move a qualified lead to invoice-ready, create the order, and issue the manual invoice.";
+  } else if (publicIntakeReady && pipelineReady && lifecycleReady) {
+    state = "Setup gap";
+    tone = "amber";
+    nextAction = "Finish the remaining external setup checklist before marking invoices sent.";
+  } else if (pipelineReady) {
+    state = "Pipeline warming";
+    tone = "amber";
+    nextAction = "Convert qualified leads only after intake, Stripe, Sheet, terms, and privacy routes are ready.";
+  }
+  return {
+    state,
+    tone,
+    blockers,
+    nextAction,
+    targetNetProfit: satelliteModel.targetNetProfit,
+    currentExternalProfit: satelliteModel.externalProfit,
+    customersNeededFor3k: satelliteModel.customersNeededFor3k,
+    customersNeededFor5k: satelliteModel.customersNeededFor5k,
+    qualifiedLeadCount: qualifiedLeads.length,
+    invoiceReadyLeadCount: invoiceReadyLeads.length,
+    paidOrderCount: paidOrders.length,
+    collectedMrr: operationsModel.collectedMrr
+  };
 }
 
 function buildOperationsModel() {
@@ -3355,6 +3666,135 @@ function buildOperationsModel() {
   };
 }
 
+function renderProfitReadiness() {
+  const panel = document.querySelector("#profitReadinessPanel");
+  if (!panel) {
+    return;
+  }
+  const readiness = buildProfitReadiness();
+  const blockers = readiness.blockers.length
+    ? readiness.blockers.map((blocker) => `<span class="state red">${escapeHtml(blocker)}</span>`).join("")
+    : `<span class="state green">clear</span>`;
+  panel.innerHTML = `
+    <article class="profit-readiness-card ${escapeHtml(readiness.tone)}">
+      <div>
+        <span class="metric-label">Profit readiness</span>
+        <h3>${escapeHtml(readiness.state)}</h3>
+        <p>${escapeHtml(readiness.nextAction)}</p>
+      </div>
+      <div class="profit-readiness-metrics">
+        <span><strong>${money.format(readiness.currentExternalProfit)}</strong><small>External profit model</small></span>
+        <span><strong>${money.format(readiness.collectedMrr)}</strong><small>Collected MRR</small></span>
+        <span><strong>${readiness.qualifiedLeadCount}</strong><small>Qualified leads</small></span>
+        <span><strong>${readiness.invoiceReadyLeadCount}</strong><small>Invoice-ready leads</small></span>
+        <span><strong>${readiness.customersNeededFor3k}</strong><small>Customers to $3K</small></span>
+        <span><strong>${readiness.customersNeededFor5k}</strong><small>Customers to $5K</small></span>
+      </div>
+      <div class="profit-readiness-blockers">${blockers}</div>
+    </article>
+  `;
+}
+
+function renderSalesPipeline() {
+  const form = document.querySelector("#salesLeadForm");
+  const serviceSelect = document.querySelector("#salesLeadService");
+  const amountInput = document.querySelector("#salesLeadAmount");
+  const leadList = document.querySelector("#salesLeadList");
+  if (!leadList) {
+    return;
+  }
+  const services = operationServices();
+  if (serviceSelect) {
+    const selectedService = serviceSelect.value || services[0]?.id || "";
+    serviceSelect.innerHTML = services
+      .map(
+        (service) => `
+          <option value="${escapeHtml(service.id)}" data-price="${Number(service.price || 0)}">
+            ${escapeHtml(service.title)} / ${money.format(Number(service.price || 0))}
+          </option>
+        `
+      )
+      .join("");
+    if (services.some((service) => service.id === selectedService)) {
+      serviceSelect.value = selectedService;
+    }
+    const selected = services.find((service) => service.id === serviceSelect.value) || services[0];
+    if (amountInput && selected && !amountInput.value) {
+      amountInput.value = String(Number(selected.price || 0));
+    }
+  }
+
+  if (!salesLeads.length) {
+    leadList.innerHTML = `
+      <article class="sales-lead-card">
+        <div>
+          <span class="metric-label">Sales pipeline</span>
+          <h4>No leads yet</h4>
+          <p>Add a prospect before creating invoice requests. Qualification keeps payment pressure away from unready buyers.</p>
+        </div>
+      </article>
+    `;
+    return;
+  }
+
+  leadList.innerHTML = salesLeads
+    .map((lead) => {
+      const service = leadService(lead);
+      const tone = toneForLeadStage(lead.stage);
+      const linkedOrder = lead.orderId ? (operations.orders || []).find((order) => order.id === lead.orderId) : null;
+      const canConvert = ["qualified", "invoice_ready"].includes(lead.stage) && !lead.orderId;
+      const canAdvance = !["delivered", "rejected"].includes(lead.stage);
+      return `
+        <article class="sales-lead-card">
+          <div>
+            <span class="metric-label">${escapeHtml(lead.source || "Manual")}</span>
+            <h4>${escapeHtml(lead.customer)}</h4>
+            <p>${escapeHtml(service?.title || lead.serviceId)} / ${money.format(Number(lead.amount || 0))}</p>
+            <p>${escapeHtml(lead.need || "Need not recorded")}</p>
+            ${lead.qualificationNote ? `<p><strong>Qualification:</strong> ${escapeHtml(lead.qualificationNote)}</p>` : ""}
+            ${lead.rejectionReason ? `<p class="sales-lead-rejected"><strong>Rejected:</strong> ${escapeHtml(lead.rejectionReason)}</p>` : ""}
+            ${linkedOrder ? `<p class="ops-order-meta">Order: ${escapeHtml(linkedOrder.invoiceNumber || linkedOrder.id)} / ${escapeHtml(linkedOrder.status)}</p>` : ""}
+          </div>
+          <strong>${escapeHtml(lead.contact || "No contact")}</strong>
+          <span class="state ${tone}">${escapeHtml(labelForLeadStage(lead.stage))}</span>
+          <div class="ops-actions sales-lead-actions">
+            <button type="button" data-copy-lead-qualification="${escapeHtml(lead.id)}">Qualification</button>
+            <button type="button" data-copy-lead-invoice="${escapeHtml(lead.id)}">Invoice packet</button>
+            <button type="button" data-copy-lead-row="${escapeHtml(lead.id)}">Copy row</button>
+            <button type="button" data-advance-sales-lead="${escapeHtml(lead.id)}" ${canAdvance ? "" : "disabled"}>Advance</button>
+            <button type="button" data-convert-sales-lead="${escapeHtml(lead.id)}" ${canConvert ? "" : "disabled"}>Create order</button>
+            <button type="button" data-reject-sales-lead="${escapeHtml(lead.id)}" ${lead.stage === "rejected" ? "disabled" : ""}>Reject</button>
+            <button type="button" data-remove-sales-lead="${escapeHtml(lead.id)}">Remove</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+
+  document.querySelectorAll("[data-copy-lead-qualification]").forEach((button) => {
+    button.addEventListener("click", () => copyLeadQualificationPacket(button.dataset.copyLeadQualification, button));
+  });
+  document.querySelectorAll("[data-copy-lead-invoice]").forEach((button) => {
+    button.addEventListener("click", () => copyLeadInvoicePacket(button.dataset.copyLeadInvoice, button));
+  });
+  document.querySelectorAll("[data-copy-lead-row]").forEach((button) => {
+    button.addEventListener("click", () => copyLeadLedgerRow(button.dataset.copyLeadRow, button));
+  });
+  document.querySelectorAll("[data-advance-sales-lead]").forEach((button) => {
+    button.addEventListener("click", () => advanceSalesLead(button.dataset.advanceSalesLead));
+  });
+  document.querySelectorAll("[data-convert-sales-lead]").forEach((button) => {
+    button.addEventListener("click", () => convertSalesLeadToOrder(button.dataset.convertSalesLead));
+  });
+  document.querySelectorAll("[data-reject-sales-lead]").forEach((button) => {
+    button.addEventListener("click", () => rejectSalesLead(button.dataset.rejectSalesLead));
+  });
+  document.querySelectorAll("[data-remove-sales-lead]").forEach((button) => {
+    button.addEventListener("click", () => removeSalesLead(button.dataset.removeSalesLead));
+  });
+
+}
+
 function renderOperations() {
   const verdict = document.querySelector("#operationsVerdict");
   const metrics = document.querySelector("#operationsMetrics");
@@ -3367,8 +3807,11 @@ function renderOperations() {
     return;
   }
   syncOperationsConfigForm();
+  syncSalesLeadsFromOrders();
 
   const model = buildOperationsModel();
+  renderProfitReadiness();
+  renderSalesPipeline();
   const services = operationServices();
   const selectedService = serviceSelect.value || services[0]?.id || "";
   serviceSelect.innerHTML = services
@@ -3798,6 +4241,9 @@ function renderDailyPilotRun() {
               <h4>${stopCount ? "Closed with stop rules" : "Closed clean"}</h4>
               <p>${doneCount}/${DAILY_RUN_CHECKS.length} checks. ${stopCount} stop rule${stopCount === 1 ? "" : "s"}. ${entry.orderIds.length} order${entry.orderIds.length === 1 ? "" : "s"} touched. ${entry.incidentIds.length} incident id${entry.incidentIds.length === 1 ? "" : "s"} attached.</p>
               <p>Closed ${escapeHtml(formatReceiptDate(entry.closedAt))} / Root ${root}</p>
+              <div class="ops-actions ops-daily-history-actions">
+                <button type="button" data-copy-daily-run="${escapeHtml(entry.id)}">Copy closeout</button>
+              </div>
             </article>
           `;
         })
@@ -3819,6 +4265,9 @@ function renderDailyPilotRun() {
   if (incidentsField) {
     incidentsField.addEventListener("change", () => updateDailyRunIncidentIds(incidentsField.value));
   }
+  document.querySelectorAll("[data-copy-daily-run]").forEach((button) => {
+    button.addEventListener("click", () => copyDailyRunSummary(button.dataset.copyDailyRun, button));
+  });
 }
 
 function formatLaunchDate(value) {
@@ -4328,6 +4777,158 @@ function addOperationOrder(form) {
   renderLogs();
 }
 
+function showSalesLeadError(message) {
+  const error = document.querySelector("#salesLeadError");
+  if (!error) {
+    return;
+  }
+  error.textContent = message || "";
+  error.hidden = !message;
+}
+
+function addSalesLead(form) {
+  const formData = new FormData(form);
+  const customer = String(formData.get("leadCustomer") || "").trim();
+  const contact = String(formData.get("leadContact") || "").trim();
+  const serviceId = String(formData.get("leadService") || "").trim();
+  const amount = Number(formData.get("leadAmount") || 0);
+  const source = String(formData.get("leadSource") || "Manual").trim();
+  const need = String(formData.get("leadNeed") || "").trim();
+  const qualificationNote = String(formData.get("leadQualificationNote") || "").trim();
+  const sensitive = findSensitiveData([customer, contact, need, qualificationNote].join("\n"));
+  if (!customer) {
+    showSalesLeadError("Customer is required.");
+    return;
+  }
+  if (contact && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact)) {
+    showSalesLeadError("Contact must be a valid email when set.");
+    return;
+  }
+  if (!Number.isFinite(amount) || amount <= 0) {
+    showSalesLeadError("Monthly amount must be a positive number.");
+    return;
+  }
+  if (sensitive.length) {
+    showSalesLeadError(`Lead text contains ${sensitive.join(", ")}. Strip and retry.`);
+    return;
+  }
+  const now = new Date().toISOString();
+  const lead = normalizeSalesLead({
+    id: `sales-lead-${slugify(customer)}-${Date.now().toString(36)}`,
+    createdAt: now,
+    updatedAt: now,
+    customer,
+    contact,
+    serviceId,
+    amount,
+    source,
+    need: need || "Need not recorded",
+    stage: qualificationNote ? "qualified" : "prospect",
+    qualificationNote
+  });
+  if (!lead) {
+    showSalesLeadError("Lead could not be created.");
+    return;
+  }
+  salesLeads.unshift(lead);
+  saveSalesLeads();
+  showSalesLeadError("");
+  form.reset();
+  renderSalesPipeline();
+  renderProfitReadiness();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function advanceSalesLead(leadId) {
+  const now = new Date().toISOString();
+  salesLeads = salesLeads.map((lead) => {
+    if (lead.id !== leadId) {
+      return lead;
+    }
+    return {
+      ...lead,
+      stage: nextLeadStage(lead.stage),
+      updatedAt: now
+    };
+  });
+  saveSalesLeads();
+  renderSalesPipeline();
+  renderProfitReadiness();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function rejectSalesLead(leadId) {
+  const now = new Date().toISOString();
+  salesLeads = salesLeads.map((lead) =>
+    lead.id === leadId
+      ? {
+          ...lead,
+          stage: "rejected",
+          rejectionReason: lead.rejectionReason || "Rejected before invoice request.",
+          updatedAt: now
+        }
+      : lead
+  );
+  saveSalesLeads();
+  renderSalesPipeline();
+  renderProfitReadiness();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function removeSalesLead(leadId) {
+  salesLeads = salesLeads.filter((lead) => lead.id !== leadId);
+  saveSalesLeads();
+  renderSalesPipeline();
+  renderProfitReadiness();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function convertSalesLeadToOrder(leadId) {
+  const lead = salesLeads.find((entry) => entry.id === leadId);
+  if (!lead || lead.orderId || !["qualified", "invoice_ready"].includes(lead.stage)) {
+    return;
+  }
+  const sensitive = leadSensitiveFindings(lead);
+  if (sensitive.length) {
+    showSalesLeadError(`Lead text contains ${sensitive.join(", ")}. Strip and retry.`);
+    return;
+  }
+  const order = createOperationOrder({
+    customer: lead.customer,
+    contact: lead.contact,
+    serviceId: lead.serviceId,
+    amount: lead.amount,
+    need: lead.need,
+    source: `Sales pipeline / ${lead.source || "Manual"}`,
+    notes: lead.qualificationNote ? `Qualified lead ${lead.id}: ${lead.qualificationNote}` : `Qualified lead ${lead.id}`
+  });
+  if (!order) {
+    return;
+  }
+  const now = new Date().toISOString();
+  salesLeads = salesLeads.map((entry) =>
+    entry.id === lead.id
+      ? {
+          ...entry,
+          stage: "invoice_ready",
+          orderId: order.id,
+          updatedAt: now
+        }
+      : entry
+  );
+  saveSalesLeads();
+  showSalesLeadError("");
+  renderSalesPipeline();
+  renderOperations();
+  renderOrderDesk();
+  renderReceiptChain();
+  renderLogs();
+}
+
 function orderAdvanceBlock(order, model) {
   const pausedReason = model.pausedReason || dailyRunPausedReason();
   if (order.status === "Draft" && pausedReason) {
@@ -4389,6 +4990,7 @@ function advanceOperationOrder(orderId) {
     return next;
   });
   saveOperations();
+  syncSalesLeadsFromOrders();
   renderOperations();
   renderOrderDesk();
   renderLogs();
@@ -4741,6 +5343,76 @@ async function copyAllLedgerRows(button) {
   }, 1500);
 }
 
+async function copyLeadText(leadId, button, buildText) {
+  const lead = salesLeads.find((item) => item.id === leadId);
+  if (!lead || !button) {
+    return;
+  }
+  const previous = button.textContent;
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(buildText(lead));
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  button.textContent = copied ? "Copied" : "Copy failed";
+  setTimeout(() => {
+    button.textContent = previous;
+  }, 1500);
+}
+
+function copyLeadQualificationPacket(leadId, button) {
+  copyLeadText(leadId, button, leadQualificationPacket);
+}
+
+function copyLeadInvoicePacket(leadId, button) {
+  copyLeadText(leadId, button, leadInvoicePacket);
+}
+
+function copyLeadLedgerRow(leadId, button) {
+  copyLeadText(leadId, button, leadToLedgerRow);
+}
+
+async function copyAllLeadRows(button) {
+  if (!button) {
+    return;
+  }
+  const previous = button.getAttribute("aria-label") || "";
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(allLeadsLedgerTsv());
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  button.setAttribute("aria-label", copied ? "All leads copied as TSV" : "Copy failed");
+  button.classList.add(copied ? "ledger-copy-ok" : "ledger-copy-fail");
+  setTimeout(() => {
+    button.setAttribute("aria-label", previous);
+    button.classList.remove("ledger-copy-ok", "ledger-copy-fail");
+  }, 1500);
+}
+
+async function copyDailyRunSummary(runId, button) {
+  const run = (dailyPilotRun.history || []).find((entry) => entry.id === runId);
+  if (!run || !button) {
+    return;
+  }
+  const previous = button.textContent;
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(dailyRunCloseoutSummary(run));
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  button.textContent = copied ? "Closeout copied" : "Copy failed";
+  setTimeout(() => {
+    button.textContent = previous;
+  }, 1500);
+}
+
 function submitOrderRequest(form) {
   const output = document.querySelector("#orderRequestOutput");
   const formData = new FormData(form);
@@ -4980,6 +5652,16 @@ function collectReceiptEvents() {
     });
   });
 
+  salesLeads.forEach((lead) => {
+    push("Sales Lead", lead.id, lead.customer, "Paid pilot pipeline", labelForLeadStage(lead.stage), lead.updatedAt || lead.createdAt, {
+      amount: Number(lead.amount || 0),
+      contact: lead.contact || "",
+      orderId: lead.orderId || "",
+      serviceId: lead.serviceId || "",
+      source: lead.source || ""
+    });
+  });
+
   const satelliteModel = buildSatelliteCompanyModel();
   const satelliteTimes = [
     ...(satelliteCompany.services || []).map((service) => service.updatedAt),
@@ -4995,6 +5677,9 @@ function collectReceiptEvents() {
     satelliteAt,
     {
       externalRevenue: satelliteModel.externalRevenue,
+      externalProfit: satelliteModel.externalProfit,
+      customersNeededFor3k: satelliteModel.customersNeededFor3k,
+      customersNeededFor5k: satelliteModel.customersNeededFor5k,
       netProfit: satelliteModel.netProfit,
       openCriticalControls: satelliteModel.openCriticalControls.length,
       relatedPartyRevenue: satelliteModel.relatedPartyRevenue,
@@ -5003,8 +5688,10 @@ function collectReceiptEvents() {
   );
 
   const operationsModel = buildOperationsModel();
+  const profitReadiness = buildProfitReadiness();
   const operationsTimes = [
     ...(operations.orders || []).map((order) => order.updatedAt || order.createdAt),
+    ...(salesLeads || []).map((lead) => lead.updatedAt || lead.createdAt),
     ...(operations.controls || []).map((control) => control.updatedAt)
   ].filter(Boolean);
   const operationsAt = operationsTimes.sort().pop() || "baseline";
@@ -5012,7 +5699,10 @@ function collectReceiptEvents() {
     collectedMrr: operationsModel.collectedMrr,
     invoicedMrr: operationsModel.invoicedMrr,
     openCriticalControls: operationsModel.openCriticalControls.length,
-    orderCount: operationsModel.orders.length
+    orderCount: operationsModel.orders.length,
+    profitReadinessState: profitReadiness.state,
+    qualifiedLeadCount: profitReadiness.qualifiedLeadCount,
+    salesLeadCount: salesLeads.length
   });
 
   operations.orders.forEach((order) => {
@@ -5789,6 +6479,14 @@ function renderLogs() {
     operationsModel.state,
     operationsModel.tone
   ]];
+  const readiness = buildProfitReadiness();
+  const profitRows = [[
+    "Profit",
+    `Paid pilot readiness: ${readiness.state}`,
+    "Profit readiness",
+    readiness.blockers.length ? readiness.blockers.join(", ") : readiness.nextAction,
+    readiness.tone
+  ]];
   const signalRows = externalSignals.slice(0, 4).map((signal) => [
     "Signal",
     `${signal.source}: ${signal.subject}`,
@@ -5865,7 +6563,7 @@ function renderLogs() {
     run.recommendation,
     toneForRecommendation(run.recommendation)
   ]);
-  log.innerHTML = [...receiptRows, ...launchRows, ...pilotRows, ...satelliteRows, ...operationsRows, ...signalRows, ...drillRows, ...routeRows, ...outcomeRows, ...executionRows, ...treasuryRows, ...gateLogRows, ...logs]
+  log.innerHTML = [...receiptRows, ...launchRows, ...pilotRows, ...satelliteRows, ...operationsRows, ...profitRows, ...signalRows, ...drillRows, ...routeRows, ...outcomeRows, ...executionRows, ...treasuryRows, ...gateLogRows, ...logs]
     .map(
       ([className, entry, owner, state, tone]) => `
         <div class="log-row" role="row">
@@ -6126,6 +6824,10 @@ function setupOperations() {
   const form = document.querySelector("#operationOrderForm");
   const serviceSelect = document.querySelector("#orderService");
   const amountInput = document.querySelector("#orderAmount");
+  const leadForm = document.querySelector("#salesLeadForm");
+  const leadServiceSelect = document.querySelector("#salesLeadService");
+  const leadAmountInput = document.querySelector("#salesLeadAmount");
+  const copyAllLeadRowsButton = document.querySelector("#copyAllLeadRows");
   const resetButton = document.querySelector("#resetOperations");
   const configForm = document.querySelector("#operationsConfigForm");
 
@@ -6145,6 +6847,22 @@ function setupOperations() {
     });
   }
 
+  if (leadForm) {
+    leadForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      addSalesLead(leadForm);
+    });
+  }
+
+  if (leadServiceSelect && leadAmountInput) {
+    leadServiceSelect.addEventListener("change", () => {
+      const service = operationServices().find((item) => item.id === leadServiceSelect.value);
+      if (service) {
+        leadAmountInput.value = String(Number(service.price || 0));
+      }
+    });
+  }
+
   if (configForm) {
     configForm.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -6156,12 +6874,18 @@ function setupOperations() {
     resetButton.addEventListener("click", () => {
       operations = defaultOperations();
       operationIncidents = defaultOperationIncidents();
+      salesLeads = defaultSalesLeads();
       saveOperations();
       saveOperationIncidents();
+      saveSalesLeads();
       renderOperations();
       renderOrderDesk();
       renderLogs();
     });
+  }
+
+  if (copyAllLeadRowsButton) {
+    copyAllLeadRowsButton.addEventListener("click", () => copyAllLeadRows(copyAllLeadRowsButton));
   }
 
   const bridgeForm = document.querySelector("#operationsLedgerBridgeForm");

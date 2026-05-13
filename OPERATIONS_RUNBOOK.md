@@ -46,13 +46,43 @@ Do not accept protected health information, payment credentials, passwords, or r
 
 ## Daily Operating Loop
 
-1. Add each customer intent in the Operations tab.
-2. Generate the invoice packet.
-3. Send the packet manually through the real support or sales route.
-4. Mark `Sent` after the invoice is sent.
-5. Mark `Paid` only after funds settle.
-6. Mark `Delivered` only after acceptance criteria are met.
-7. Seal the receipt chain after material state changes.
+1. Add each promising customer intent as a private paid-pilot lead.
+2. Qualify the lead and confirm the request fits the v0 data boundary.
+3. Convert a qualified lead into an Operations order.
+4. Generate the invoice packet.
+5. Send the packet manually through the real support or sales route.
+6. Mark `Sent` after the invoice is sent.
+7. Mark `Paid` only after funds settle.
+8. Mark `Delivered` only after acceptance criteria are met.
+9. Seal the receipt chain after material state changes.
+
+## Paid Pilot Profit Readiness
+
+The private Operations view has a `Profit readiness` panel and a `Paid pilot pipeline` section. Together they are the manual path from prospect to first paid customer.
+
+Lead stages are:
+
+- `prospect`,
+- `qualified`,
+- `invoice_ready`,
+- `invoice_sent`,
+- `paid`,
+- `delivered`,
+- `rejected`.
+
+A lead stores the customer, contact, service, amount, source, need, qualification note, rejection reason, and linked order id. Lead notes are scanned for PHI, payment card data, credentials, private keys, SSNs, API keys, and customer-private records before they are saved or converted.
+
+Qualified or invoice-ready leads can be converted into Operations orders without retyping the customer, contact, service, amount, or notes. After conversion, the linked lead follows the order lifecycle: `Draft` maps to `invoice_ready`, `Sent` maps to `invoice_sent`, `Paid` maps to `paid`, and `Delivered` maps to `delivered`.
+
+Copy actions support the human loop:
+
+- `Qualification` copies a qualification packet for operator review.
+- `Invoice packet` copies manual Stripe Hosted Invoice instructions.
+- `Copy row` copies a row for the optional Google Sheet `Leads` tab.
+- The pipeline header copy icon copies all lead rows as TSV.
+- Closed daily runs can copy a closeout summary for the support/accounting record.
+
+The panel reports whether the satellite can sell today from four gates: external setup, public intake config, qualified customer pipeline, and operational order lifecycle. It also reports current external-only profit, collected MRR, and remaining compliance proof sprint customers needed for `$3K` and `$5K` monthly net profit. Related-party work never counts as market proof.
 
 ## Daily Pilot Run Console
 
