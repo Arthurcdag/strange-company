@@ -56,6 +56,27 @@ Do not accept protected health information, payment credentials, passwords, or r
 8. Mark `Delivered` only after acceptance criteria are met.
 9. Seal the receipt chain after material state changes.
 
+## Operational v1.5 — Setup Evidence and Customer Acquisition
+
+Operational v1.5 layers two private panels onto the Operations console without changing the public surface:
+
+- A **Setup Evidence** panel turns the launch checklist into operator-asserted proof. Each of the nine slots (`llc`, `ein`, `bank`, `stripe`, `support-inbox`, `google-sheet`, `google-form`, `terms-review`, `privacy-review`) stores a status (`missing`, `pending`, `verified`, `blocked`), an `https://` evidence URL, an optional `verifiedAt` timestamp, and an operator note. Notes are scanned for PHI, payment card data, credentials, SSNs, private keys, and API keys before they are saved. See [SETUP_EVIDENCE.md](SETUP_EVIDENCE.md).
+- A **Customer Acquisition** panel surfaces the daily outreach target, a log of operator outreach attempts by source (`referral`, `email`, `form`, `direct`, `partner`), conversion counts for every sales lead stage, and a copyable outreach packet. The lead form on the same view now requires a source category. See [CUSTOMER_ACQUISITION.md](CUSTOMER_ACQUISITION.md).
+
+### Profit Readiness gate
+
+The Profit Readiness card now requires verified setup evidence before it can leave amber. `externalSetupReady` is the AND of:
+
+- every Setup Evidence row at status `verified`,
+- every critical commercial control closed,
+- every Operational launch item complete.
+
+If any of those is open, the readiness card stays out of `Sell today` / `Invoice ready` / `Profit proving` and the blockers list names the exact missing rows by label (`unverified evidence: EIN`, `unverified evidence: Stripe account active`, …). UI checkboxes alone never declare the company sell-ready.
+
+### Repo boundary
+
+The repo cannot certify that the second company is legally operational. It tracks readiness and workflow; the operator confirms the outside-the-repo artifacts. If an operator marks a row `verified` without real evidence, the receipt chain records the assertion but the assertion remains operator-asserted, not system-certified.
+
 ## Paid Pilot Profit Readiness
 
 The private Operations view has a `Profit readiness` panel and a `Paid pilot pipeline` section. Together they are the manual path from prospect to first paid customer.

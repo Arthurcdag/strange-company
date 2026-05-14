@@ -96,7 +96,16 @@ function checkPublicSurface() {
     ["ledger bridge form id", /operationsLedgerBridgeForm/],
     ["daily run storage key", /strange-company-daily-pilot-run/],
     ["plugin workflow UI", /\b(Alpaca|Binance|Zotero|Life Science Research|GitHub signal)\b/],
-    ["automatic network submit", /\bfetch\s*\(/]
+    ["automatic network submit", /\bfetch\s*\(/],
+    ["private Setup evidence panel", /\bSetup evidence\b/i],
+    ["private Customer acquisition panel", /\bCustomer acquisition\b/i],
+    ["setup evidence form id", /setupEvidencePanel/],
+    ["setup evidence storage key", /strange-company-setup-evidence/],
+    ["setup evidence slot internals", /SETUP_EVIDENCE_SLOTS/],
+    ["customer acquisition form id", /customerAcquisitionPanel/],
+    ["customer acquisition storage key", /strange-company-customer-acquisition/],
+    ["acquisition lead source internals", /ACQUISITION_LEAD_SOURCES/],
+    ["private outreach log form", /outreachLogForm/]
   ];
 
   for (const [file, contents] of publicFiles) {
@@ -402,6 +411,85 @@ function checkPaidPilotProfitReadinessContract() {
   }
 }
 
+function checkOperationalV15Contract() {
+  const script = read("script.js");
+  const indexHtml = read("index.html");
+  const runbook = read("OPERATIONS_RUNBOOK.md");
+  const publicHtml = read("public.html");
+  const publicJs = read("public.js");
+  const publicConfigText = read("public-config.js");
+
+  const requiredScript = [
+    ["setup evidence storage key", 'const SETUP_EVIDENCE_KEY = "strange-company-setup-evidence"'],
+    ["customer acquisition storage key", 'const CUSTOMER_ACQUISITION_KEY = "strange-company-customer-acquisition"'],
+    ["setup evidence statuses", 'const SETUP_EVIDENCE_STATUSES = ["missing", "pending", "verified", "blocked"]'],
+    ["setup evidence slots", "const SETUP_EVIDENCE_SLOTS = ["],
+    ["acquisition lead sources", 'const ACQUISITION_LEAD_SOURCES = ["referral", "email", "form", "direct", "partner"]'],
+    ["setup evidence loader", "function loadSetupEvidence"],
+    ["setup evidence saver", "function saveSetupEvidence"],
+    ["setup evidence normalizer", "function normalizeSetupEvidence"],
+    ["setup evidence model", "function buildSetupEvidenceModel"],
+    ["setup evidence renderer", "function renderSetupEvidence"],
+    ["setup evidence verify handler", "function verifySetupEvidence"],
+    ["setup evidence clear handler", "function clearSetupEvidence"],
+    ["setup evidence url sanitizer", 'safeHttpsUrl(raw)'],
+    ["setup evidence note sensitive scan", "findSensitiveData(note)"],
+    ["customer acquisition loader", "function loadCustomerAcquisition"],
+    ["customer acquisition saver", "function saveCustomerAcquisition"],
+    ["customer acquisition model", "function buildCustomerAcquisitionModel"],
+    ["customer acquisition renderer", "function renderCustomerAcquisition"],
+    ["outreach packet builder", "function outreachPacket"],
+    ["outreach log submit", "function submitOutreachLog"],
+    ["outreach log remove", "function removeOutreachEntry"],
+    ["outreach packet copy", "async function copyOutreachPacket"],
+    ["profit readiness reads setup evidence", "const setupModel = buildSetupEvidenceModel()"],
+    ["profit readiness blocker names slot", 'blockers.push(`unverified evidence: ${record.label}`)'],
+    ["setup evidence receipt type", 'push("Setup Evidence"'],
+    ["acquisition receipt type", 'push("Acquisition"'],
+    ["sales lead sourceCategory", "const sourceCategory = ACQUISITION_LEAD_SOURCES.includes(sourceCategoryRaw)"]
+  ];
+  for (const [label, snippet] of requiredScript) {
+    assert(script.includes(snippet), `script.js is missing ${label}.`);
+  }
+
+  const indexExpectations = [
+    ["setup evidence panel container", 'id="setupEvidencePanel"'],
+    ["setup evidence reset button", 'id="resetSetupEvidence"'],
+    ["customer acquisition panel container", 'id="customerAcquisitionPanel"'],
+    ["customer acquisition reset button", 'id="resetCustomerAcquisition"'],
+    ["sales lead source category select", 'id="salesLeadSourceCategory"']
+  ];
+  for (const [label, snippet] of indexExpectations) {
+    assert(indexHtml.includes(snippet), `index.html is missing ${label}.`);
+  }
+
+  assert(runbook.includes("Operational v1.5"), "OPERATIONS_RUNBOOK.md must document Operational v1.5.");
+  assert(runbook.includes("Setup Evidence"), "OPERATIONS_RUNBOOK.md must reference the Setup Evidence panel.");
+  assert(runbook.includes("Customer Acquisition"), "OPERATIONS_RUNBOOK.md must reference the Customer Acquisition panel.");
+
+  const setupDoc = read("SETUP_EVIDENCE.md");
+  assert(setupDoc.includes("# Setup Evidence"), "SETUP_EVIDENCE.md must exist and start with a top-level heading.");
+  assert(setupDoc.includes("Profit Readiness Gate"), "SETUP_EVIDENCE.md must document the Profit Readiness gate.");
+
+  const acquisitionDoc = read("CUSTOMER_ACQUISITION.md");
+  assert(acquisitionDoc.includes("# Customer Acquisition"), "CUSTOMER_ACQUISITION.md must exist and start with a top-level heading.");
+  assert(acquisitionDoc.includes("Outreach Log"), "CUSTOMER_ACQUISITION.md must document the outreach log.");
+
+  for (const [file, contents] of [
+    ["public.html", publicHtml],
+    ["public.js", publicJs],
+    ["public-config.js", publicConfigText]
+  ]) {
+    assert(!/strange-company-setup-evidence/.test(contents), `${file} exposes setup evidence storage key.`);
+    assert(!/strange-company-customer-acquisition/.test(contents), `${file} exposes customer acquisition storage key.`);
+    assert(!/setupEvidencePanel/.test(contents), `${file} exposes setup evidence panel id.`);
+    assert(!/customerAcquisitionPanel/.test(contents), `${file} exposes customer acquisition panel id.`);
+    assert(!/outreachLogForm/.test(contents), `${file} exposes outreach log form id.`);
+    assert(!/SETUP_EVIDENCE_SLOTS/.test(contents), `${file} exposes setup evidence slot internals.`);
+    assert(!/ACQUISITION_LEAD_SOURCES/.test(contents), `${file} exposes acquisition lead source internals.`);
+  }
+}
+
 function checkConfig() {
   const config = loadPublicConfig();
   const formUrl = String(config.googleFormUrl || "").trim();
@@ -449,6 +537,7 @@ checkLedgerBridgeContract();
 checkOrderLifecycleContract();
 checkDailyPilotRunContract();
 checkPaidPilotProfitReadinessContract();
+checkOperationalV15Contract();
 checkConfig();
 
 if (failures.length) {

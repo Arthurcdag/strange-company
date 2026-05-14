@@ -652,8 +652,23 @@ const OPERATIONS_KEY = "strange-company-operations";
 const OPERATION_INCIDENTS_KEY = "strange-company-operation-incidents";
 const DAILY_PILOT_RUN_KEY = "strange-company-daily-pilot-run";
 const EXTERNAL_SIGNALS_KEY = "strange-company-external-signals";
+const SETUP_EVIDENCE_KEY = "strange-company-setup-evidence";
+const CUSTOMER_ACQUISITION_KEY = "strange-company-customer-acquisition";
 const INCIDENT_SEVERITIES = ["info", "low", "medium", "high"];
 const INCIDENT_STATUSES = ["open", "mitigating", "resolved", "closed"];
+const SETUP_EVIDENCE_STATUSES = ["missing", "pending", "verified", "blocked"];
+const SETUP_EVIDENCE_SLOTS = [
+  { id: "llc", label: "US LLC formation", detail: "Articles of organization filed; entity is in good standing." },
+  { id: "ein", label: "EIN", detail: "Federal Employer Identification Number issued by the IRS for the LLC." },
+  { id: "bank", label: "Business bank account", detail: "Operating account opened in the LLC name with payouts wired in." },
+  { id: "stripe", label: "Stripe account active", detail: "Stripe account verified for the LLC with payouts and invoicing enabled." },
+  { id: "support-inbox", label: "Support inbox monitored", detail: "Real monitored inbox is reachable and read every business day." },
+  { id: "google-sheet", label: "Google Sheet ledger", detail: "Live Sheet with Requests, Invoices, Customers, Delivery, Incidents, Leads tabs." },
+  { id: "google-form", label: "Google Form intake", detail: "Public intake form points at the verified sheet and obeys boundaries." },
+  { id: "terms-review", label: "Terms reviewed", detail: "Customer-facing terms reviewed before sending the first paid invoice." },
+  { id: "privacy-review", label: "Privacy notice reviewed", detail: "Privacy notice reviewed before collecting any customer detail." }
+];
+const ACQUISITION_LEAD_SOURCES = ["referral", "email", "form", "direct", "partner"];
 const DAILY_RUN_CHECKS = [
   { id: "review-requests", title: "Review new requests", detail: "Sheet Requests tab, support inbox, and Order Desk submissions." },
   { id: "qualify-customer", title: "Qualify customer", detail: "Real US business, allowed service, no regulated data in the request." },
@@ -692,6 +707,8 @@ let operations = loadOperations();
 let operationIncidents = loadOperationIncidents();
 let dailyPilotRun = loadDailyPilotRun();
 let externalSignals = loadExternalSignals();
+let setupEvidence = loadSetupEvidence();
+let customerAcquisition = loadCustomerAcquisition();
 
 function activateView(target) {
   document.querySelectorAll(".view").forEach((view) => {
@@ -2388,6 +2405,8 @@ function normalizeSalesLead(lead) {
     return null;
   }
   const amount = Number(lead.amount || lead.value || 0);
+  const sourceCategoryRaw = String(lead.sourceCategory || "").trim().toLowerCase();
+  const sourceCategory = ACQUISITION_LEAD_SOURCES.includes(sourceCategoryRaw) ? sourceCategoryRaw : "";
   return {
     id: typeof lead.id === "string" && lead.id ? lead.id : `sales-lead-${slugify(customer)}-${Date.now()}`,
     createdAt: typeof lead.createdAt === "string" ? lead.createdAt : new Date().toISOString(),
@@ -2397,12 +2416,118 @@ function normalizeSalesLead(lead) {
     serviceId: String(lead.serviceId || "proof-sprint").slice(0, 80),
     amount: Number.isFinite(amount) && amount > 0 ? amount : 750,
     source: String(lead.source || "Manual").slice(0, 120),
+    sourceCategory,
     need: String(lead.need || "Need not recorded").slice(0, 900),
     stage,
     qualificationNote: String(lead.qualificationNote || "").slice(0, 900),
     rejectionReason: String(lead.rejectionReason || "").slice(0, 500),
     orderId: String(lead.orderId || "").slice(0, 140)
   };
+}
+
+function defaultSetupEvidence() {
+  return SETUP_EVIDENCE_SLOTS.map((slot) => ({
+    id: slot.id,
+    label: slot.label,
+    detail: slot.detail,
+    status: "missing",
+    evidenceUrl: "",
+    verifiedAt: "",
+    operatorNote: "",
+    updatedAt: ""
+  }));
+}
+
+function normalizeSetupEvidence(record, slot) {
+  const base = record && typeof record === "object" ? record : {};
+  const status = SETUP_EVIDENCE_STATUSES.includes(base.status) ? base.status : "missing";
+  const evidenceUrlRaw = typeof base.evidenceUrl === "string" ? base.evidenceUrl : "";
+  const evidenceUrl = evidenceUrlRaw ? safeHttpsUrl(evidenceUrlRaw) : "";
+  const verifiedAtRaw = typeof base.verifiedAt === "string" ? base.verifiedAt : "";
+  const verifiedAt = status === "verified" && verifiedAtRaw ? verifiedAtRaw : "";
+  return {
+    id: slot.id,
+    label: slot.label,
+    detail: slot.detail,
+    status,
+    evidenceUrl,
+    verifiedAt,
+    operatorNote: String(base.operatorNote || "").slice(0, 900),
+    updatedAt: typeof base.updatedAt === "string" ? base.updatedAt : ""
+  };
+}
+
+function loadSetupEvidence() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(SETUP_EVIDENCE_KEY) || "null");
+    if (Array.isArray(stored)) {
+      const byId = new Map(stored.filter((r) => r && r.id).map((r) => [r.id, r]));
+      return SETUP_EVIDENCE_SLOTS.map((slot) => normalizeSetupEvidence(byId.get(slot.id), slot));
+    }
+  } catch {
+    // Fall through.
+  }
+  return defaultSetupEvidence();
+}
+
+function saveSetupEvidence() {
+  try {
+    localStorage.setItem(SETUP_EVIDENCE_KEY, JSON.stringify(setupEvidence));
+  } catch {
+    // Local storage can be unavailable in hardened browser contexts.
+  }
+}
+
+function defaultCustomerAcquisition() {
+  return {
+    dailyOutreachTarget: 5,
+    log: []
+  };
+}
+
+function normalizeOutreachLogEntry(entry) {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+  const source = String(entry.source || "").trim().toLowerCase();
+  const sourceCategory = ACQUISITION_LEAD_SOURCES.includes(source) ? source : "direct";
+  const attempts = Number(entry.attempts || 0);
+  if (!Number.isFinite(attempts) || attempts <= 0) {
+    return null;
+  }
+  const at = typeof entry.at === "string" ? entry.at : new Date().toISOString();
+  return {
+    id: typeof entry.id === "string" && entry.id ? entry.id : `outreach-${Date.now().toString(36)}`,
+    at,
+    source: sourceCategory,
+    attempts: Math.min(Math.floor(attempts), 999),
+    note: String(entry.note || "").slice(0, 500)
+  };
+}
+
+function loadCustomerAcquisition() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(CUSTOMER_ACQUISITION_KEY) || "null");
+    if (stored && typeof stored === "object") {
+      const target = Number(stored.dailyOutreachTarget);
+      const log = Array.isArray(stored.log) ? stored.log.map(normalizeOutreachLogEntry).filter(Boolean).slice(0, 90) : [];
+      return {
+        dailyOutreachTarget: Number.isFinite(target) && target >= 0 ? Math.min(Math.floor(target), 999) : 5,
+        log
+      };
+    }
+  } catch {
+    // Fall through.
+  }
+  return defaultCustomerAcquisition();
+}
+
+function saveCustomerAcquisition() {
+  try {
+    localStorage.setItem(CUSTOMER_ACQUISITION_KEY, JSON.stringify(customerAcquisition));
+  } catch {
+    // Local storage can be unavailable in hardened browser contexts.
+  }
 }
 
 function loadSalesLeads() {
@@ -3485,9 +3610,42 @@ function dailyRunCloseoutSummary(entry) {
   ].join("\n");
 }
 
+function buildSetupEvidenceModel() {
+  const records = setupEvidence;
+  const verified = records.filter((r) => r.status === "verified");
+  const pending = records.filter((r) => r.status === "pending");
+  const blocked = records.filter((r) => r.status === "blocked");
+  const missing = records.filter((r) => r.status === "missing");
+  const unverified = records.filter((r) => r.status !== "verified");
+  let state = "Setup gap";
+  let tone = "amber";
+  if (blocked.length) {
+    state = "Setup blocked";
+    tone = "red";
+  } else if (!unverified.length) {
+    state = "Operator-verified";
+    tone = "green";
+  } else if (missing.length === records.length) {
+    state = "Not started";
+    tone = "red";
+  }
+  return {
+    records,
+    verifiedIds: verified.map((r) => r.id),
+    pendingIds: pending.map((r) => r.id),
+    blockedIds: blocked.map((r) => r.id),
+    missingIds: missing.map((r) => r.id),
+    unverifiedRecords: unverified,
+    allVerified: unverified.length === 0,
+    state,
+    tone
+  };
+}
+
 function buildProfitReadiness() {
   const satelliteModel = buildSatelliteCompanyModel();
   const operationsModel = buildOperationsModel();
+  const setupModel = buildSetupEvidenceModel();
   const qualifiedLeads = salesLeads.filter((lead) =>
     ["qualified", "invoice_ready", "invoice_sent", "paid", "delivered"].includes(lead.stage)
   );
@@ -3500,11 +3658,20 @@ function buildProfitReadiness() {
       && operationsModel.termsReviewed
       && operationsModel.privacyReviewed
   );
-  const externalSetupReady = operationsModel.openLaunchItems.length === 0 && operationsModel.openCriticalControls.length === 0;
+  const externalSetupVerified = setupModel.allVerified;
+  const checklistComplete = operationsModel.openLaunchItems.length === 0 && operationsModel.openCriticalControls.length === 0;
+  const externalSetupReady = externalSetupVerified && checklistComplete;
   const pipelineReady = qualifiedLeads.length > 0;
   const lifecycleReady = !operationsModel.pausedReason && operationServices().length > 0;
   const blockers = [];
-  if (!externalSetupReady) blockers.push("external setup");
+  if (!externalSetupReady) {
+    if (!externalSetupVerified) {
+      for (const record of setupModel.unverifiedRecords) {
+        blockers.push(`unverified evidence: ${record.label}`);
+      }
+    }
+    if (externalSetupVerified && !checklistComplete) blockers.push("external setup checklist");
+  }
   if (!publicIntakeReady) blockers.push("public intake config");
   if (!pipelineReady) blockers.push("qualified customer pipeline");
   if (!lifecycleReady) blockers.push("operational order lifecycle");
@@ -3544,7 +3711,46 @@ function buildProfitReadiness() {
     qualifiedLeadCount: qualifiedLeads.length,
     invoiceReadyLeadCount: invoiceReadyLeads.length,
     paidOrderCount: paidOrders.length,
-    collectedMrr: operationsModel.collectedMrr
+    collectedMrr: operationsModel.collectedMrr,
+    setupEvidenceState: setupModel.state,
+    setupEvidenceVerifiedCount: setupModel.verifiedIds.length,
+    setupEvidenceTotal: setupModel.records.length,
+    setupEvidenceVerified: externalSetupVerified
+  };
+}
+
+function buildCustomerAcquisitionModel() {
+  const target = customerAcquisition.dailyOutreachTarget;
+  const today = new Date().toISOString().slice(0, 10);
+  const log = customerAcquisition.log || [];
+  const todayAttempts = log
+    .filter((entry) => entry.at && entry.at.slice(0, 10) === today)
+    .reduce((sum, entry) => sum + Number(entry.attempts || 0), 0);
+  const cutoff = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const last7 = log.filter((entry) => entry.at && entry.at.slice(0, 10) >= cutoff);
+  const last7Attempts = last7.reduce((sum, e) => sum + Number(e.attempts || 0), 0);
+  const leadsBySource = { unspecified: 0 };
+  for (const s of ACQUISITION_LEAD_SOURCES) leadsBySource[s] = 0;
+  for (const lead of salesLeads) {
+    if (lead.sourceCategory && ACQUISITION_LEAD_SOURCES.includes(lead.sourceCategory)) {
+      leadsBySource[lead.sourceCategory]++;
+    } else {
+      leadsBySource.unspecified++;
+    }
+  }
+  const conversions = { prospect: 0, qualified: 0, invoice_ready: 0, invoice_sent: 0, paid: 0, delivered: 0, rejected: 0 };
+  for (const lead of salesLeads) {
+    if (Object.prototype.hasOwnProperty.call(conversions, lead.stage)) conversions[lead.stage]++;
+  }
+  return {
+    target,
+    todayAttempts,
+    todayMet: target === 0 ? false : todayAttempts >= target,
+    last7Attempts,
+    last7,
+    leadsBySource,
+    conversions,
+    totalLeads: salesLeads.length
   };
 }
 
@@ -3687,12 +3893,458 @@ function renderProfitReadiness() {
         <span><strong>${money.format(readiness.collectedMrr)}</strong><small>Collected MRR</small></span>
         <span><strong>${readiness.qualifiedLeadCount}</strong><small>Qualified leads</small></span>
         <span><strong>${readiness.invoiceReadyLeadCount}</strong><small>Invoice-ready leads</small></span>
+        <span><strong>${readiness.setupEvidenceVerifiedCount}/${readiness.setupEvidenceTotal}</strong><small>Verified evidence</small></span>
         <span><strong>${readiness.customersNeededFor3k}</strong><small>Customers to $3K</small></span>
         <span><strong>${readiness.customersNeededFor5k}</strong><small>Customers to $5K</small></span>
       </div>
       <div class="profit-readiness-blockers">${blockers}</div>
     </article>
   `;
+}
+
+function renderSetupEvidence() {
+  const panel = document.querySelector("#setupEvidencePanel");
+  if (!panel) return;
+  const model = buildSetupEvidenceModel();
+  const verifiedCount = model.verifiedIds.length;
+  const total = model.records.length;
+  const cards = model.records
+    .map((record) => {
+      const tone = record.status === "verified" ? "green" : record.status === "blocked" ? "red" : record.status === "pending" ? "amber" : "";
+      const verifiedLine = record.verifiedAt
+        ? `<p class="setup-evidence-stamp">Verified ${escapeHtml(formatReceiptDate(record.verifiedAt))}</p>`
+        : "";
+      const urlLine = record.evidenceUrl
+        ? `<a class="setup-evidence-link" href="${escapeHtml(record.evidenceUrl)}" target="_blank" rel="noreferrer noopener">${escapeHtml(record.evidenceUrl)}</a>`
+        : `<span class="metric-label">No https evidence URL yet</span>`;
+      const noteLine = record.operatorNote
+        ? `<p class="setup-evidence-note">${escapeHtml(record.operatorNote)}</p>`
+        : "";
+      return `
+        <article class="setup-evidence-card" data-evidence-id="${escapeHtml(record.id)}">
+          <div>
+            <span class="metric-label">${escapeHtml(record.label)}</span>
+            <p>${escapeHtml(record.detail)}</p>
+            ${urlLine}
+            ${verifiedLine}
+            ${noteLine}
+          </div>
+          <span class="state ${tone}">${escapeHtml(record.status)}</span>
+          <div class="setup-evidence-fields">
+            <label>
+              <span>Evidence URL (https only)</span>
+              <input type="url" inputmode="url" placeholder="https://..." value="${escapeHtml(record.evidenceUrl || "")}" data-evidence-url="${escapeHtml(record.id)}" />
+            </label>
+            <label>
+              <span>Operator note</span>
+              <textarea rows="2" placeholder="What was checked; who confirmed it." data-evidence-note="${escapeHtml(record.id)}">${escapeHtml(record.operatorNote || "")}</textarea>
+            </label>
+            <label>
+              <span>Status</span>
+              <select data-evidence-status="${escapeHtml(record.id)}">
+                ${SETUP_EVIDENCE_STATUSES.map((s) => `<option value="${escapeHtml(s)}" ${s === record.status ? "selected" : ""}>${escapeHtml(s)}</option>`).join("")}
+              </select>
+            </label>
+          </div>
+          <div class="setup-evidence-actions">
+            <button type="button" data-save-evidence="${escapeHtml(record.id)}">Save</button>
+            <button type="button" data-verify-evidence="${escapeHtml(record.id)}" ${record.status === "verified" ? "disabled" : ""}>Verify</button>
+            <button type="button" data-clear-evidence="${escapeHtml(record.id)}">Clear</button>
+            <p class="evidence-form-error" data-evidence-error="${escapeHtml(record.id)}" hidden></p>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+  panel.innerHTML = `
+    <article class="setup-evidence-summary ${escapeHtml(model.tone)}">
+      <div>
+        <span class="metric-label">Setup evidence</span>
+        <h3>${escapeHtml(model.state)}</h3>
+        <p>Operator-asserted proof of external setup. The repo cannot certify LLC, EIN, bank, or Stripe completion by itself; verified rows mean the operator confirmed the artifact outside this prototype.</p>
+      </div>
+      <div class="setup-evidence-counts">
+        <span><strong>${verifiedCount}/${total}</strong><small>Verified</small></span>
+        <span><strong>${model.pendingIds.length}</strong><small>Pending</small></span>
+        <span><strong>${model.blockedIds.length}</strong><small>Blocked</small></span>
+        <span><strong>${model.missingIds.length}</strong><small>Missing</small></span>
+      </div>
+    </article>
+    <div class="setup-evidence-list">${cards}</div>
+  `;
+
+  document.querySelectorAll("[data-evidence-url]").forEach((input) => {
+    input.addEventListener("change", () => updateSetupEvidenceUrl(input.dataset.evidenceUrl, input.value));
+  });
+  document.querySelectorAll("[data-evidence-note]").forEach((textarea) => {
+    textarea.addEventListener("change", () => updateSetupEvidenceNote(textarea.dataset.evidenceNote, textarea.value));
+  });
+  document.querySelectorAll("[data-evidence-status]").forEach((select) => {
+    select.addEventListener("change", () => updateSetupEvidenceStatus(select.dataset.evidenceStatus, select.value));
+  });
+  document.querySelectorAll("[data-verify-evidence]").forEach((btn) => {
+    btn.addEventListener("click", () => verifySetupEvidence(btn.dataset.verifyEvidence));
+  });
+  document.querySelectorAll("[data-clear-evidence]").forEach((btn) => {
+    btn.addEventListener("click", () => clearSetupEvidence(btn.dataset.clearEvidence));
+  });
+  document.querySelectorAll("[data-save-evidence]").forEach((btn) => {
+    btn.addEventListener("click", () => saveSetupEvidenceCard(btn.dataset.saveEvidence, btn));
+  });
+}
+
+function showSetupEvidenceError(slotId, message) {
+  const target = document.querySelector(`[data-evidence-error="${slotId}"]`);
+  if (!target) return;
+  if (!message) {
+    target.hidden = true;
+    target.textContent = "";
+    return;
+  }
+  target.hidden = false;
+  target.textContent = message;
+}
+
+function patchSetupEvidence(slotId, patch) {
+  let touched = false;
+  setupEvidence = setupEvidence.map((record) => {
+    if (record.id !== slotId) return record;
+    touched = true;
+    return { ...record, ...patch, updatedAt: new Date().toISOString() };
+  });
+  if (touched) saveSetupEvidence();
+  return touched;
+}
+
+function updateSetupEvidenceUrl(slotId, value) {
+  const raw = String(value || "").trim();
+  const safe = raw ? safeHttpsUrl(raw) : "";
+  if (raw && !safe) {
+    showSetupEvidenceError(slotId, "Evidence URL must start with https://.");
+    return;
+  }
+  showSetupEvidenceError(slotId, "");
+  patchSetupEvidence(slotId, { evidenceUrl: safe });
+  renderSetupEvidence();
+  renderProfitReadiness();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function updateSetupEvidenceNote(slotId, value) {
+  const note = String(value || "").slice(0, 900);
+  const findings = findSensitiveData(note);
+  if (findings.length) {
+    showSetupEvidenceError(slotId, `Operator note contains ${findings.join(", ")}. Strip and retry.`);
+    return;
+  }
+  showSetupEvidenceError(slotId, "");
+  patchSetupEvidence(slotId, { operatorNote: note });
+  renderSetupEvidence();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function updateSetupEvidenceStatus(slotId, value) {
+  if (!SETUP_EVIDENCE_STATUSES.includes(value)) return;
+  const patch = { status: value };
+  if (value === "verified") {
+    patch.verifiedAt = new Date().toISOString();
+  } else {
+    patch.verifiedAt = "";
+  }
+  patchSetupEvidence(slotId, patch);
+  renderSetupEvidence();
+  renderProfitReadiness();
+  renderOperations();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function verifySetupEvidence(slotId) {
+  const record = setupEvidence.find((r) => r.id === slotId);
+  if (!record) return;
+  if (!record.evidenceUrl) {
+    showSetupEvidenceError(slotId, "Paste an https evidence URL before verifying.");
+    return;
+  }
+  if (!record.operatorNote.trim()) {
+    showSetupEvidenceError(slotId, "Record an operator note before verifying.");
+    return;
+  }
+  showSetupEvidenceError(slotId, "");
+  patchSetupEvidence(slotId, { status: "verified", verifiedAt: new Date().toISOString() });
+  renderSetupEvidence();
+  renderProfitReadiness();
+  renderOperations();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function clearSetupEvidence(slotId) {
+  showSetupEvidenceError(slotId, "");
+  patchSetupEvidence(slotId, { status: "missing", evidenceUrl: "", verifiedAt: "", operatorNote: "" });
+  renderSetupEvidence();
+  renderProfitReadiness();
+  renderOperations();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function saveSetupEvidenceCard(slotId, button) {
+  const card = document.querySelector(`[data-evidence-id="${slotId}"]`);
+  if (!card) return;
+  const url = card.querySelector("[data-evidence-url]").value;
+  const note = card.querySelector("[data-evidence-note]").value;
+  const status = card.querySelector("[data-evidence-status]").value;
+  const raw = String(url || "").trim();
+  const safe = raw ? safeHttpsUrl(raw) : "";
+  if (raw && !safe) {
+    showSetupEvidenceError(slotId, "Evidence URL must start with https://.");
+    return;
+  }
+  const findings = findSensitiveData(note);
+  if (findings.length) {
+    showSetupEvidenceError(slotId, `Operator note contains ${findings.join(", ")}. Strip and retry.`);
+    return;
+  }
+  if (!SETUP_EVIDENCE_STATUSES.includes(status)) {
+    showSetupEvidenceError(slotId, "Invalid status.");
+    return;
+  }
+  showSetupEvidenceError(slotId, "");
+  const patch = {
+    evidenceUrl: safe,
+    operatorNote: String(note || "").slice(0, 900),
+    status
+  };
+  patch.verifiedAt = status === "verified" ? new Date().toISOString() : "";
+  patchSetupEvidence(slotId, patch);
+  renderSetupEvidence();
+  renderProfitReadiness();
+  renderOperations();
+  renderReceiptChain();
+  renderLogs();
+  if (button) {
+    const original = button.textContent;
+    button.textContent = "Saved";
+    setTimeout(() => { button.textContent = original; }, 1200);
+  }
+}
+
+function resetSetupEvidence() {
+  setupEvidence = defaultSetupEvidence();
+  saveSetupEvidence();
+  renderSetupEvidence();
+  renderProfitReadiness();
+  renderOperations();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function outreachPacket() {
+  const model = buildCustomerAcquisitionModel();
+  const lines = [
+    "Strange Works Studio - daily outreach packet",
+    `Daily target: ${model.target}`,
+    `Today's logged attempts: ${model.todayAttempts}`,
+    `7-day attempts: ${model.last7Attempts}`,
+    "",
+    "Conversions:",
+    `- prospect: ${model.conversions.prospect}`,
+    `- qualified: ${model.conversions.qualified}`,
+    `- invoice-ready: ${model.conversions.invoice_ready}`,
+    `- invoice-sent: ${model.conversions.invoice_sent}`,
+    `- paid: ${model.conversions.paid}`,
+    `- delivered: ${model.conversions.delivered}`,
+    "",
+    "Leads by source:",
+    ...ACQUISITION_LEAD_SOURCES.map((s) => `- ${s}: ${model.leadsBySource[s] || 0}`),
+    `- unspecified: ${model.leadsBySource.unspecified || 0}`,
+    "",
+    "Outreach boundary: contact only operators or companies you can name in public. Do not paste PHI, payment data, credentials, or private records into the log."
+  ];
+  return lines.join("\n");
+}
+
+function renderCustomerAcquisition() {
+  const panel = document.querySelector("#customerAcquisitionPanel");
+  if (!panel) return;
+  const model = buildCustomerAcquisitionModel();
+  const targetInput = document.querySelector("#outreachTargetInput");
+  if (targetInput && document.activeElement !== targetInput) {
+    targetInput.value = String(model.target);
+  }
+  const ack = customerAcquisition.log
+    .slice(0, 20)
+    .map((entry) => {
+      const stamp = entry.at ? formatReceiptDate(entry.at) : "baseline";
+      const note = entry.note ? `<p class="acq-log-note">${escapeHtml(entry.note)}</p>` : "";
+      return `
+        <li class="acq-log-entry">
+          <div>
+            <span class="metric-label">${escapeHtml(entry.source)}</span>
+            <strong>${entry.attempts} attempt${entry.attempts === 1 ? "" : "s"}</strong>
+            <time>${escapeHtml(stamp)}</time>
+          </div>
+          ${note}
+          <button type="button" data-remove-outreach="${escapeHtml(entry.id)}">Remove</button>
+        </li>
+      `;
+    })
+    .join("");
+  const conversionItems = ["prospect", "qualified", "invoice_ready", "invoice_sent", "paid", "delivered", "rejected"]
+    .map((stage) => `<span><strong>${model.conversions[stage] || 0}</strong><small>${escapeHtml(stage.replace(/_/g, " "))}</small></span>`)
+    .join("");
+  const sourceItems = ACQUISITION_LEAD_SOURCES.map((source) =>
+    `<span><strong>${model.leadsBySource[source] || 0}</strong><small>${escapeHtml(source)}</small></span>`
+  ).join("") + `<span><strong>${model.leadsBySource.unspecified || 0}</strong><small>unspecified</small></span>`;
+  const targetTone = model.target === 0 ? "amber" : model.todayMet ? "green" : "red";
+  panel.innerHTML = `
+    <article class="acq-summary ${escapeHtml(targetTone)}">
+      <div>
+        <span class="metric-label">Customer acquisition</span>
+        <h3>${model.todayMet ? "Daily target met" : model.target === 0 ? "No daily target set" : "Daily target open"}</h3>
+        <p>Tracks operator-led outreach and the pipeline that follows. It is not automated outreach, lead generation, or autonomous email sending.</p>
+      </div>
+      <div class="acq-counts">
+        <span><strong>${model.todayAttempts}/${model.target}</strong><small>Today vs target</small></span>
+        <span><strong>${model.last7Attempts}</strong><small>7-day attempts</small></span>
+        <span><strong>${model.totalLeads}</strong><small>Total leads</small></span>
+      </div>
+    </article>
+    <div class="acq-target-row">
+      <label class="acq-target-label">
+        <span>Daily outreach target</span>
+        <input id="outreachTargetInput" type="number" min="0" step="1" value="${model.target}" />
+      </label>
+      <button type="button" id="saveOutreachTarget" class="primary-action">
+        <span>Save target</span>
+      </button>
+      <button type="button" id="copyOutreachPacket" class="primary-action">
+        <span>Copy outreach packet</span>
+      </button>
+    </div>
+    <form class="acq-log-form" id="outreachLogForm">
+      <div class="field-row">
+        <div class="field">
+          <label for="outreachSource">Source</label>
+          <select id="outreachSource" name="source">
+            ${ACQUISITION_LEAD_SOURCES.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label for="outreachAttempts">Attempts</label>
+          <input id="outreachAttempts" name="attempts" type="number" min="1" step="1" value="1" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="outreachNote">Note (no PHI, no credentials, no customer-private records)</label>
+        <textarea id="outreachNote" name="note" rows="2"></textarea>
+      </div>
+      <button class="primary-action" type="submit">
+        <i data-lucide="plus"></i>
+        <span>Log outreach</span>
+      </button>
+      <p class="evidence-form-error" id="outreachLogError" hidden></p>
+    </form>
+    <div class="acq-conversions">
+      <span class="metric-label">Conversion counts</span>
+      <div class="acq-grid">${conversionItems}</div>
+    </div>
+    <div class="acq-sources">
+      <span class="metric-label">Leads by source</span>
+      <div class="acq-grid">${sourceItems}</div>
+    </div>
+    <ol class="acq-log">${ack || `<li class="acq-log-empty">No outreach logged yet.</li>`}</ol>
+  `;
+
+  const targetButton = document.querySelector("#saveOutreachTarget");
+  if (targetButton) targetButton.addEventListener("click", () => {
+    const value = document.querySelector("#outreachTargetInput")?.value;
+    updateOutreachTarget(value);
+  });
+  const copyButton = document.querySelector("#copyOutreachPacket");
+  if (copyButton) copyButton.addEventListener("click", () => copyOutreachPacket(copyButton));
+  const form = document.querySelector("#outreachLogForm");
+  if (form) form.addEventListener("submit", (event) => { event.preventDefault(); submitOutreachLog(form); });
+  document.querySelectorAll("[data-remove-outreach]").forEach((btn) => {
+    btn.addEventListener("click", () => removeOutreachEntry(btn.dataset.removeOutreach));
+  });
+}
+
+function showOutreachError(message) {
+  const target = document.querySelector("#outreachLogError");
+  if (!target) return;
+  if (!message) {
+    target.hidden = true;
+    target.textContent = "";
+    return;
+  }
+  target.hidden = false;
+  target.textContent = message;
+}
+
+function updateOutreachTarget(value) {
+  const raw = Number(value);
+  if (!Number.isFinite(raw) || raw < 0) return;
+  customerAcquisition.dailyOutreachTarget = Math.min(Math.floor(raw), 999);
+  saveCustomerAcquisition();
+  renderCustomerAcquisition();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function submitOutreachLog(form) {
+  const formData = new FormData(form);
+  const source = String(formData.get("source") || "").trim().toLowerCase();
+  const attempts = Number(formData.get("attempts") || 0);
+  const note = String(formData.get("note") || "").trim();
+  if (!ACQUISITION_LEAD_SOURCES.includes(source)) {
+    showOutreachError(`Source must be one of ${ACQUISITION_LEAD_SOURCES.join(", ")}.`);
+    return;
+  }
+  if (!Number.isFinite(attempts) || attempts <= 0) {
+    showOutreachError("Attempts must be a positive whole number.");
+    return;
+  }
+  const findings = findSensitiveData(note);
+  if (findings.length) {
+    showOutreachError(`Note contains ${findings.join(", ")}. Strip and retry.`);
+    return;
+  }
+  showOutreachError("");
+  const entry = normalizeOutreachLogEntry({
+    id: `outreach-${Date.now().toString(36)}`,
+    at: new Date().toISOString(),
+    source,
+    attempts,
+    note
+  });
+  if (!entry) return;
+  customerAcquisition.log.unshift(entry);
+  customerAcquisition.log = customerAcquisition.log.slice(0, 90);
+  saveCustomerAcquisition();
+  form.reset();
+  renderCustomerAcquisition();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function removeOutreachEntry(entryId) {
+  customerAcquisition.log = (customerAcquisition.log || []).filter((entry) => entry.id !== entryId);
+  saveCustomerAcquisition();
+  renderCustomerAcquisition();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function resetCustomerAcquisition() {
+  customerAcquisition = defaultCustomerAcquisition();
+  saveCustomerAcquisition();
+  renderCustomerAcquisition();
+  renderReceiptChain();
+  renderLogs();
 }
 
 function renderSalesPipeline() {
@@ -4793,6 +5445,8 @@ function addSalesLead(form) {
   const serviceId = String(formData.get("leadService") || "").trim();
   const amount = Number(formData.get("leadAmount") || 0);
   const source = String(formData.get("leadSource") || "Manual").trim();
+  const sourceCategoryRaw = String(formData.get("leadSourceCategory") || "").trim().toLowerCase();
+  const sourceCategory = ACQUISITION_LEAD_SOURCES.includes(sourceCategoryRaw) ? sourceCategoryRaw : "";
   const need = String(formData.get("leadNeed") || "").trim();
   const qualificationNote = String(formData.get("leadQualificationNote") || "").trim();
   const sensitive = findSensitiveData([customer, contact, need, qualificationNote].join("\n"));
@@ -4822,6 +5476,7 @@ function addSalesLead(form) {
     serviceId,
     amount,
     source,
+    sourceCategory,
     need: need || "Need not recorded",
     stage: qualificationNote ? "qualified" : "prospect",
     qualificationNote
@@ -4836,6 +5491,7 @@ function addSalesLead(form) {
   form.reset();
   renderSalesPipeline();
   renderProfitReadiness();
+  renderCustomerAcquisition();
   renderReceiptChain();
   renderLogs();
 }
@@ -4855,6 +5511,7 @@ function advanceSalesLead(leadId) {
   saveSalesLeads();
   renderSalesPipeline();
   renderProfitReadiness();
+  renderCustomerAcquisition();
   renderReceiptChain();
   renderLogs();
 }
@@ -4874,6 +5531,7 @@ function rejectSalesLead(leadId) {
   saveSalesLeads();
   renderSalesPipeline();
   renderProfitReadiness();
+  renderCustomerAcquisition();
   renderReceiptChain();
   renderLogs();
 }
@@ -4883,6 +5541,7 @@ function removeSalesLead(leadId) {
   saveSalesLeads();
   renderSalesPipeline();
   renderProfitReadiness();
+  renderCustomerAcquisition();
   renderReceiptChain();
   renderLogs();
 }
@@ -4925,6 +5584,7 @@ function convertSalesLeadToOrder(leadId) {
   renderSalesPipeline();
   renderOperations();
   renderOrderDesk();
+  renderCustomerAcquisition();
   renderReceiptChain();
   renderLogs();
 }
@@ -5413,6 +6073,22 @@ async function copyDailyRunSummary(runId, button) {
   }, 1500);
 }
 
+async function copyOutreachPacket(button) {
+  if (!button) return;
+  const previous = button.textContent;
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(outreachPacket());
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  button.textContent = copied ? "Packet copied" : "Copy failed";
+  setTimeout(() => {
+    button.textContent = previous;
+  }, 1500);
+}
+
 function submitOrderRequest(form) {
   const output = document.querySelector("#orderRequestOutput");
   const formData = new FormData(form);
@@ -5702,7 +6378,29 @@ function collectReceiptEvents() {
     orderCount: operationsModel.orders.length,
     profitReadinessState: profitReadiness.state,
     qualifiedLeadCount: profitReadiness.qualifiedLeadCount,
-    salesLeadCount: salesLeads.length
+    salesLeadCount: salesLeads.length,
+    setupEvidenceVerified: profitReadiness.setupEvidenceVerifiedCount,
+    setupEvidenceTotal: profitReadiness.setupEvidenceTotal
+  });
+
+  const setupModel = buildSetupEvidenceModel();
+  setupModel.records.forEach((record) => {
+    push("Setup Evidence", record.id, record.label, "Operations console", record.status, record.updatedAt || record.verifiedAt || "baseline", {
+      evidenceUrl: record.evidenceUrl || "",
+      verifiedAt: record.verifiedAt || "",
+      hasNote: Boolean(record.operatorNote)
+    });
+  });
+
+  const acquisition = buildCustomerAcquisitionModel();
+  const acquisitionAt = (customerAcquisition.log[0] && customerAcquisition.log[0].at) || "baseline";
+  push("Acquisition", "customer-acquisition", "Customer acquisition", "Operations console", `${acquisition.todayAttempts}/${acquisition.target} today`, acquisitionAt, {
+    dailyTarget: acquisition.target,
+    todayAttempts: acquisition.todayAttempts,
+    last7Attempts: acquisition.last7Attempts,
+    totalLeads: acquisition.totalLeads,
+    conversions: acquisition.conversions,
+    leadsBySource: acquisition.leadsBySource
   });
 
   operations.orders.forEach((order) => {
@@ -6888,6 +7586,15 @@ function setupOperations() {
     copyAllLeadRowsButton.addEventListener("click", () => copyAllLeadRows(copyAllLeadRowsButton));
   }
 
+  const resetSetupEvidenceButton = document.querySelector("#resetSetupEvidence");
+  if (resetSetupEvidenceButton) {
+    resetSetupEvidenceButton.addEventListener("click", () => resetSetupEvidence());
+  }
+  const resetAcquisitionButton = document.querySelector("#resetCustomerAcquisition");
+  if (resetAcquisitionButton) {
+    resetAcquisitionButton.addEventListener("click", () => resetCustomerAcquisition());
+  }
+
   const bridgeForm = document.querySelector("#operationsLedgerBridgeForm");
   const bridgeTextarea = document.querySelector("#operationsLedgerTsv");
   const bridgeOutput = document.querySelector("#operationsLedgerOutput");
@@ -7753,6 +8460,8 @@ renderLaunchGate();
 renderRevenuePilot();
 renderSatelliteCompany();
 renderOperations();
+renderSetupEvidence();
+renderCustomerAcquisition();
 renderExternalSignals();
 renderReceiptChain();
 renderTreasuryProposals();
