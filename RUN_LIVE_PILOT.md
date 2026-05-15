@@ -30,6 +30,7 @@ Complete every line in the **Operational launch** checklist before sending the f
 - [ ] **Terms reviewed.** Date stamped in the Operations integration config.
 - [ ] **Privacy notice reviewed.** Date stamped in the Operations integration config.
 - [ ] **Integration config saved.** Support email, Sheet URL, Form URL or Apps Script URL, Stripe dashboard URL, prefix all set in the Operations console.
+- [ ] **Revenue start packet issued.** Operations `Revenue start` board confirms the Strange Company sealed lane and the second company revenue lane before invoice work starts.
 - [ ] **First customer invoice sent.** Confirms the loop end-to-end before scaling.
 
 The Operations tab will hold the launch in **Launch incomplete** or **Integration incomplete** until the above is done.
@@ -81,6 +82,12 @@ Run this once per workday until the pilot is on rails.
 - Flip any stop rule that applies during the day: Stripe hold, business bank restricted, regulated-data submission, Sheet ledger outage, support inbox outage, terms or privacy change. While any stop rule is active the Operations console reads `Paused` and `Draft -> Sent` is blocked across all orders. Clear the rule when the underlying issue is fixed.
 - Paste the ids of any incidents logged in step 7 into the `Incident ids` field on the run panel.
 - At end of day press `Close run`. The console snapshots the current receipt-chain root, captures which orders moved during the run, and stores the result locally. The active run becomes a closed entry in the run history.
+
+### 9. Issue or refresh the revenue start packet
+- Use the Operations `Revenue start` board when day-one posture changes.
+- Keep the Strange Company lane sealed and no-direct-invoice.
+- Keep the second company lane tied to external setup evidence, manual invoices, Sheet ledger, support, delivery closeout, and incident handling.
+- Copy the start packet into the operator record when it changes.
 
 ## Weekly Review
 

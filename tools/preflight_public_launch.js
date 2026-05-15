@@ -442,10 +442,15 @@ function checkOperationalV15Contract() {
     ["outreach log submit", "function submitOutreachLog"],
     ["outreach log remove", "function removeOutreachEntry"],
     ["outreach packet copy", "async function copyOutreachPacket"],
+    ["growth review model", "function buildGrowthReviewModel"],
+    ["growth review renderer", "function renderGrowthReview"],
+    ["growth review packet", "function growthReviewPacket"],
+    ["growth review copy handler", "async function copyGrowthReviewPacket"],
     ["profit readiness reads setup evidence", "const setupModel = buildSetupEvidenceModel()"],
     ["profit readiness blocker names slot", 'blockers.push(`unverified evidence: ${record.label}`)'],
     ["setup evidence receipt type", 'push("Setup Evidence"'],
     ["acquisition receipt type", 'push("Acquisition"'],
+    ["growth review receipt type", '"Growth Review",'],
     ["sales lead sourceCategory", "const sourceCategory = ACQUISITION_LEAD_SOURCES.includes(sourceCategoryRaw)"]
   ];
   for (const [label, snippet] of requiredScript) {
@@ -457,6 +462,8 @@ function checkOperationalV15Contract() {
     ["setup evidence reset button", 'id="resetSetupEvidence"'],
     ["customer acquisition panel container", 'id="customerAcquisitionPanel"'],
     ["customer acquisition reset button", 'id="resetCustomerAcquisition"'],
+    ["growth review panel container", 'id="growthReviewPanel"'],
+    ["growth review copy button", 'id="copyGrowthReview"'],
     ["sales lead source category select", 'id="salesLeadSourceCategory"']
   ];
   for (const [label, snippet] of indexExpectations) {
@@ -466,6 +473,7 @@ function checkOperationalV15Contract() {
   assert(runbook.includes("Operational v1.5"), "OPERATIONS_RUNBOOK.md must document Operational v1.5.");
   assert(runbook.includes("Setup Evidence"), "OPERATIONS_RUNBOOK.md must reference the Setup Evidence panel.");
   assert(runbook.includes("Customer Acquisition"), "OPERATIONS_RUNBOOK.md must reference the Customer Acquisition panel.");
+  assert(runbook.includes("Growth Management"), "OPERATIONS_RUNBOOK.md must reference the Growth Management panel.");
 
   const setupDoc = read("SETUP_EVIDENCE.md");
   assert(setupDoc.includes("# Setup Evidence"), "SETUP_EVIDENCE.md must exist and start with a top-level heading.");
@@ -474,6 +482,10 @@ function checkOperationalV15Contract() {
   const acquisitionDoc = read("CUSTOMER_ACQUISITION.md");
   assert(acquisitionDoc.includes("# Customer Acquisition"), "CUSTOMER_ACQUISITION.md must exist and start with a top-level heading.");
   assert(acquisitionDoc.includes("Outreach Log"), "CUSTOMER_ACQUISITION.md must document the outreach log.");
+
+  const growthDoc = read("GROWTH_MANAGEMENT.md");
+  assert(growthDoc.includes("# Growth Management"), "GROWTH_MANAGEMENT.md must exist and start with a top-level heading.");
+  assert(growthDoc.includes("Growth States"), "GROWTH_MANAGEMENT.md must document growth states.");
 
   for (const [file, contents] of [
     ["public.html", publicHtml],
@@ -484,9 +496,78 @@ function checkOperationalV15Contract() {
     assert(!/strange-company-customer-acquisition/.test(contents), `${file} exposes customer acquisition storage key.`);
     assert(!/setupEvidencePanel/.test(contents), `${file} exposes setup evidence panel id.`);
     assert(!/customerAcquisitionPanel/.test(contents), `${file} exposes customer acquisition panel id.`);
+    assert(!/growthReviewPanel/.test(contents), `${file} exposes growth review panel id.`);
+    assert(!/copyGrowthReview/.test(contents), `${file} exposes growth review copy action.`);
     assert(!/outreachLogForm/.test(contents), `${file} exposes outreach log form id.`);
     assert(!/SETUP_EVIDENCE_SLOTS/.test(contents), `${file} exposes setup evidence slot internals.`);
     assert(!/ACQUISITION_LEAD_SOURCES/.test(contents), `${file} exposes acquisition lead source internals.`);
+  }
+}
+
+function checkRevenueStartContract() {
+  const script = read("script.js");
+  const indexHtml = read("index.html");
+  const runbook = read("OPERATIONS_RUNBOOK.md");
+  const livePilot = read("RUN_LIVE_PILOT.md");
+  const satelliteDoc = read("SATELLITE_COMPANY.md");
+  const revenuePilotDoc = read("REVENUE_PILOT.md");
+  const revenueStartDoc = read("REVENUE_START.md");
+  const readme = read("README.md");
+  const publicHtml = read("public.html");
+  const publicJs = read("public.js");
+  const publicConfigText = read("public-config.js");
+
+  const requiredScript = [
+    ["revenue start storage key", 'const REVENUE_START_KEY = "strange-company-revenue-start"'],
+    ["revenue start lanes", "const REVENUE_START_LANES = ["],
+    ["revenue start default", "function defaultRevenueStart"],
+    ["revenue start loader", "function loadRevenueStart"],
+    ["revenue start saver", "function saveRevenueStart"],
+    ["revenue start packet lane normalizer", "function normalizeRevenueStartPacketLane"],
+    ["revenue start model", "function buildRevenueStartModel"],
+    ["revenue start renderer", "function renderRevenueStart"],
+    ["revenue start task toggle", "function toggleRevenueStartTask"],
+    ["revenue start lane snapshot", "function snapshotRevenueStartLanes"],
+    ["revenue start packet builder", "function revenueStartPacket"],
+    ["revenue start issue handler", "function issueRevenueStartPacket"],
+    ["revenue start copy handler", "function copyRevenueStartPacket"],
+    ["revenue start packet captures lanes", "lanes: snapshotRevenueStartLanes(model.lanes)"],
+    ["revenue start packet captures next action", "nextAction: model.nextAction"],
+    ["revenue start receipt", '"Revenue Start",'],
+    ["revenue packet receipt carries lane snapshots", "laneSnapshots: (packet.lanes || []).map"],
+    ["revenue packet receipt", 'push("Revenue Packet"']
+  ];
+  for (const [label, snippet] of requiredScript) {
+    assert(script.includes(snippet), `script.js is missing ${label}.`);
+  }
+
+  const indexExpectations = [
+    ["revenue start panel", 'id="revenueStartPanel"'],
+    ["issue start packet button", 'id="issueRevenueStartPacket"'],
+    ["reset revenue start button", 'id="resetRevenueStart"']
+  ];
+  for (const [label, snippet] of indexExpectations) {
+    assert(indexHtml.includes(snippet), `index.html is missing ${label}.`);
+  }
+
+  assert(runbook.includes("Revenue Start Board"), "OPERATIONS_RUNBOOK.md must document the Revenue Start Board.");
+  assert(livePilot.includes("Revenue start packet issued"), "RUN_LIVE_PILOT.md must include the start packet setup step.");
+  assert(satelliteDoc.includes("## Revenue Start"), "SATELLITE_COMPANY.md must document Revenue Start.");
+  assert(revenuePilotDoc.includes("## Starting Revenue"), "REVENUE_PILOT.md must document Starting Revenue.");
+  assert(revenueStartDoc.includes("# Revenue Start"), "REVENUE_START.md must exist and start with a top-level heading.");
+  assert(revenueStartDoc.includes("Strange Company Lane"), "REVENUE_START.md must document the Strange Company lane.");
+  assert(revenueStartDoc.includes("Second Company Lane"), "REVENUE_START.md must document the second company lane.");
+  assert(readme.includes("REVENUE_START.md"), "README.md must link the Revenue Start operator doc.");
+  assert(readme.includes("tools/audit_company_functionality.js"), "README.md must link the company functionality audit.");
+
+  for (const [file, contents] of [
+    ["public.html", publicHtml],
+    ["public.js", publicJs],
+    ["public-config.js", publicConfigText]
+  ]) {
+    assert(!/strange-company-revenue-start/.test(contents), `${file} exposes revenue start storage key.`);
+    assert(!/revenueStartPanel/.test(contents), `${file} exposes revenue start panel id.`);
+    assert(!/issueRevenueStartPacket/.test(contents), `${file} exposes revenue start issue action.`);
   }
 }
 
@@ -530,6 +611,7 @@ function checkConfig() {
 compileJavaScript("public-config.js");
 compileJavaScript("public.js");
 compileJavaScript("script.js");
+compileJavaScript("tools/audit_company_functionality.js");
 checkPublicSurface();
 checkPrivateUrlAllowlists();
 checkOutcomeEvidenceContract();
@@ -538,6 +620,7 @@ checkOrderLifecycleContract();
 checkDailyPilotRunContract();
 checkPaidPilotProfitReadinessContract();
 checkOperationalV15Contract();
+checkRevenueStartContract();
 checkConfig();
 
 if (failures.length) {

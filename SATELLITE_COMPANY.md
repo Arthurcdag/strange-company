@@ -50,6 +50,14 @@ The panel checks four gates:
 
 It also shows the current external-only profit model, collected MRR from Operations, and how many external compliance proof sprint customers are still needed to reach `$3K` and `$5K` monthly net profit. Related-party work never counts as market proof in this tracker.
 
+## Revenue Start
+
+The Operations console now includes a **Revenue start** board that starts both company lanes without merging them.
+
+The Strange Company lane confirms the sealed boundary, Online Gate review, treasury hold, and receipt-chain baseline. The second company lane confirms Strange Works Studio setup evidence, first qualified lead, manual invoice route, daily pilot run, and delivery closeout.
+
+The start packet is the handoff between readiness and first revenue work. It lets the satellite begin the manual paid pilot while Strange Company stays sealed and does not invoice customers directly.
+
 ## Clean Transaction Controls
 
 The satellite may go online as a paid operator only when these controls are clear:

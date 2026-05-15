@@ -272,6 +272,11 @@ h3 {
 .satellite-control,
 .ops-verdict,
 .profit-readiness-card,
+.revenue-start-card,
+.revenue-start-lane,
+.revenue-start-packet,
+.growth-review-card,
+.growth-channel,
 .sales-lead-form,
 .sales-lead-card,
 .ops-form,
@@ -1149,6 +1154,314 @@ h3 {
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.revenue-start {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.revenue-start-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.95fr);
+  gap: 18px;
+  border-left: 3px solid var(--amber);
+}
+
+.revenue-start-card.green {
+  border-left-color: var(--green);
+}
+
+.revenue-start-card.red {
+  border-left-color: var(--red);
+}
+
+.revenue-start-card h3,
+.revenue-start-card p,
+.revenue-start-lane h4,
+.revenue-start-lane p,
+.revenue-start-packet h4,
+.revenue-start-packet p {
+  margin: 0;
+}
+
+.revenue-start-card h3 {
+  font-size: 19px;
+}
+
+.revenue-start-card p,
+.revenue-start-lane p,
+.revenue-start-packet p {
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.revenue-start-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.revenue-start-metrics span {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f3efe8;
+}
+
+.revenue-start-metrics strong,
+.revenue-start-metrics small {
+  display: block;
+}
+
+.revenue-start-metrics strong {
+  overflow-wrap: anywhere;
+  font-size: 18px;
+}
+
+.revenue-start-metrics small {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.revenue-start-blockers {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.revenue-start-blockers span {
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: #f3efe8;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.revenue-start-lanes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.revenue-start-lane {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  border-left: 3px solid var(--green);
+}
+
+.revenue-start-lane.red {
+  border-left-color: var(--red);
+}
+
+.revenue-start-lane-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.revenue-start-task-list {
+  display: grid;
+  gap: 10px;
+}
+
+.revenue-start-task {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.revenue-start-task.done {
+  border-color: rgba(38, 122, 85, 0.35);
+}
+
+.revenue-start-task input {
+  margin-top: 2px;
+}
+
+.revenue-start-task strong,
+.revenue-start-task small {
+  display: block;
+}
+
+.revenue-start-task small {
+  margin-top: 4px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.revenue-start-output article {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.revenue-start-output pre {
+  margin: 12px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.revenue-start-packets {
+  display: grid;
+  gap: 10px;
+}
+
+.revenue-start-packet {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+}
+
+.revenue-start-packet.empty {
+  grid-template-columns: 1fr;
+}
+
+.revenue-start-packet button {
+  min-width: 110px;
+}
+
+.growth-review {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.growth-review-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 1fr);
+  gap: 18px;
+  border-left: 3px solid var(--amber);
+}
+
+.growth-review-card.green {
+  border-left-color: var(--green);
+}
+
+.growth-review-card.red {
+  border-left-color: var(--red);
+}
+
+.growth-review-card h3,
+.growth-review-card p,
+.growth-channel p {
+  margin: 0;
+}
+
+.growth-review-card h3 {
+  font-size: 19px;
+}
+
+.growth-review-card p,
+.growth-channel p {
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.growth-review-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.growth-review-metrics span {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f3efe8;
+}
+
+.growth-review-metrics strong,
+.growth-review-metrics small {
+  display: block;
+}
+
+.growth-review-metrics strong {
+  overflow-wrap: anywhere;
+  font-size: 18px;
+}
+
+.growth-review-metrics small {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.growth-review-blockers {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.growth-review-blockers span {
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: #f3efe8;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.growth-channels {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.growth-channel {
+  min-width: 0;
+  padding: 14px;
+}
+
+.growth-channel.active {
+  border-color: rgba(38, 122, 85, 0.4);
+  background: rgba(38, 122, 85, 0.08);
+}
+
+.growth-channel strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 26px;
+}
+
+.growth-review-output article {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.growth-review-output pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .sales-pipeline-layout {
@@ -2753,6 +3066,9 @@ input[type="range"] {
   .pilot-layout,
   .ops-verdict,
   .ops-layout,
+  .revenue-start-card,
+  .revenue-start-lanes,
+  .growth-review-card,
   .sales-pipeline-layout,
   .signal-layout,
   .treasury-panel,
@@ -2775,6 +3091,9 @@ input[type="range"] {
   .ops-metrics-grid,
   .profit-target-grid,
   .profit-readiness-metrics,
+  .revenue-start-metrics,
+  .growth-review-metrics,
+  .growth-channels,
   .signal-policy-grid,
   .signal-metrics-grid,
   .receipt-summary,
@@ -2819,6 +3138,9 @@ input[type="range"] {
   .pilot-metrics-grid,
   .satellite-metrics-grid,
   .ops-metrics-grid,
+  .revenue-start-metrics,
+  .growth-review-metrics,
+  .growth-channels,
   .signal-policy-grid,
   .signal-metrics-grid,
   .receipt-summary,
@@ -2837,6 +3159,8 @@ input[type="range"] {
   .ops-control,
   .ops-order,
   .ops-launch-item,
+  .revenue-start-packet,
+  .growth-channel,
   .sales-lead-card,
   .signal-card,
   .launch-phase,

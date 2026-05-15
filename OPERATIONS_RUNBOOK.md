@@ -56,12 +56,24 @@ Do not accept protected health information, payment credentials, passwords, or r
 8. Mark `Delivered` only after acceptance criteria are met.
 9. Seal the receipt chain after material state changes.
 
+## Revenue Start Board
+
+The private Operations view now includes a **Revenue start** board for the two-company launch posture.
+
+The board has two lanes:
+
+- **Strange Company lane** keeps the sealed company out of direct customer invoicing. It confirms the public/no-secret boundary, Online Gate review, treasury hold, and receipt-chain baseline.
+- **Second company lane** starts the revenue-facing operator, Strange Works Studio. It confirms external setup evidence, first qualified lead, manual invoice route, daily pilot run, and delivery closeout.
+
+Pressing `Issue start packet` records a local revenue-start packet and copies the day-one sequence. The packet snapshots the current lane tasks, blockers, readiness state, and next action so later checklist edits do not rewrite the copied record. The packet is a coordination receipt only. It is not legal formation, tax advice, accounting software, payment automation, or proof that external setup exists.
+
 ## Operational v1.5 — Setup Evidence and Customer Acquisition
 
 Operational v1.5 layers two private panels onto the Operations console without changing the public surface:
 
 - A **Setup Evidence** panel turns the launch checklist into operator-asserted proof. Each of the nine slots (`llc`, `ein`, `bank`, `stripe`, `support-inbox`, `google-sheet`, `google-form`, `terms-review`, `privacy-review`) stores a status (`missing`, `pending`, `verified`, `blocked`), an `https://` evidence URL, an optional `verifiedAt` timestamp, and an operator note. Notes are scanned for PHI, payment card data, credentials, SSNs, private keys, and API keys before they are saved. See [SETUP_EVIDENCE.md](SETUP_EVIDENCE.md).
 - A **Customer Acquisition** panel surfaces the daily outreach target, a log of operator outreach attempts by source (`referral`, `email`, `form`, `direct`, `partner`), conversion counts for every sales lead stage, and a copyable outreach packet. The lead form on the same view now requires a source category. See [CUSTOMER_ACQUISITION.md](CUSTOMER_ACQUISITION.md).
+- A **Growth Management** panel turns acquisition, pipeline, revenue-start, and readiness receipts into one next operator action. It never sends outreach, approves spend, or overrides legal/payment gates. See [GROWTH_MANAGEMENT.md](GROWTH_MANAGEMENT.md).
 
 ### Profit Readiness gate
 

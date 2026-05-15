@@ -43,6 +43,12 @@ $4,000/month committed recurring revenue
 6. Deliver manually first.
 7. Turn repeated manual work into packets, software, and automation.
 
+## Starting Revenue
+
+The Revenue Pilot now hands off to the Operations `Revenue start` board.
+
+That board keeps the first payment out of the sealed Strange Company lane. The pilot can start revenue only through the second company lane, where Strange Works Studio has separate setup evidence, manual invoice handling, Sheet ledger tracking, support, delivery closeout, and incident handling.
+
 ## Payment Gate
 
 The prototype blocks the mental move from interest to revenue until critical blockers are done:

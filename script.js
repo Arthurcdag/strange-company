@@ -560,6 +560,20 @@ function defaultOperations() {
   };
 }
 
+function defaultRevenueStart() {
+  return {
+    lanes: REVENUE_START_LANES.map((lane) => ({
+      id: lane.id,
+      tasks: lane.tasks.map((task) => ({
+        id: task.id,
+        done: false,
+        completedAt: ""
+      }))
+    })),
+    packets: []
+  };
+}
+
 function defaultExternalSignals() {
   return [];
 }
@@ -649,6 +663,7 @@ const REVENUE_PILOT_KEY = "strange-company-revenue-pilot";
 const SATELLITE_COMPANY_KEY = "strange-company-satellite-company";
 const SALES_LEADS_KEY = "strange-company-sales-leads";
 const OPERATIONS_KEY = "strange-company-operations";
+const REVENUE_START_KEY = "strange-company-revenue-start";
 const OPERATION_INCIDENTS_KEY = "strange-company-operation-incidents";
 const DAILY_PILOT_RUN_KEY = "strange-company-daily-pilot-run";
 const EXTERNAL_SIGNALS_KEY = "strange-company-external-signals";
@@ -669,6 +684,78 @@ const SETUP_EVIDENCE_SLOTS = [
   { id: "privacy-review", label: "Privacy notice reviewed", detail: "Privacy notice reviewed before collecting any customer detail." }
 ];
 const ACQUISITION_LEAD_SOURCES = ["referral", "email", "form", "direct", "partner"];
+const REVENUE_START_LANES = [
+  {
+    id: "strange-company",
+    label: "Strange Company lane",
+    owner: "Sealed reinvestment company",
+    posture: "Operate the private control system without taking direct customer money.",
+    tasks: [
+      {
+        id: "sealed-boundary",
+        title: "Sealed boundary confirmed",
+        detail: "No private governance material, secrets, customer records, or payment data move into the public repo.",
+        required: true
+      },
+      {
+        id: "online-gate-reviewed",
+        title: "Online Gate reviewed",
+        detail: "The current launch phase is checked before making any public or commercial claim.",
+        required: true
+      },
+      {
+        id: "treasury-hold",
+        title: "Treasury hold active",
+        detail: "Strange Company does not invoice customers directly; any revenue proof comes through the second company lane.",
+        required: true
+      },
+      {
+        id: "receipt-chain-baseline",
+        title: "Receipt chain baseline ready",
+        detail: "Material revenue-start state can be sealed after the operator issues the start packet.",
+        required: true
+      }
+    ]
+  },
+  {
+    id: "second-company",
+    label: "Second company lane",
+    owner: "Strange Works Studio",
+    posture: "Run the manual paid pilot as a normal for-profit operator with separate books.",
+    tasks: [
+      {
+        id: "setup-evidence",
+        title: "External setup evidence checked",
+        detail: "LLC, EIN, bank, Stripe, support, Sheet, Form, terms, and privacy evidence are reviewed outside the repo.",
+        required: true
+      },
+      {
+        id: "qualified-lead",
+        title: "First qualified lead ready",
+        detail: "A real external buyer has a scoped request that fits the no-regulated-data v0 boundary.",
+        required: true
+      },
+      {
+        id: "manual-invoice-route",
+        title: "Manual invoice route ready",
+        detail: "Stripe Hosted Invoice and Sheet ledger paths are configured before the first invoice is sent.",
+        required: true
+      },
+      {
+        id: "daily-run",
+        title: "Daily pilot run started",
+        detail: "The workday is tracked through the Daily pilot run console with stop rules available.",
+        required: true
+      },
+      {
+        id: "delivery-closeout",
+        title: "Delivery closeout route ready",
+        detail: "Delivery artifact, acceptance note, incident route, and receipt-chain seal are part of the day-one loop.",
+        required: true
+      }
+    ]
+  }
+];
 const DAILY_RUN_CHECKS = [
   { id: "review-requests", title: "Review new requests", detail: "Sheet Requests tab, support inbox, and Order Desk submissions." },
   { id: "qualify-customer", title: "Qualify customer", detail: "Real US business, allowed service, no regulated data in the request." },
@@ -704,6 +791,7 @@ let revenuePilot = loadRevenuePilot();
 let satelliteCompany = loadSatelliteCompany();
 let salesLeads = loadSalesLeads();
 let operations = loadOperations();
+let revenueStart = loadRevenueStart();
 let operationIncidents = loadOperationIncidents();
 let dailyPilotRun = loadDailyPilotRun();
 let externalSignals = loadExternalSignals();
@@ -2583,6 +2671,119 @@ function loadOperations() {
   return defaultOperations();
 }
 
+function normalizeRevenueStartTask(storedTask, definition) {
+  const source = storedTask && typeof storedTask === "object" ? storedTask : {};
+  return {
+    id: definition.id,
+    done: Boolean(source.done),
+    completedAt: typeof source.completedAt === "string" ? source.completedAt : ""
+  };
+}
+
+function normalizeRevenueStartLane(storedLane, definition) {
+  const taskMap = new Map(
+    Array.isArray(storedLane?.tasks)
+      ? storedLane.tasks.filter((task) => task && task.id).map((task) => [task.id, task])
+      : []
+  );
+  return {
+    id: definition.id,
+    tasks: definition.tasks.map((task) => normalizeRevenueStartTask(taskMap.get(task.id), task))
+  };
+}
+
+function normalizeRevenueStartPacket(packet) {
+  if (!packet || typeof packet !== "object") {
+    return null;
+  }
+  const defaultTotalTasks = REVENUE_START_LANES.reduce((sum, lane) => sum + lane.tasks.length, 0);
+  const lanes = Array.isArray(packet.lanes)
+    ? packet.lanes.map((lane) => normalizeRevenueStartPacketLane(lane)).filter(Boolean).slice(0, 4)
+    : [];
+  const parsedCompletedTasks = Number(packet.completedTasks);
+  const parsedTotalTasks = Number(packet.totalTasks);
+  const laneCompletedTasks = lanes.reduce((sum, lane) => sum + lane.completed, 0);
+  const laneTotalTasks = lanes.reduce((sum, lane) => sum + lane.total, 0);
+  return {
+    id: typeof packet.id === "string" && packet.id ? packet.id : `revenue-start-${Date.now().toString(36)}`,
+    createdAt: typeof packet.createdAt === "string" ? packet.createdAt : new Date().toISOString(),
+    state: typeof packet.state === "string" ? packet.state : "Draft",
+    tone: typeof packet.tone === "string" ? packet.tone : "amber",
+    completedTasks: Number.isFinite(parsedCompletedTasks) && parsedCompletedTasks >= 0 ? parsedCompletedTasks : laneCompletedTasks,
+    totalTasks: Number.isFinite(parsedTotalTasks) && parsedTotalTasks > 0 ? parsedTotalTasks : (laneTotalTasks || defaultTotalTasks),
+    blockers: Array.isArray(packet.blockers) ? packet.blockers.map((item) => String(item).slice(0, 180)).slice(0, 20) : [],
+    nextAction: typeof packet.nextAction === "string" ? packet.nextAction : "",
+    readinessState: typeof packet.readinessState === "string" ? packet.readinessState : "",
+    operationsState: typeof packet.operationsState === "string" ? packet.operationsState : "",
+    launchMode: typeof packet.launchMode === "string" ? packet.launchMode : "",
+    issuedBy: typeof packet.issuedBy === "string" ? packet.issuedBy : "Operations console",
+    lanes
+  };
+}
+
+function normalizeRevenueStartPacketLane(lane) {
+  if (!lane || typeof lane !== "object") {
+    return null;
+  }
+  const definition = REVENUE_START_LANES.find((item) => item.id === lane.id) || {};
+  const definitionTasks = Array.isArray(definition.tasks) ? definition.tasks : [];
+  const tasks = Array.isArray(lane.tasks)
+    ? lane.tasks
+        .filter((task) => task && typeof task === "object")
+        .map((task) => ({
+          id: typeof task.id === "string" && task.id ? task.id : "",
+          title: typeof task.title === "string" && task.title ? task.title.slice(0, 120) : "Start task",
+          detail: typeof task.detail === "string" ? task.detail.slice(0, 240) : "",
+          done: Boolean(task.done),
+          completedAt: typeof task.completedAt === "string" ? task.completedAt : ""
+        }))
+        .slice(0, 20)
+    : [];
+  const parsedCompleted = Number(lane.completed);
+  const parsedTotal = Number(lane.total);
+  return {
+    id: typeof lane.id === "string" && lane.id ? lane.id : definition.id || "company-lane",
+    label: typeof lane.label === "string" && lane.label ? lane.label.slice(0, 80) : definition.label || "Company lane",
+    owner: typeof lane.owner === "string" && lane.owner ? lane.owner.slice(0, 120) : definition.owner || "Operator",
+    posture: typeof lane.posture === "string" && lane.posture ? lane.posture.slice(0, 240) : definition.posture || "",
+    completed: Number.isFinite(parsedCompleted) && parsedCompleted >= 0 ? parsedCompleted : tasks.filter((task) => task.done).length,
+    total: Number.isFinite(parsedTotal) && parsedTotal > 0 ? parsedTotal : (tasks.length || definitionTasks.length),
+    tasks
+  };
+}
+
+function loadRevenueStart() {
+  const base = defaultRevenueStart();
+  try {
+    const stored = JSON.parse(localStorage.getItem(REVENUE_START_KEY) || "null");
+    if (stored && typeof stored === "object") {
+      const laneMap = new Map(
+        Array.isArray(stored.lanes)
+          ? stored.lanes.filter((lane) => lane && lane.id).map((lane) => [lane.id, lane])
+          : []
+      );
+      const packets = Array.isArray(stored.packets)
+        ? stored.packets.map((packet) => normalizeRevenueStartPacket(packet)).filter(Boolean).slice(0, 12)
+        : [];
+      return {
+        lanes: REVENUE_START_LANES.map((lane) => normalizeRevenueStartLane(laneMap.get(lane.id), lane)),
+        packets
+      };
+    }
+  } catch {
+    // Fall through to the built-in start board.
+  }
+  return base;
+}
+
+function saveRevenueStart() {
+  try {
+    localStorage.setItem(REVENUE_START_KEY, JSON.stringify(revenueStart));
+  } catch {
+    // Local storage can be unavailable in hardened browser contexts.
+  }
+}
+
 function normalizeOperationOrder(order) {
   const artifactRaw = order.deliveryArtifactUrl || "";
   return {
@@ -3902,6 +4103,627 @@ function renderProfitReadiness() {
   `;
 }
 
+function revenueStartLaneState(definition, storedLane) {
+  const taskMap = new Map(
+    Array.isArray(storedLane?.tasks)
+      ? storedLane.tasks.filter((task) => task && task.id).map((task) => [task.id, task])
+      : []
+  );
+  const tasks = definition.tasks.map((task) => {
+    const storedTask = taskMap.get(task.id) || {};
+    return {
+      ...task,
+      done: Boolean(storedTask.done),
+      completedAt: typeof storedTask.completedAt === "string" ? storedTask.completedAt : ""
+    };
+  });
+  const completed = tasks.filter((task) => task.done).length;
+  const requiredOpen = tasks.filter((task) => task.required && !task.done);
+  return {
+    ...definition,
+    tasks,
+    completed,
+    total: tasks.length,
+    requiredOpen
+  };
+}
+
+function snapshotRevenueStartLanes(lanes) {
+  return lanes.map((lane) => ({
+    id: lane.id,
+    label: lane.label,
+    owner: lane.owner,
+    posture: lane.posture,
+    completed: lane.completed,
+    total: lane.total,
+    tasks: lane.tasks.map((task) => ({
+      id: task.id,
+      title: task.title,
+      detail: task.detail,
+      done: Boolean(task.done),
+      completedAt: task.completedAt || ""
+    }))
+  }));
+}
+
+function buildRevenueStartModel() {
+  const laneMap = new Map(
+    Array.isArray(revenueStart.lanes)
+      ? revenueStart.lanes.filter((lane) => lane && lane.id).map((lane) => [lane.id, lane])
+      : []
+  );
+  const lanes = REVENUE_START_LANES.map((lane) => revenueStartLaneState(lane, laneMap.get(lane.id)));
+  const totalTasks = lanes.reduce((sum, lane) => sum + lane.total, 0);
+  const completedTasks = lanes.reduce((sum, lane) => sum + lane.completed, 0);
+  const openRequired = lanes.reduce((items, lane) => items.concat(lane.requiredOpen.map((task) => `${lane.label}: ${task.title}`)), []);
+  const readiness = buildProfitReadiness();
+  const operationsModel = buildOperationsModel();
+  const launchDecision = buildLaunchDecision();
+  const latestPacket = (revenueStart.packets || [])[0] || null;
+  const timestamps = [];
+  lanes.forEach((lane) => {
+    lane.tasks.forEach((task) => {
+      if (task.completedAt) timestamps.push(task.completedAt);
+    });
+  });
+  (revenueStart.packets || []).forEach((packet) => {
+    if (packet.createdAt) timestamps.push(packet.createdAt);
+  });
+  const blockers = openRequired.slice();
+  if (operationsModel.pausedReason) blockers.push(operationsModel.pausedReason);
+  readiness.blockers.slice(0, 8).forEach((blocker) => blockers.push(`profit readiness: ${blocker}`));
+
+  let state = "Start checklist open";
+  let tone = "red";
+  let nextAction = "Complete both company-lane start tasks before treating the pilot as revenue-ready.";
+  if (!openRequired.length && operationsModel.pausedReason) {
+    state = "Paused";
+    tone = "red";
+    nextAction = operationsModel.pausedReason;
+  } else if (!openRequired.length && !readiness.blockers.length && readiness.paidOrderCount > 0) {
+    state = "Revenue operating";
+    tone = "green";
+    nextAction = "Reconcile paid orders, finish delivery closeout, and seal the receipt chain.";
+  } else if (!openRequired.length && !readiness.blockers.length && readiness.invoiceReadyLeadCount > 0) {
+    state = "Invoice ready";
+    tone = "green";
+    nextAction = "Create the manual Stripe Hosted Invoice and move the order through the Sheet ledger.";
+  } else if (!openRequired.length && !readiness.blockers.length) {
+    state = "Sell today";
+    tone = "green";
+    nextAction = "Move the qualified lead to invoice-ready, issue the manual invoice, and close the daily run.";
+  } else if (!openRequired.length && readiness.qualifiedLeadCount > 0) {
+    state = "Revenue warmup";
+    tone = "amber";
+    nextAction = "Keep outreach active while setup evidence, intake, and invoice blockers close.";
+  } else if (!openRequired.length) {
+    state = "Start packet staged";
+    tone = "amber";
+    nextAction = "Issue the start packet as a blocker record, then qualify the first external buyer.";
+  }
+
+  return {
+    lanes,
+    totalTasks,
+    completedTasks,
+    openRequired,
+    blockers,
+    readiness,
+    operationsModel,
+    launchDecision,
+    latestPacket,
+    latestAt: timestamps.sort().pop() || "baseline",
+    state,
+    tone,
+    nextAction
+  };
+}
+
+function renderRevenueStart() {
+  const panel = document.querySelector("#revenueStartPanel");
+  if (!panel) {
+    return;
+  }
+  const model = buildRevenueStartModel();
+  const blockerMarkup = model.blockers.length
+    ? model.blockers.slice(0, 10).map((blocker) => `<span class="state red">${escapeHtml(blocker)}</span>`).join("")
+    : `<span class="state green">clear</span>`;
+  const laneMarkup = model.lanes
+    .map((lane) => {
+      const laneTone = lane.requiredOpen.length ? "red" : "green";
+      const taskMarkup = lane.tasks
+        .map((task) => {
+          const stamp = task.completedAt ? `<small>${escapeHtml(formatReceiptDate(task.completedAt))}</small>` : "<small>Not checked</small>";
+          return `
+            <label class="revenue-start-task ${task.done ? "done" : ""}">
+              <input type="checkbox" data-revenue-start-task="${escapeHtml(`${lane.id}:${task.id}`)}" ${task.done ? "checked" : ""} />
+              <span>
+                <strong>${escapeHtml(task.title)}</strong>
+                <small>${escapeHtml(task.detail)}</small>
+                ${stamp}
+              </span>
+            </label>
+          `;
+        })
+        .join("");
+      return `
+        <article class="revenue-start-lane ${laneTone}">
+          <div class="revenue-start-lane-head">
+            <div>
+              <span class="metric-label">${escapeHtml(lane.owner)}</span>
+              <h4>${escapeHtml(lane.label)}</h4>
+              <p>${escapeHtml(lane.posture)}</p>
+            </div>
+            <span class="state ${laneTone}">${lane.completed}/${lane.total}</span>
+          </div>
+          <div class="revenue-start-task-list">${taskMarkup}</div>
+        </article>
+      `;
+    })
+    .join("");
+  const packetMarkup = (revenueStart.packets || []).length
+    ? revenueStart.packets
+        .slice(0, 4)
+        .map((packet) => `
+          <article class="revenue-start-packet">
+            <div>
+              <span class="metric-label">${escapeHtml(formatReceiptDate(packet.createdAt))}</span>
+              <h4>${escapeHtml(packet.id)}</h4>
+              <p>${escapeHtml(packet.state)} / ${packet.completedTasks}/${packet.totalTasks} tasks / ${packet.blockers.length} blocker${packet.blockers.length === 1 ? "" : "s"}</p>
+            </div>
+            <button type="button" data-copy-revenue-start-packet="${escapeHtml(packet.id)}">Copy packet</button>
+          </article>
+        `)
+        .join("")
+    : `<article class="revenue-start-packet empty"><span class="metric-label">No start packet issued yet</span><p>Issue one when the operator is ready to record day-one revenue posture.</p></article>`;
+
+  panel.innerHTML = `
+    <article class="revenue-start-card ${escapeHtml(model.tone)}">
+      <div>
+        <span class="metric-label">Revenue start</span>
+        <h3>${escapeHtml(model.state)}</h3>
+        <p>${escapeHtml(model.nextAction)}</p>
+      </div>
+      <div class="revenue-start-metrics">
+        <span><strong>${model.completedTasks}/${model.totalTasks}</strong><small>Start tasks</small></span>
+        <span><strong>${escapeHtml(model.launchDecision.mode)}</strong><small>Strange Company gate</small></span>
+        <span><strong>${escapeHtml(model.operationsModel.state)}</strong><small>Second company ops</small></span>
+        <span><strong>${escapeHtml(model.readiness.state)}</strong><small>Profit readiness</small></span>
+      </div>
+      <div class="revenue-start-blockers">${blockerMarkup}</div>
+    </article>
+    <div class="revenue-start-lanes">${laneMarkup}</div>
+    <div class="revenue-start-output" id="revenueStartOutput" aria-live="polite"></div>
+    <div class="revenue-start-packets">${packetMarkup}</div>
+  `;
+
+  document.querySelectorAll("[data-revenue-start-task]").forEach((input) => {
+    input.addEventListener("change", () => toggleRevenueStartTask(input.dataset.revenueStartTask, input.checked));
+  });
+  document.querySelectorAll("[data-copy-revenue-start-packet]").forEach((button) => {
+    button.addEventListener("click", () => copyRevenueStartPacket(button.dataset.copyRevenueStartPacket, button));
+  });
+}
+
+function toggleRevenueStartTask(key, done) {
+  const [laneId, taskId] = String(key || "").split(":");
+  if (!laneId || !taskId) {
+    return;
+  }
+  const now = new Date().toISOString();
+  revenueStart.lanes = REVENUE_START_LANES.map((definition) => {
+    const current = revenueStart.lanes.find((lane) => lane.id === definition.id) || { id: definition.id, tasks: [] };
+    const taskMap = new Map((current.tasks || []).map((task) => [task.id, task]));
+    return {
+      id: definition.id,
+      tasks: definition.tasks.map((task) => {
+        const currentTask = taskMap.get(task.id) || { id: task.id, done: false, completedAt: "" };
+        if (definition.id !== laneId || task.id !== taskId) {
+          return currentTask;
+        }
+        return {
+          id: task.id,
+          done: Boolean(done),
+          completedAt: done ? (currentTask.completedAt || now) : ""
+        };
+      })
+    };
+  });
+  saveRevenueStart();
+  renderRevenueStart();
+  renderGrowthReview();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function resetRevenueStart() {
+  revenueStart = defaultRevenueStart();
+  saveRevenueStart();
+  renderRevenueStart();
+  renderGrowthReview();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function revenueStartPacket(packet) {
+  const model = buildRevenueStartModel();
+  const issued = packet || model.latestPacket || {};
+  const packetLanes = Array.isArray(issued.lanes) && issued.lanes.length
+    ? issued.lanes
+    : snapshotRevenueStartLanes(model.lanes);
+  const completedTasks = Number.isFinite(Number(issued.completedTasks)) ? Number(issued.completedTasks) : model.completedTasks;
+  const totalTasks = Number.isFinite(Number(issued.totalTasks)) && Number(issued.totalTasks) > 0 ? Number(issued.totalTasks) : model.totalTasks;
+  const blockersSource = Array.isArray(issued.blockers) ? issued.blockers : model.blockers;
+  const lanes = packetLanes.map((lane) => {
+    const taskLines = lane.tasks.map((task) => `- [${task.done ? "x" : " "}] ${task.title}: ${task.detail}`);
+    return [`${lane.label} (${lane.owner})`, lane.posture, ...taskLines].join("\n");
+  });
+  const blockers = blockersSource.length
+    ? blockersSource.map((blocker) => `- ${blocker}`)
+    : ["- none recorded"];
+  return [
+    "Revenue start packet",
+    `Packet id: ${issued.id || "draft"}`,
+    `Issued: ${issued.createdAt || new Date().toISOString()}`,
+    `State: ${issued.state || model.state}`,
+    `Strange Company launch mode: ${issued.launchMode || model.launchDecision.mode}`,
+    `Second company operations mode: ${issued.operationsState || model.operationsModel.state}`,
+    `Profit readiness: ${issued.readinessState || model.readiness.state}`,
+    `Tasks: ${completedTasks}/${totalTasks}`,
+    `Next action: ${issued.nextAction || model.nextAction}`,
+    "",
+    "Company lanes:",
+    lanes.join("\n\n"),
+    "",
+    "Current blockers:",
+    blockers.join("\n"),
+    "",
+    "Day-one sequence:",
+    "1. Keep Strange Company sealed; do not invoice customers directly from the sealed lane.",
+    "2. Run revenue through Strange Works Studio only after external setup evidence and commercial controls are real.",
+    "3. Use a manually created Stripe Hosted Invoice and mirror the row into the Sheet ledger.",
+    "4. Start and close the Daily pilot run, attach incidents if any, and seal the receipt chain after material changes.",
+    "",
+    "Boundary: this packet is an operator receipt. It is not legal formation, tax advice, accounting software, payment automation, or customer-data storage."
+  ].join("\n");
+}
+
+function renderRevenueStartOutput(packet, copied) {
+  const output = document.querySelector("#revenueStartOutput");
+  if (!output || !packet) {
+    return;
+  }
+  output.innerHTML = `
+    <article>
+      <span class="metric-label">${copied ? "Revenue start packet copied" : "Revenue start packet issued"}</span>
+      <strong>${escapeHtml(packet.id)}</strong>
+      <p>${escapeHtml(packet.state)} / ${packet.completedTasks}/${packet.totalTasks} tasks / ${packet.blockers.length} blocker${packet.blockers.length === 1 ? "" : "s"}</p>
+      <pre>${escapeHtml(revenueStartPacket(packet))}</pre>
+    </article>
+  `;
+}
+
+async function issueRevenueStartPacket(button) {
+  const model = buildRevenueStartModel();
+  const packet = normalizeRevenueStartPacket({
+    id: `revenue-start-${Date.now().toString(36)}`,
+    createdAt: new Date().toISOString(),
+    state: model.state,
+    tone: model.tone,
+    completedTasks: model.completedTasks,
+    totalTasks: model.totalTasks,
+    blockers: model.blockers,
+    nextAction: model.nextAction,
+    readinessState: model.readiness.state,
+    operationsState: model.operationsModel.state,
+    launchMode: model.launchDecision.mode,
+    issuedBy: "Operations console",
+    lanes: snapshotRevenueStartLanes(model.lanes)
+  });
+  revenueStart.packets = [packet, ...(revenueStart.packets || [])].slice(0, 12);
+  saveRevenueStart();
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(revenueStartPacket(packet));
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  renderRevenueStart();
+  renderRevenueStartOutput(packet, copied);
+  renderGrowthReview();
+  renderReceiptChain();
+  renderLogs();
+  if (button) {
+    const label = button.querySelector("span") || button;
+    const previous = label.textContent;
+    label.textContent = copied ? "Packet copied" : "Packet issued";
+    setTimeout(() => {
+      label.textContent = previous;
+    }, 1500);
+  }
+}
+
+async function copyRevenueStartPacket(packetId, button) {
+  const packet = (revenueStart.packets || []).find((entry) => entry.id === packetId);
+  if (!packet || !button) {
+    return;
+  }
+  const previous = button.textContent;
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(revenueStartPacket(packet));
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  button.textContent = copied ? "Copied" : "Copy failed";
+  renderRevenueStartOutput(packet, copied);
+  setTimeout(() => {
+    button.textContent = previous;
+  }, 1500);
+}
+
+function buildGrowthReviewModel() {
+  const acquisition = buildCustomerAcquisitionModel();
+  const readiness = buildProfitReadiness();
+  const operationsModel = buildOperationsModel();
+  const revenueStartModel = buildRevenueStartModel();
+  const attemptsBySource = {};
+  ACQUISITION_LEAD_SOURCES.forEach((source) => {
+    attemptsBySource[source] = 0;
+  });
+  (customerAcquisition.log || []).forEach((entry) => {
+    if (Object.prototype.hasOwnProperty.call(attemptsBySource, entry.source)) {
+      attemptsBySource[entry.source] += Number(entry.attempts || 0);
+    }
+  });
+  const channels = ACQUISITION_LEAD_SOURCES.map((source) => ({
+    source,
+    attempts: attemptsBySource[source] || 0,
+    leads: acquisition.leadsBySource[source] || 0
+  }));
+  channels.push({
+    source: "unspecified",
+    attempts: 0,
+    leads: acquisition.leadsBySource.unspecified || 0
+  });
+  const bestChannel = channels
+    .slice()
+    .sort((a, b) => (b.leads - a.leads) || (b.attempts - a.attempts))[0] || { source: "referral", attempts: 0, leads: 0 };
+  const blockers = [];
+  if (revenueStartModel.openRequired.length) {
+    blockers.push(...revenueStartModel.openRequired.slice(0, 6));
+  }
+  if (operationsModel.pausedReason) {
+    blockers.push(operationsModel.pausedReason);
+  }
+  readiness.blockers.slice(0, 8).forEach((blocker) => blockers.push(`profit readiness: ${blocker}`));
+
+  let state = "Growth blocked";
+  let tone = "red";
+  let nextAction = "Close the company-lane and commercial readiness blockers before scaling outreach.";
+  if (!revenueStartModel.openRequired.length && operationsModel.pausedReason) {
+    state = "Growth paused";
+    tone = "red";
+    nextAction = operationsModel.pausedReason;
+  } else if (!revenueStartModel.openRequired.length && acquisition.target > 0 && !acquisition.todayMet) {
+    state = "Outreach open";
+    tone = "amber";
+    nextAction = `Log ${Math.max(acquisition.target - acquisition.todayAttempts, 0)} more outreach attempt${acquisition.target - acquisition.todayAttempts === 1 ? "" : "s"} today before adding new spend.`;
+  } else if (!revenueStartModel.openRequired.length && !acquisition.totalLeads) {
+    state = "Need prospects";
+    tone = "amber";
+    nextAction = "Use the safest channel with a clear buyer list, then log the outreach receipt.";
+  } else if (!revenueStartModel.openRequired.length && !readiness.qualifiedLeadCount) {
+    state = "Qualify pipeline";
+    tone = "amber";
+    nextAction = "Convert a real external buyer into a qualified lead before spending on broader growth.";
+  } else if (!revenueStartModel.openRequired.length && !readiness.invoiceReadyLeadCount) {
+    state = "Prepare invoice";
+    tone = "amber";
+    nextAction = "Move a qualified lead to invoice-ready only after setup, terms, privacy, Stripe, and Sheet routes are real.";
+  } else if (!revenueStartModel.openRequired.length && readiness.invoiceReadyLeadCount && !readiness.paidOrderCount) {
+    state = "Close first payment";
+    tone = "amber";
+    nextAction = "Send one manual hosted invoice and reconcile settlement before scaling acquisition.";
+  } else if (!blockers.length && readiness.paidOrderCount > 0) {
+    state = "Scale measured source";
+    tone = "green";
+    nextAction = `Increase the ${bestChannel.source} channel only while delivery closeout and receipt sealing stay current.`;
+  }
+
+  const latestTimes = [
+    ...(customerAcquisition.log || []).map((entry) => entry.at),
+    ...(salesLeads || []).map((lead) => lead.updatedAt || lead.createdAt),
+    ...(operations.orders || []).map((order) => order.updatedAt || order.createdAt),
+    revenueStartModel.latestAt
+  ].filter((value) => value && value !== "baseline");
+
+  return {
+    acquisition,
+    readiness,
+    operationsModel,
+    revenueStartModel,
+    channels,
+    bestChannel,
+    blockers: [...new Set(blockers)].slice(0, 12),
+    state,
+    tone,
+    nextAction,
+    latestAt: latestTimes.sort().pop() || "baseline"
+  };
+}
+
+function growthReviewPacket() {
+  const model = buildGrowthReviewModel();
+  const channelLines = model.channels.map((channel) => `- ${channel.source}: ${channel.attempts} attempts / ${channel.leads} leads`);
+  const blockerLines = model.blockers.length
+    ? model.blockers.map((blocker) => `- ${blocker}`)
+    : ["- none recorded"];
+  return [
+    "Strange Company growth review",
+    `State: ${model.state}`,
+    `Next action: ${model.nextAction}`,
+    `Daily outreach: ${model.acquisition.todayAttempts}/${model.acquisition.target}`,
+    `Last 7 days: ${model.acquisition.last7Attempts} attempts`,
+    `Pipeline: ${model.acquisition.totalLeads} leads / ${model.readiness.qualifiedLeadCount} qualified / ${model.readiness.invoiceReadyLeadCount} invoice-ready / ${model.readiness.paidOrderCount} paid`,
+    `Best current source: ${model.bestChannel.source}`,
+    `Revenue start: ${model.revenueStartModel.completedTasks}/${model.revenueStartModel.totalTasks} tasks`,
+    `Profit readiness: ${model.readiness.state}`,
+    "",
+    "Channels:",
+    channelLines.join("\n"),
+    "",
+    "Blockers:",
+    blockerLines.join("\n"),
+    "",
+    "Boundary: this is a management receipt. It does not automate outreach, spend, legal setup, payment collection, or customer delivery."
+  ].join("\n");
+}
+
+function renderGrowthReviewOutput(text, copied) {
+  const output = document.querySelector("#growthReviewOutput");
+  if (!output) {
+    return;
+  }
+  output.innerHTML = `
+    <article>
+      <span class="metric-label">${copied ? "Growth review copied" : "Growth review generated"}</span>
+      <pre>${escapeHtml(text)}</pre>
+    </article>
+  `;
+}
+
+function renderGrowthReview() {
+  const panel = document.querySelector("#growthReviewPanel");
+  if (!panel) {
+    return;
+  }
+  const model = buildGrowthReviewModel();
+  const blockers = model.blockers.length
+    ? model.blockers.slice(0, 8).map((blocker) => `<span class="state red">${escapeHtml(blocker)}</span>`).join("")
+    : `<span class="state green">clear</span>`;
+  const channelMarkup = model.channels
+    .map((channel) => `
+      <article class="growth-channel ${channel.source === model.bestChannel.source ? "active" : ""}">
+        <span class="metric-label">${escapeHtml(channel.source)}</span>
+        <strong>${channel.leads}</strong>
+        <p>${channel.attempts} logged attempts</p>
+      </article>
+    `)
+    .join("");
+  panel.innerHTML = `
+    <article class="growth-review-card ${escapeHtml(model.tone)}">
+      <div>
+        <span class="metric-label">Growth review</span>
+        <h3>${escapeHtml(model.state)}</h3>
+        <p>${escapeHtml(model.nextAction)}</p>
+      </div>
+      <div class="growth-review-metrics">
+        <span><strong>${model.acquisition.todayAttempts}/${model.acquisition.target}</strong><small>Today outreach</small></span>
+        <span><strong>${model.acquisition.last7Attempts}</strong><small>7-day attempts</small></span>
+        <span><strong>${model.readiness.qualifiedLeadCount}</strong><small>Qualified</small></span>
+        <span><strong>${model.readiness.invoiceReadyLeadCount}</strong><small>Invoice-ready</small></span>
+        <span><strong>${model.readiness.paidOrderCount}</strong><small>Paid</small></span>
+        <span><strong>${escapeHtml(model.bestChannel.source)}</strong><small>Best source</small></span>
+      </div>
+      <div class="growth-review-blockers">${blockers}</div>
+    </article>
+    <div class="growth-channels">${channelMarkup}</div>
+    <div class="growth-review-output" id="growthReviewOutput" aria-live="polite"></div>
+  `;
+}
+
+async function copyGrowthReviewPacket(button) {
+  const packet = growthReviewPacket();
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(packet);
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  renderGrowthReviewOutput(packet, copied);
+  if (button) {
+    const previous = button.getAttribute("aria-label") || "Copy growth review";
+    button.setAttribute("aria-label", copied ? "Growth review copied" : "Copy failed");
+    setTimeout(() => {
+      button.setAttribute("aria-label", previous);
+    }, 1500);
+  }
+}
+
+function buildGrowthTreasuryProposal(model) {
+  const now = new Date().toISOString();
+  const dateKey = now.slice(0, 10);
+  const channel = model.bestChannel.source || "referral";
+  const target = model.readiness.paidOrderCount > 0 ? "one additional paid external order" : "one qualified external lead";
+  const amount = model.readiness.paidOrderCount > 0 ? 750 : 250;
+  return {
+    id: `growth-review-${dateKey}`,
+    title: `Run capped ${channel} growth test`,
+    bucket: "Growth experiments",
+    amount,
+    className: "A",
+    note: `Drafted from Growth Review. State: ${model.state}. Next action: ${model.nextAction}`,
+    claim: `The ${channel} channel can produce ${target} within one week without violating the v0 data boundary`,
+    argument: [
+      `The current growth review has ${model.acquisition.todayAttempts}/${model.acquisition.target} outreach attempts today.`,
+      `The pipeline has ${model.readiness.qualifiedLeadCount} qualified, ${model.readiness.invoiceReadyLeadCount} invoice-ready, and ${model.readiness.paidOrderCount} paid records.`,
+      "The test is capped, manually operated, and blocked from spend until the Research Gate and Treasury approval both pass.",
+      `Therefore the ${channel} channel should receive a capped one-week growth test.`
+    ].join(" "),
+    context: "Strange Company growth review",
+    status: "needs_gate",
+    recommendation: "ungated",
+    polarity: "pending",
+    effectiveness: 0,
+    confidence: 0,
+    issueCount: 0,
+    reportId: "",
+    approved: false,
+    generatedFromGrowthReview: true,
+    growthReviewAt: now
+  };
+}
+
+function draftGrowthTreasuryProposal(button) {
+  const model = buildGrowthReviewModel();
+  if (model.blockers.length) {
+    renderGrowthReviewOutput([
+      "Growth proposal blocked",
+      "Resolve these blockers before drafting spend:",
+      ...model.blockers.map((blocker) => `- ${blocker}`),
+      "",
+      "Boundary: the growth review may suggest action, but it cannot bypass setup, payment, support, privacy, or treasury gates."
+    ].join("\n"), false);
+    return;
+  }
+  const proposal = buildGrowthTreasuryProposal(model);
+  treasuryProposals = [proposal, ...treasuryProposals.filter((item) => item.id !== proposal.id)];
+  saveTreasuryProposals();
+  renderTreasuryProposals();
+  renderGrowthReviewOutput([
+    "Growth treasury proposal drafted",
+    `Proposal id: ${proposal.id}`,
+    `Title: ${proposal.title}`,
+    `Bucket: ${proposal.bucket}`,
+    `Amount: ${money.format(proposal.amount)}`,
+    "Next gate: run the Research Gate from Treasury before any approval."
+  ].join("\n"), false);
+  renderReceiptChain();
+  renderLogs();
+  if (button) {
+    const label = button.querySelector("span") || button;
+    const previous = label.textContent;
+    label.textContent = "Proposal drafted";
+    setTimeout(() => {
+      label.textContent = previous;
+    }, 1500);
+  }
+}
+
 function renderSetupEvidence() {
   const panel = document.querySelector("#setupEvidencePanel");
   if (!panel) return;
@@ -4291,6 +5113,7 @@ function updateOutreachTarget(value) {
   customerAcquisition.dailyOutreachTarget = Math.min(Math.floor(raw), 999);
   saveCustomerAcquisition();
   renderCustomerAcquisition();
+  renderGrowthReview();
   renderReceiptChain();
   renderLogs();
 }
@@ -4327,6 +5150,7 @@ function submitOutreachLog(form) {
   saveCustomerAcquisition();
   form.reset();
   renderCustomerAcquisition();
+  renderGrowthReview();
   renderReceiptChain();
   renderLogs();
 }
@@ -4335,6 +5159,7 @@ function removeOutreachEntry(entryId) {
   customerAcquisition.log = (customerAcquisition.log || []).filter((entry) => entry.id !== entryId);
   saveCustomerAcquisition();
   renderCustomerAcquisition();
+  renderGrowthReview();
   renderReceiptChain();
   renderLogs();
 }
@@ -4343,6 +5168,7 @@ function resetCustomerAcquisition() {
   customerAcquisition = defaultCustomerAcquisition();
   saveCustomerAcquisition();
   renderCustomerAcquisition();
+  renderGrowthReview();
   renderReceiptChain();
   renderLogs();
 }
@@ -4463,7 +5289,9 @@ function renderOperations() {
 
   const model = buildOperationsModel();
   renderProfitReadiness();
+  renderRevenueStart();
   renderSalesPipeline();
+  renderGrowthReview();
   const services = operationServices();
   const selectedService = serviceSelect.value || services[0]?.id || "";
   serviceSelect.innerHTML = services
@@ -5492,6 +6320,7 @@ function addSalesLead(form) {
   renderSalesPipeline();
   renderProfitReadiness();
   renderCustomerAcquisition();
+  renderGrowthReview();
   renderReceiptChain();
   renderLogs();
 }
@@ -5512,6 +6341,7 @@ function advanceSalesLead(leadId) {
   renderSalesPipeline();
   renderProfitReadiness();
   renderCustomerAcquisition();
+  renderGrowthReview();
   renderReceiptChain();
   renderLogs();
 }
@@ -5532,6 +6362,7 @@ function rejectSalesLead(leadId) {
   renderSalesPipeline();
   renderProfitReadiness();
   renderCustomerAcquisition();
+  renderGrowthReview();
   renderReceiptChain();
   renderLogs();
 }
@@ -5542,6 +6373,7 @@ function removeSalesLead(leadId) {
   renderSalesPipeline();
   renderProfitReadiness();
   renderCustomerAcquisition();
+  renderGrowthReview();
   renderReceiptChain();
   renderLogs();
 }
@@ -5585,6 +6417,7 @@ function convertSalesLeadToOrder(leadId) {
   renderOperations();
   renderOrderDesk();
   renderCustomerAcquisition();
+  renderGrowthReview();
   renderReceiptChain();
   renderLogs();
 }
@@ -6383,6 +7216,38 @@ function collectReceiptEvents() {
     setupEvidenceTotal: profitReadiness.setupEvidenceTotal
   });
 
+  const revenueStartModel = buildRevenueStartModel();
+  push(
+    "Revenue Start",
+    "two-company-revenue-start",
+    "Two-company revenue start",
+    "Operations console",
+    revenueStartModel.state,
+    revenueStartModel.latestAt,
+    {
+      blockers: revenueStartModel.blockers.slice(0, 20),
+      completedTasks: revenueStartModel.completedTasks,
+      launchMode: revenueStartModel.launchDecision.mode,
+      latestPacketId: revenueStartModel.latestPacket ? revenueStartModel.latestPacket.id : "",
+      operationsState: revenueStartModel.operationsModel.state,
+      profitReadinessState: revenueStartModel.readiness.state,
+      totalTasks: revenueStartModel.totalTasks
+    }
+  );
+
+  (revenueStart.packets || []).forEach((packet) => {
+    push("Revenue Packet", packet.id, "Revenue start packet", packet.issuedBy || "Operations console", packet.state, packet.createdAt, {
+      blockers: packet.blockers || [],
+      completedTasks: packet.completedTasks,
+      laneSnapshots: (packet.lanes || []).map((lane) => `${lane.label}: ${lane.completed}/${lane.total}`),
+      launchMode: packet.launchMode || "",
+      nextAction: packet.nextAction || "",
+      operationsState: packet.operationsState || "",
+      readinessState: packet.readinessState || "",
+      totalTasks: packet.totalTasks
+    });
+  });
+
   const setupModel = buildSetupEvidenceModel();
   setupModel.records.forEach((record) => {
     push("Setup Evidence", record.id, record.label, "Operations console", record.status, record.updatedAt || record.verifiedAt || "baseline", {
@@ -6401,6 +7266,18 @@ function collectReceiptEvents() {
     totalLeads: acquisition.totalLeads,
     conversions: acquisition.conversions,
     leadsBySource: acquisition.leadsBySource
+  });
+
+  const growthReview = buildGrowthReviewModel();
+  push("Growth Review", "growth-management", "Operator growth review", "Operations console", growthReview.state, growthReview.latestAt, {
+    bestChannel: growthReview.bestChannel.source,
+    blockers: growthReview.blockers.slice(0, 12),
+    invoiceReadyLeadCount: growthReview.readiness.invoiceReadyLeadCount,
+    nextAction: growthReview.nextAction,
+    paidOrderCount: growthReview.readiness.paidOrderCount,
+    qualifiedLeadCount: growthReview.readiness.qualifiedLeadCount,
+    todayAttempts: growthReview.acquisition.todayAttempts,
+    outreachTarget: growthReview.acquisition.target
   });
 
   operations.orders.forEach((order) => {
@@ -6533,6 +7410,8 @@ function collectReceiptEvents() {
         evidenceMeasuredBefore: proposal.evidenceMeasuredBefore || "",
         evidenceReviewId: proposal.evidenceReviewId || "",
         evidenceReviewNote: proposal.evidenceReviewNote || "",
+        generatedFromGrowthReview: Boolean(proposal.generatedFromGrowthReview),
+        growthReviewAt: proposal.growthReviewAt || "",
         outcomeId: proposal.outcomeId || "",
         packetId: proposal.packetId || "",
         recommendation: proposal.recommendation || "ungated",
@@ -6666,6 +7545,8 @@ function toneForReceiptEvent(receipt) {
     state.includes("online") ||
     state.includes("paid sandbox") ||
     state.includes("passed") ||
+    state.includes("operating") ||
+    state.includes("sell today") ||
     state.includes("scale") ||
     state.includes("resolved") ||
     state.includes("closed")
@@ -6678,6 +7559,7 @@ function toneForReceiptEvent(receipt) {
     state.includes("do not") ||
     state.includes("kill") ||
     state.includes("offline") ||
+    state.includes("checklist open") ||
     state.includes("reject") ||
     state.includes("weak") ||
     state.includes("high open") ||
@@ -7185,6 +8067,31 @@ function renderLogs() {
     readiness.blockers.length ? readiness.blockers.join(", ") : readiness.nextAction,
     readiness.tone
   ]];
+  const revenueStartModel = buildRevenueStartModel();
+  const revenueStartRows = [[
+    "Start",
+    `Revenue start: ${revenueStartModel.completedTasks}/${revenueStartModel.totalTasks} tasks`,
+    "Two-company operations",
+    revenueStartModel.state,
+    revenueStartModel.tone
+  ]];
+  if (revenueStartModel.latestPacket) {
+    revenueStartRows.push([
+      "Packet",
+      `Issued: ${revenueStartModel.latestPacket.id}`,
+      "Revenue start",
+      revenueStartModel.latestPacket.state,
+      revenueStartModel.latestPacket.tone || revenueStartModel.tone
+    ]);
+  }
+  const growthReview = buildGrowthReviewModel();
+  const growthRows = [[
+    "Growth",
+    `Growth review: ${growthReview.acquisition.todayAttempts}/${growthReview.acquisition.target} outreach today`,
+    "Operations console",
+    growthReview.state,
+    growthReview.tone
+  ]];
   const signalRows = externalSignals.slice(0, 4).map((signal) => [
     "Signal",
     `${signal.source}: ${signal.subject}`,
@@ -7261,7 +8168,7 @@ function renderLogs() {
     run.recommendation,
     toneForRecommendation(run.recommendation)
   ]);
-  log.innerHTML = [...receiptRows, ...launchRows, ...pilotRows, ...satelliteRows, ...operationsRows, ...profitRows, ...signalRows, ...drillRows, ...routeRows, ...outcomeRows, ...executionRows, ...treasuryRows, ...gateLogRows, ...logs]
+  log.innerHTML = [...receiptRows, ...launchRows, ...pilotRows, ...satelliteRows, ...operationsRows, ...profitRows, ...revenueStartRows, ...growthRows, ...signalRows, ...drillRows, ...routeRows, ...outcomeRows, ...executionRows, ...treasuryRows, ...gateLogRows, ...logs]
     .map(
       ([className, entry, owner, state, tone]) => `
         <div class="log-row" role="row">
@@ -7593,6 +8500,22 @@ function setupOperations() {
   const resetAcquisitionButton = document.querySelector("#resetCustomerAcquisition");
   if (resetAcquisitionButton) {
     resetAcquisitionButton.addEventListener("click", () => resetCustomerAcquisition());
+  }
+  const copyGrowthReviewButton = document.querySelector("#copyGrowthReview");
+  if (copyGrowthReviewButton) {
+    copyGrowthReviewButton.addEventListener("click", () => copyGrowthReviewPacket(copyGrowthReviewButton));
+  }
+  const draftGrowthProposalButton = document.querySelector("#draftGrowthProposal");
+  if (draftGrowthProposalButton) {
+    draftGrowthProposalButton.addEventListener("click", () => draftGrowthTreasuryProposal(draftGrowthProposalButton));
+  }
+  const issueRevenueStartButton = document.querySelector("#issueRevenueStartPacket");
+  if (issueRevenueStartButton) {
+    issueRevenueStartButton.addEventListener("click", () => issueRevenueStartPacket(issueRevenueStartButton));
+  }
+  const resetRevenueStartButton = document.querySelector("#resetRevenueStart");
+  if (resetRevenueStartButton) {
+    resetRevenueStartButton.addEventListener("click", resetRevenueStart);
   }
 
   const bridgeForm = document.querySelector("#operationsLedgerBridgeForm");

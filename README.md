@@ -65,9 +65,11 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [ONLINE_GATE.md](ONLINE_GATE.md): when the company may move from local prototype to private sandbox, public beta, or live operation.
 - [REVENUE_PILOT.md](REVENUE_PILOT.md): how the prototype moves toward the first controlled paid offer.
 - [SATELLITE_COMPANY.md](SATELLITE_COMPANY.md): how a separate for-profit company can net profit without breaking the sealed Strange Company charter.
+- [REVENUE_START.md](REVENUE_START.md): day-one two-company revenue posture and start packet sequence.
 - [ORDER_DESK.md](ORDER_DESK.md): how public invoice requests become manual order packets.
 - [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md): the manual order, invoice, payment, delivery, and receipt loop for the first functional operator.
 - [RUN_LIVE_PILOT.md](RUN_LIVE_PILOT.md): operational v1 daily loop for the real US manual paid pilot (LLC, EIN, bank, Stripe, Sheet ledger).
+- [GROWTH_MANAGEMENT.md](GROWTH_MANAGEMENT.md): private growth review that turns acquisition and pipeline receipts into the next operator action.
 - [OPERATOR_FAST_START.md](OPERATOR_FAST_START.md): the quick config and smoke-test path for turning the public desk toward real routes.
 - [GOOGLE_SHEET_LEDGER.md](GOOGLE_SHEET_LEDGER.md): Google Sheet tabs, columns, and first public intake route.
 - [TOOLING_POLICY.md](TOOLING_POLICY.md): how market data, research, Zotero, and GitHub tools are allowed in v1.
@@ -89,9 +91,10 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [public-config.js](public-config.js): public support inbox, Google Form URL, service names, and prices.
 - [public.js](public.js): payment-safe public request packet builder.
 - [tools/preflight_public_launch.js](tools/preflight_public_launch.js): launch preflight for public/private separation, URL allowlists, live-mode config, and sensitive-data guard coverage.
+- [tools/audit_company_functionality.js](tools/audit_company_functionality.js): repo-level audit for Strange Company, the satellite operator, and the external live-operation gate.
 - [index.html](index.html): private/local command center for Operations, Treasury, Decisions, and Research Gate.
 - [styles.css](styles.css): interface design for the prototype.
-- [script.js](script.js): treasury allocation, launch readiness, private order requests, revenue pilot, satellite profit model, operations console, external signals, execution packets, outcome receipts, outcome evidence reviews, capital routing, resilience drills, cooldown lanes, local receipt chain, logs, and operating loop animation.
+- [script.js](script.js): treasury allocation, launch readiness, private order requests, revenue pilot, satellite profit model, revenue start board, growth review, operations console, external signals, execution packets, outcome receipts, outcome evidence reviews, capital routing, resilience drills, cooldown lanes, local receipt chain, logs, and operating loop animation.
 
 Open `index.html` directly in a browser for private/local operation. Open `public.html` to test the public request surface. No build step is required.
 
