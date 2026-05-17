@@ -65,6 +65,12 @@ function auditPrivateConsole() {
   assertIncludes("script.js", "function growthReviewPacket", "growth review packet");
   assertIncludes("script.js", "function buildProfitReadiness", "satellite profit readiness model");
   assertIncludes("script.js", "function advanceOperationOrder", "manual order lifecycle");
+  assertIncludes("script.js", "function buildOrderTimeline(order)", "order receipt-chain timeline model");
+  assertIncludes("script.js", "function renderOrderTimeline(order)", "order timeline renderer");
+  assertIncludes("script.js", "${renderOrderTimeline(order)}", "order timeline mounted on order cards");
+  assertIncludes("script.js", "ops-order-timeline-evidence", "order timeline evidence rows");
+  assertIncludes("script.js", "events.sort((a, b) => String(a.at || \"\").localeCompare(String(b.at || \"\")))", "chronological order timeline");
+  assertIncludes("script.js", "(order.incidentIds || []).forEach", "incident-linked order timeline events");
   assertIncludes("script.js", '"Revenue Start",', "revenue start receipt");
   assertIncludes("script.js", '"Revenue Packet",', "revenue packet receipt");
   assertIncludes("script.js", '"Growth Review",', "growth review receipt");
@@ -74,6 +80,7 @@ function auditDocs() {
   assertIncludes("README.md", "REVENUE_START.md", "revenue start README link");
   assertIncludes("README.md", "GROWTH_MANAGEMENT.md", "growth management README link");
   assertIncludes("OPERATIONS_RUNBOOK.md", "## Functional Definition", "satellite functional definition");
+  assertIncludes("OPERATIONS_RUNBOOK.md", "Receipt Chain Timeline Panel", "order timeline runbook section");
   assertIncludes("OPERATIONS_RUNBOOK.md", "Revenue Start Board", "revenue start runbook section");
   assertIncludes("OPERATIONS_RUNBOOK.md", "Growth Management", "growth management runbook note");
   assertIncludes("SATELLITE_COMPANY.md", "## Revenue Start", "satellite revenue start section");

@@ -272,6 +272,46 @@ function checkOrderLifecycleContract() {
   }
 }
 
+function checkOrderTimelineContract() {
+  const script = read("script.js");
+  const runbook = read("OPERATIONS_RUNBOOK.md");
+  const required = [
+    ["timeline builder", "function buildOrderTimeline(order)"],
+    ["timeline renderer", "function renderOrderTimeline(order)"],
+    ["timeline mounted on order cards", "${renderOrderTimeline(order)}"],
+    ["created order event", "order.createdAt"],
+    ["sent invoice event", "order.invoiceSentAt"],
+    ["paid order event", "order.paidAt"],
+    ["delivered order event", "order.deliveredAt"],
+    ["blocked transition event", "order.blockedAt && order.blockReason"],
+    ["linked incident timeline events", "(order.incidentIds || []).forEach"],
+    ["incident update event", "incident.updatedAt && incident.updatedAt !== incident.createdAt"],
+    ["timeline chronological sort", "events.sort((a, b) => String(a.at || \"\").localeCompare(String(b.at || \"\")))"],
+    ["timeline timestamp rendering", "formatReceiptDate(event.at)"],
+    ["timeline actor rendering", "ops-order-timeline-actor"],
+    ["timeline evidence rendering", "ops-order-timeline-evidence"],
+    ["timeline evidence links", "entry.href"],
+    ["timeline empty state", "ops-order-timeline-empty"],
+    ["timeline summary label", "Receipt chain timeline"]
+  ];
+  for (const [label, snippet] of required) {
+    assert(script.includes(snippet), `script.js is missing ${label}.`);
+  }
+
+  assert(
+    runbook.includes("Receipt Chain Timeline Panel"),
+    "OPERATIONS_RUNBOOK.md must document the Receipt Chain Timeline Panel."
+  );
+  assert(
+    runbook.includes("Each event shows:") &&
+      runbook.includes("the timestamp") &&
+      runbook.includes("the actor that produced the transition") &&
+      runbook.includes("the state transition itself") &&
+      runbook.includes("attached evidence and metadata"),
+    "OPERATIONS_RUNBOOK.md must document the order timeline event fields."
+  );
+}
+
 function checkDailyPilotRunContract() {
   const script = read("script.js");
   const indexHtml = read("index.html");
@@ -617,6 +657,7 @@ checkPrivateUrlAllowlists();
 checkOutcomeEvidenceContract();
 checkLedgerBridgeContract();
 checkOrderLifecycleContract();
+checkOrderTimelineContract();
 checkDailyPilotRunContract();
 checkPaidPilotProfitReadinessContract();
 checkOperationalV15Contract();
