@@ -69,6 +69,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [REVENUE_START.md](REVENUE_START.md): day-one two-company revenue posture and start packet sequence.
 - [ORDER_DESK.md](ORDER_DESK.md): how public invoice requests become manual order packets.
 - [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md): the manual order, invoice, payment, delivery, and receipt loop for the first functional operator.
+- [OPERATIONS_START_PACKET.md](OPERATIONS_START_PACKET.md): current start sequence and evidence checklist for opening live intake.
 - [RUN_LIVE_PILOT.md](RUN_LIVE_PILOT.md): operational v1 daily loop for the real US manual paid pilot (LLC, EIN, bank, Stripe, Sheet ledger).
 - [GROWTH_MANAGEMENT.md](GROWTH_MANAGEMENT.md): private growth review that turns acquisition and pipeline receipts into the next operator action.
 - [OPERATOR_FAST_START.md](OPERATOR_FAST_START.md): the quick config and smoke-test path for turning the public desk toward real routes.
