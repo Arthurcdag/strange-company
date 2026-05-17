@@ -29,6 +29,20 @@ Do not mark an order as paid until these controls are real:
 
 The command center enforces this by blocking `Sent -> Paid` while critical controls are open.
 
+## Reviewer Answers
+
+The satellite profit model is intentionally separate from real revenue evidence:
+
+- `$4,092/month` is modeled net profit, not earned revenue.
+- `6` proof-sprint buyers and `12` template-pack buyers are assumptions, not a waitlist.
+- The three open critical satellite controls are `Written scope and deliverables`, `Invoices and bookkeeping lane`, and `Conflict disclosure review`.
+- Owner is the `Satellite operator` / Strange Works Studio launch operator.
+- Timeline is `Before first paid invoice`.
+
+The private UI now shows owner, timeline, and evidence needed on both satellite transaction controls and operational controls so a reviewer can tell what remains open without interpreting the model math as revenue.
+
+Use `Copy reviewer answer` in the Satellite view when an outside reviewer asks for the current explanation. The copied packet is a handoff summary only; it does not approve launch, close controls, or prove customer revenue.
+
 ## First Service
 
 Start with the compliance proof sprint.

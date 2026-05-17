@@ -63,6 +63,9 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [RESILIENCE_DRILLS.md](RESILIENCE_DRILLS.md): how attack drills become receipts and hardening packets.
 - [LAUNCH_PLAN.md](LAUNCH_PLAN.md): practical path to version 0.
 - [ONLINE_GATE.md](ONLINE_GATE.md): when the company may move from local prototype to private sandbox, public beta, or live operation.
+- [LEGAL_PROCEDURE.md](LEGAL_PROCEDURE.md): outside evidence procedure for entity, EIN, BOI, tax, payment, privacy, and legal/accounting signoff before live operation.
+- [LEGAL_DRAFT_FILINGS.md](LEGAL_DRAFT_FILINGS.md): draft-only filing worksheets for state formation, EIN, BOI, finance, privacy, and reviewer signoff.
+- [LEGAL_FILING_EXPERIMENT.md](LEGAL_FILING_EXPERIMENT.md): dry-run experiment for evolving the draft filing packet without submission.
 - [REVENUE_PILOT.md](REVENUE_PILOT.md): how the prototype moves toward the first controlled paid offer.
 - [SATELLITE_COMPANY.md](SATELLITE_COMPANY.md): how a separate for-profit company can net profit without breaking the sealed Strange Company charter.
 - [REVENUE_START.md](REVENUE_START.md): day-one two-company revenue posture and start packet sequence.

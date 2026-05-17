@@ -22,7 +22,7 @@ The clean version:
 
 The current model uses a low-complexity service mix:
 
-| Offer | Buyer | Price | Cost | Default count | Default profit |
+| Offer | Buyer | Price | Cost | Modeled count | Modeled profit |
 | --- | --- | ---: | ---: | ---: | ---: |
 | Compliance proof sprint | External clinics | $750/mo | $210/mo | 6 | $3,240/mo |
 | Compliance template pack | External buyers | $79/mo | $8/mo | 12 | $852/mo |
@@ -35,7 +35,20 @@ Default target:
 $3,500/month net profit before related-party work is needed.
 ```
 
-With the default external mix, the satellite can model about `$4,092/month` net profit. It is still blocked from real launch until the transaction controls are closed.
+With the default external mix, the satellite can model about `$4,092/month` net profit. That is modeled profit only. The `6` proof-sprint buyers and `12` template-pack buyers are assumptions in the model, not a real waitlist, earned revenue, or proof that customers exist.
+
+## Reviewer Answers
+
+The current default state answers Jason's launch-readiness questions this way:
+
+- The `$4,092/month` figure is modeled net profit, not earned revenue.
+- The `6 buyers / 12 buyers` counts are default model assumptions, not a real waitlist.
+- The three open critical satellite controls are `Written scope and deliverables`, `Invoices and bookkeeping lane`, and `Conflict disclosure review`.
+- Owner for closing all three is the `Satellite operator` / Strange Works Studio launch operator.
+- Timeline for all three is gate-based: `Before first paid invoice`.
+- Evidence must be attached before claiming launch readiness: written paid-pilot scope, invoice/bookkeeping route, and related-party conflict disclosure rule.
+
+The Satellite view includes `Copy reviewer answer`, which generates the same answer from the current live model state. It includes modeled profit, collected MRR, buyer-count assumptions, the open critical controls, owner, timeline, and evidence needed.
 
 ## Profit Readiness
 
@@ -62,7 +75,7 @@ The start packet is the handoff between readiness and first revenue work. It let
 
 The satellite may go online as a paid operator only when these controls are clear:
 
-- external customer revenue exists,
+- external customer model assumptions are separated from real customer evidence,
 - market pricing evidence exists,
 - written scope and deliverables exist,
 - invoices and bookkeeping lane exist,

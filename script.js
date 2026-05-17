@@ -67,6 +67,13 @@ const experiments = [
     note: "Possible acquisition of local license requirement data set.",
     budget: "$8,000",
     payback: "70 days"
+  },
+  {
+    title: "Legal filing dry run",
+    status: "Measure",
+    note: "Draft-only formation, EIN, BOI, finance, privacy, and reviewer worksheets are tested for completeness without submission.",
+    budget: "$0 filing",
+    payback: "Review-ready"
   }
 ];
 
@@ -78,6 +85,290 @@ const scores = [
   ["Vendor", 3.6],
   ["Data", 4.5],
   ["Reputation", 4.1]
+];
+
+const MAIN_LEGAL_PROCEDURE_ITEMS = [
+  {
+    id: "state-entity",
+    title: "State legal existence",
+    owner: "Accountable human guardian",
+    timeline: "Before live operation or first Strange Company invoice",
+    source: "SBA business registration",
+    sourceUrl: "https://www.sba.gov/business-guide/launch-your-business/register-your-business",
+    evidenceNeeded: "Formation filing or certificate, registered agent, governance document, state/local license review, and foreign qualification review if activity crosses state lines."
+  },
+  {
+    id: "ein-responsible-party",
+    title: "EIN and responsible party",
+    owner: "Human responsible party",
+    timeline: "After entity formation and before bank or payment setup",
+    source: "IRS responsible-party rules",
+    sourceUrl: "https://www.irs.gov/businesses/small-businesses-self-employed/responsible-parties-and-nominees",
+    evidenceNeeded: "Responsible-party identity approved by counsel/accounting, EIN confirmation or 147C proof, and a change-control route for IRS Form 8822-B updates."
+  },
+  {
+    id: "boi-review",
+    title: "BOI determination",
+    owner: "Legal/accounting reviewer",
+    timeline: "Before live operation and whenever formation status changes",
+    source: "FinCEN BOI current rule page",
+    sourceUrl: "https://www.fincen.gov/boi",
+    evidenceNeeded: "Current BOI memo or filing receipt. For a U.S.-created entity, re-check the current FinCEN domestic-entity exemption before relying on it."
+  },
+  {
+    id: "tax-bookkeeping-payment",
+    title: "Tax, bookkeeping, and payment lane",
+    owner: "Accounting owner",
+    timeline: "Before accepting or spending live money",
+    source: "IRS EIN and SBA launch guidance",
+    sourceUrl: "https://www.irs.gov/businesses/employer-identification-number",
+    evidenceNeeded: "Tax classification, sales-tax/license review, invoice series, bank and processor verification, ledger owner, and monthly reconciliation calendar."
+  },
+  {
+    id: "privacy-security-support",
+    title: "Privacy, security, support, and incident route",
+    owner: "Operator plus security reviewer",
+    timeline: "Before collecting customer data",
+    source: "FTC protecting personal information guide",
+    sourceUrl: "https://www.ftc.gov/business-guidance/resources/protecting-personal-information-guide-business",
+    evidenceNeeded: "Data inventory, minimization rule, TLS/access-control review, retention/disposal path, privacy notice, support inbox, and incident communication plan."
+  },
+  {
+    id: "professional-signoff",
+    title: "External professional signoff",
+    owner: "Outside counsel and accounting reviewer",
+    timeline: "Before live-operation claim",
+    source: "External review record",
+    sourceUrl: "https://www.sba.gov/business-guide/launch-your-business",
+    evidenceNeeded: "Dated review memo or signed checklist confirming legal, tax, accounting, privacy, customer-contract, and payment controls are acceptable for the chosen jurisdiction and offer."
+  }
+];
+
+const MAIN_LEGAL_DRAFT_FILING_ITEMS = [
+  {
+    id: "state-entity",
+    title: "State formation worksheet",
+    artifact: "Draft articles / formation memo",
+    source: "SBA business registration",
+    sourceUrl: "https://www.sba.gov/business-guide/launch-your-business/register-your-business",
+    fields: [
+      "Proposed legal name and fallback names",
+      "Entity type and formation state",
+      "Principal office and mailing address",
+      "Registered agent name and in-state address",
+      "Management structure and accountable human guardian",
+      "Business purpose and local license review",
+      "Initial report, tax board, and foreign qualification follow-ups"
+    ],
+    hold: "Do not file until name availability, registered agent consent, state fee, and counsel/accounting review are confirmed."
+  },
+  {
+    id: "ein-responsible-party",
+    title: "IRS EIN / SS-4 worksheet",
+    artifact: "Draft SS-4 data packet",
+    source: "IRS Form SS-4 instructions",
+    sourceUrl: "https://www.irs.gov/instructions/iss4",
+    fields: [
+      "Legal name exactly as formed",
+      "Trade name if any",
+      "Mailing and physical address",
+      "County and state of principal business",
+      "Responsible party name only; SSN/ITIN stays outside repo",
+      "Entity type and reason for applying",
+      "Business activity, start date, employee expectation, and closing month"
+    ],
+    hold: "Do not use the IRS online EIN flow until state formation is complete; the online session cannot be saved for later."
+  },
+  {
+    id: "boi-review",
+    title: "BOI determination memo",
+    artifact: "Draft FinCEN determination",
+    source: "FinCEN BOI interim final rule Q&A",
+    sourceUrl: "https://www.fincen.gov/boi/ifr-qa",
+    fields: [
+      "Domestic or foreign formation",
+      "Formation jurisdiction and U.S. registration status",
+      "Domestic-entity exemption check dated 2026-05-17",
+      "Foreign reporting-company check if applicable",
+      "Beneficial owner data storage rule",
+      "Reviewer conclusion and re-check date"
+    ],
+    hold: "Do not file or skip filing based on the draft alone; re-check FinCEN and reviewer advice before launch."
+  },
+  {
+    id: "tax-bookkeeping-payment",
+    title: "Tax, bookkeeping, and payment worksheet",
+    artifact: "Draft finance operations packet",
+    source: "IRS EIN and SBA launch guidance",
+    sourceUrl: "https://www.irs.gov/businesses/small-businesses-self-employed/get-an-employer-identification-number",
+    fields: [
+      "Tax classification and accounting method",
+      "Sales-tax, local license, and nexus questions",
+      "Bank account requirements",
+      "Stripe or invoice processor verification fields",
+      "Invoice numbering and refund path",
+      "Ledger owner and monthly reconciliation calendar"
+    ],
+    hold: "Do not accept or spend live money until bank, processor, tax, invoice, and ledger controls are externally reviewed."
+  },
+  {
+    id: "privacy-security-support",
+    title: "Privacy and data-security worksheet",
+    artifact: "Draft FTC-aligned data plan",
+    source: "FTC protecting personal information guide",
+    sourceUrl: "https://www.ftc.gov/business-guidance/resources/protecting-personal-information-guide-business",
+    fields: [
+      "Personal-data inventory",
+      "Data minimization rule",
+      "Access control, TLS, device, and vendor controls",
+      "Retention and disposal path",
+      "Privacy notice update",
+      "Support inbox and incident communication owner"
+    ],
+    hold: "Do not collect customer data until the data inventory, notice, support route, and incident plan are reviewed."
+  },
+  {
+    id: "professional-signoff",
+    title: "Counsel and accounting review request",
+    artifact: "Draft signoff checklist",
+    source: "External review record",
+    sourceUrl: "LEGAL_PROCEDURE.md",
+    fields: [
+      "Questions for counsel",
+      "Questions for accounting/tax reviewer",
+      "Jurisdiction and offer scope",
+      "Contract, payment, privacy, and support exceptions",
+      "Open blockers and reviewer decisions",
+      "No-submit confirmation before final filing"
+    ],
+    hold: "Do not mark live operation ready until the reviewers return dated signoff or a written blocker list."
+  }
+];
+
+const LEGAL_FILING_EXPERIMENT = {
+  id: "legal-filing-dry-run",
+  title: "Legal filing dry run",
+  status: "Measure",
+  owner: "Accountable human guardian",
+  hypothesis: "If the operator fills draft-only filing worksheets with non-sensitive placeholders first, counsel and accounting can identify blockers before any legal submission is attempted.",
+  successCriteria: [
+    "All six draft worksheets have non-sensitive placeholder answers.",
+    "State formation and registered-agent assumptions are explicit.",
+    "SS-4 worksheet is complete without storing SSN or ITIN.",
+    "BOI memo records domestic or foreign formation logic and a re-check date.",
+    "Privacy/security worksheet maps data inventory, retention, disposal, support, and incident owners.",
+    "Counsel/accounting review request lists open questions and no-submit confirmation."
+  ],
+  killCriteria: [
+    "Any worksheet needs SSN, ITIN, bank credentials, payment credentials, private keys, or signatures in the repo.",
+    "Formation state, entity type, or registered agent cannot be chosen without legal advice.",
+    "BOI status cannot be determined from current official guidance and reviewer input.",
+    "The draft packet is mistaken for a filing, approval, or live-operation clearance."
+  ],
+  nextAction: "Choose formation state and entity type, then fill the state formation worksheet outside the repo with non-sensitive placeholders.",
+  boundary: "Experiment only. Do not submit state filings, IRS EIN applications, BOI reports, bank forms, payment processor forms, or signed legal documents from this repo."
+};
+
+const LEGAL_MODE_DISTINCTIONS = [
+  {
+    mode: "Demand",
+    status: "Block",
+    surface: "Main company evidence demands",
+    meaning: "A legal, tax, payment, privacy, or reviewer requirement is still open.",
+    closes: "Only outside artifacts plus reviewer signoff can close it.",
+    cannot: "Cannot be closed by a draft worksheet or experiment result.",
+    tone: "red"
+  },
+  {
+    mode: "Draft",
+    status: "Prepared",
+    surface: "Draft filing worksheets",
+    meaning: "A non-sensitive worksheet is ready to be filled or reviewed.",
+    closes: "Closes nothing by itself; it only reduces ambiguity.",
+    cannot: "Cannot mean submitted, filed, approved, issued, paid, or signed.",
+    tone: "amber"
+  },
+  {
+    mode: "Experiment",
+    status: "Measure",
+    surface: "Legal filing dry run",
+    meaning: "A dry run tests whether the draft packet is reviewer-ready.",
+    closes: "Can produce questions, blockers, or reviewer-ready packet state.",
+    cannot: "Cannot clear live operation or authorize filings.",
+    tone: "amber"
+  },
+  {
+    mode: "Evidence",
+    status: "External",
+    surface: "Outside filing and review records",
+    meaning: "A filed, issued, reviewed, or signed artifact exists outside the repo.",
+    closes: "Can close a demand only after responsible human review.",
+    cannot: "Must not store SSN, ITIN, bank credentials, private keys, or signatures in this repo.",
+    tone: "green"
+  }
+];
+
+const LEGAL_TRY_MATRIX = [
+  {
+    id: "formation-state",
+    title: "Formation state candidate",
+    mode: "Experiment",
+    question: "Which candidate state is operationally plausible before counsel review?",
+    tryThis: "Compare home-state formation, Delaware-style investor default, and pause/no-entity options as placeholders only.",
+    inputNeeded: "Candidate operating location, customer location assumptions, registered agent route, annual report/tax follow-up list.",
+    successSignal: "One candidate state is marked reviewer-ready with open questions and no claim that it is legally chosen.",
+    stopRule: "Stop if the choice depends on tax avoidance, unverified state fees, or legal advice not yet received."
+  },
+  {
+    id: "entity-type",
+    title: "Entity type candidate",
+    mode: "Experiment",
+    question: "Which entity type should the reviewer evaluate first?",
+    tryThis: "Compare LLC, corporation, nonprofit-adjacent wrapper, and no-entity-yet as review hypotheses.",
+    inputNeeded: "Capital plan, governance constraints, liability needs, expected customers, tax review questions.",
+    successSignal: "One primary hypothesis and one fallback are ready for counsel/accounting review.",
+    stopRule: "Stop if the draft implies the entity type is selected or tax-approved."
+  },
+  {
+    id: "responsible-party",
+    title: "Responsible-party path",
+    mode: "Experiment",
+    question: "Can the accountable human role be identified without storing sensitive identifiers?",
+    tryThis: "Draft the role, authority, replacement route, and Form 8822-B change-control path.",
+    inputNeeded: "Responsible party name outside repo, role authority, contact route, change-control owner.",
+    successSignal: "SS-4 worksheet can be reviewed while SSN/ITIN stays completely outside git.",
+    stopRule: "Stop if any SSN, ITIN, private address, signature, or credential would enter the repo."
+  },
+  {
+    id: "boi-branch",
+    title: "BOI branch test",
+    mode: "Experiment",
+    question: "Is this a domestic-entity exemption memo or a foreign reporting-company analysis?",
+    tryThis: "Run domestic-created and foreign-registered branches against current FinCEN guidance as alternatives.",
+    inputNeeded: "Formation jurisdiction, U.S. registration facts, beneficial owner data storage rule, reviewer re-check date.",
+    successSignal: "The BOI memo names the branch, source check date, open assumptions, and reviewer question.",
+    stopRule: "Stop if branch facts are ambiguous or if beneficial-owner personal data would be copied into the repo."
+  },
+  {
+    id: "data-minimization",
+    title: "Data-minimization pass",
+    mode: "Experiment",
+    question: "Can the first public workflow avoid regulated or unnecessary personal data?",
+    tryThis: "Map intake fields to FTC take-stock, scale-down, lock-it, pitch-it, and plan-ahead checks.",
+    inputNeeded: "Public intake fields, storage locations, access roles, retention period, support and incident route.",
+    successSignal: "The draft can remove or defer every unnecessary sensitive field before launch.",
+    stopRule: "Stop if the workflow requires protected health, payment card, credential, SSN, or other regulated data."
+  },
+  {
+    id: "reviewer-questions",
+    title: "Reviewer question triage",
+    mode: "Experiment",
+    question: "Can counsel and accounting answer the packet without first decoding the project?",
+    tryThis: "Group questions by formation, tax/EIN, BOI, payments, privacy, contracts, and launch gate.",
+    inputNeeded: "One-line business summary, proposed offer, candidate entity assumptions, open blockers.",
+    successSignal: "Reviewer can return approve, revise, or block decisions for each demand.",
+    stopRule: "Stop if the questions ask reviewers to infer missing facts or bless a live launch."
+  }
 ];
 
 function defaultExecutionPackets() {
@@ -327,7 +618,7 @@ function defaultSatelliteCompany() {
         price: 750,
         unitCost: 210,
         customers: 6,
-        source: "External customers",
+        source: "Model assumption",
         relatedParty: false,
         active: true
       },
@@ -338,7 +629,7 @@ function defaultSatelliteCompany() {
         price: 79,
         unitCost: 8,
         customers: 12,
-        source: "External customers",
+        source: "Model assumption",
         relatedParty: false,
         active: true
       },
@@ -368,45 +659,63 @@ function defaultSatelliteCompany() {
     controls: [
       {
         id: "external-customers",
-        title: "External customer revenue exists",
-        detail: "Profit comes from real third-party buyers before any Strange Company contract is counted.",
+        title: "External customer model separated",
+        detail: "Default buyer counts are assumptions until proven by real invoices, waitlist records, or paid orders.",
         done: true,
-        critical: true
+        critical: true,
+        owner: "Satellite operator",
+        timeline: "Before first paid invoice",
+        evidenceNeeded: "Replace model counts with paid invoices, qualified lead receipts, or a named waitlist before claiming real demand."
       },
       {
         id: "market-pricing",
         title: "Market pricing evidence",
         detail: "Related-party services use comparable quotes or public rates, not arbitrary extraction.",
         done: true,
-        critical: true
+        critical: true,
+        owner: "Satellite operator",
+        timeline: "Before first paid invoice",
+        evidenceNeeded: "Keep comparable public rates or quotes for each paid offer."
       },
       {
         id: "written-contracts",
         title: "Written scope and deliverables",
         detail: "Every paid service has a scope, acceptance criteria, refund path, and data boundary.",
         done: false,
-        critical: true
+        critical: true,
+        owner: "Satellite operator",
+        timeline: "Before first paid invoice",
+        evidenceNeeded: "Publish the paid pilot scope, deliverables, acceptance criteria, refund path, and no-regulated-data boundary."
       },
       {
         id: "invoices",
         title: "Invoices and bookkeeping lane",
         detail: "Revenue, expenses, taxes, and support obligations are tracked outside the Strange Company treasury.",
         done: false,
-        critical: true
+        critical: true,
+        owner: "Satellite operator",
+        timeline: "Before first paid invoice",
+        evidenceNeeded: "Confirm invoice numbering, Stripe hosted invoice route, Sheet ledger, expense categories, and monthly reconciliation owner."
       },
       {
         id: "conflict-review",
         title: "Conflict disclosure review",
         detail: "Any work sold to Strange Company is disclosed and can be rejected by the gate.",
         done: false,
-        critical: true
+        critical: true,
+        owner: "Satellite operator",
+        timeline: "Before first paid invoice",
+        evidenceNeeded: "Record the related-party disclosure rule and the gate that can reject or replace the satellite as vendor."
       },
       {
         id: "vendor-exit",
         title: "Replaceable vendor rule",
         detail: "Strange Company can choose a different vendor if the satellite becomes expensive, weak, or captured.",
         done: true,
-        critical: false
+        critical: false,
+        owner: "Satellite operator",
+        timeline: "Before first paid invoice",
+        evidenceNeeded: "Keep a written replaceable-vendor rule and at least one alternative-vendor search path."
       }
     ]
   };
@@ -498,49 +807,70 @@ function defaultOperations() {
         title: "Entity and tax identity ready",
         detail: "Legal name, tax identity, signer authority, and customer contract path are confirmed.",
         done: false,
-        critical: true
+        critical: true,
+        owner: "Satellite operator",
+        timeline: "Before first paid invoice",
+        evidenceNeeded: "Verify legal name, tax identity, signer authority, and customer contract path."
       },
       {
         id: "payment",
         title: "Payment route ready",
         detail: "Bank, processor or manual invoice route, refund path, and failed-payment handling are ready.",
         done: false,
-        critical: true
+        critical: true,
+        owner: "Satellite operator",
+        timeline: "Before first paid invoice",
+        evidenceNeeded: "Verify bank, Stripe hosted invoice route, payout path, refund path, and failed-payment handling."
       },
       {
         id: "accounting",
         title: "Bookkeeping lane ready",
         detail: "Invoice numbers, revenue categories, tax review, and monthly reconciliation are defined.",
         done: false,
-        critical: true
+        critical: true,
+        owner: "Satellite operator",
+        timeline: "Before first paid invoice",
+        evidenceNeeded: "Verify invoice numbering, revenue categories, tax review, Sheet ledger, and reconciliation owner."
       },
       {
         id: "support",
         title: "Support inbox monitored",
         detail: "The support inbox exists, is monitored, and has an incident escalation path.",
         done: false,
-        critical: true
+        critical: true,
+        owner: "Satellite operator",
+        timeline: "Before first paid invoice",
+        evidenceNeeded: "Verify a monitored inbox, response cadence, and incident escalation path."
       },
       {
         id: "terms",
         title: "Terms published",
         detail: "Customer scope, payment terms, cancellation, refund, and service limits are visible.",
         done: true,
-        critical: true
+        critical: true,
+        owner: "Satellite operator",
+        timeline: "Before first paid invoice",
+        evidenceNeeded: "Keep reviewed terms visible before accepting payment."
       },
       {
         id: "privacy",
         title: "Privacy notice published",
         detail: "Data handling, local storage, retention, and contact route are visible.",
         done: true,
-        critical: true
+        critical: true,
+        owner: "Satellite operator",
+        timeline: "Before first paid invoice",
+        evidenceNeeded: "Keep the privacy notice visible before accepting payment."
       },
       {
         id: "no-regulated-data",
         title: "No regulated data in v0",
         detail: "The first service accepts summaries and document lists, not protected health, payment, or credential data.",
         done: true,
-        critical: false
+        critical: false,
+        owner: "Satellite operator",
+        timeline: "Before first paid invoice",
+        evidenceNeeded: "Keep intake copy and operator review blocking regulated data."
       }
     ],
     orders: [
@@ -971,6 +1301,9 @@ function renderLaunchGate() {
 
   const decision = buildLaunchDecision();
   const launchPacket = findLaunchPacket();
+  const legalProcedure = buildMainLegalProcedureModel();
+  const draftFilings = buildLegalDraftFilingModel();
+  const filingExperiment = buildLegalFilingExperimentModel();
   const checkedAt = launchGate.checkedAt
     ? new Date(launchGate.checkedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
     : "Not checked";
@@ -1002,10 +1335,28 @@ function renderLaunchGate() {
       <strong>${escapeHtml(launchPacket ? launchPacket.state : "None")}</strong>
     </article>
     <article class="metric-card">
+      <span class="metric-label">Legal demands</span>
+      <strong>${legalProcedure.openCount} open</strong>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Draft filings</span>
+      <strong>${draftFilings.draftCount} prepared</strong>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Filing experiment</span>
+      <strong>${escapeHtml(filingExperiment.status)}</strong>
+    </article>
+    <article class="metric-card">
       <span class="metric-label">Last check</span>
       <strong>${escapeHtml(checkedAt)}</strong>
     </article>
   `;
+
+  renderLegalModeDistinctions();
+  renderLegalProcedure();
+  renderLegalDraftFilings();
+  renderLegalFilingExperiment();
+  renderLegalTryMatrix();
 
   phaseList.innerHTML = launchPhases(decision.mode)
     .map(
@@ -1038,6 +1389,415 @@ function renderLaunchGate() {
       `
     )
     .join("");
+}
+
+function buildMainLegalProcedureModel() {
+  const items = MAIN_LEGAL_PROCEDURE_ITEMS.map((item) => ({
+    ...item,
+    draft: MAIN_LEGAL_DRAFT_FILING_ITEMS.find((draft) => draft.id === item.id),
+    status: "Draft prepared; external filing evidence required",
+    blocking: true
+  }));
+  return {
+    items,
+    openCount: items.filter((item) => item.blocking).length,
+    draftCount: items.filter((item) => item.draft).length,
+    boundary: "This prototype can assemble evidence demands, but it cannot form an entity, issue an EIN, file BOI, give legal advice, certify tax posture, or prove privacy compliance."
+  };
+}
+
+function buildLegalModeDistinctionsModel() {
+  return LEGAL_MODE_DISTINCTIONS.map((item) => ({ ...item }));
+}
+
+function buildLegalDraftFilingModel() {
+  const items = MAIN_LEGAL_DRAFT_FILING_ITEMS.map((item) => ({
+    ...item,
+    status: "Draft only - not submitted",
+    blocking: true
+  }));
+  return {
+    items,
+    draftCount: items.length,
+    boundary: "Draft filing packets are worksheets. They intentionally omit SSN, ITIN, bank credentials, payment credentials, private addresses that are not meant for publication, and signatures."
+  };
+}
+
+function buildLegalFilingExperimentModel() {
+  const drafts = buildLegalDraftFilingModel();
+  const draftCoverage = drafts.items.length;
+  return {
+    ...LEGAL_FILING_EXPERIMENT,
+    draftCoverage,
+    tries: LEGAL_TRY_MATRIX.map((item) => ({ ...item })),
+    blockerCount: LEGAL_FILING_EXPERIMENT.killCriteria.length,
+    readyForReview: draftCoverage === MAIN_LEGAL_PROCEDURE_ITEMS.length,
+    sourceDoc: "LEGAL_FILING_EXPERIMENT.md"
+  };
+}
+
+function buildLegalTryMatrixModel() {
+  return LEGAL_TRY_MATRIX.map((item) => ({ ...item }));
+}
+
+function renderLegalProcedure() {
+  const list = document.querySelector("#legalProcedureList");
+  if (!list) {
+    return;
+  }
+
+  const model = buildMainLegalProcedureModel();
+  list.innerHTML = model.items
+    .map(
+      (item) => `
+        <article class="legal-procedure-card">
+          <div>
+            <span class="metric-label">${escapeHtml(item.status)}</span>
+            <h4>${escapeHtml(item.title)}</h4>
+            <p>
+              Source:
+              <a href="${escapeHtml(item.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.source)}</a>
+            </p>
+            <dl class="control-meta">
+              <div>
+                <dt>Owner</dt>
+                <dd>${escapeHtml(item.owner)}</dd>
+              </div>
+              <div>
+                <dt>Timeline</dt>
+                <dd>${escapeHtml(item.timeline)}</dd>
+              </div>
+              <div>
+                <dt>Evidence</dt>
+                <dd>${escapeHtml(item.evidenceNeeded)}</dd>
+              </div>
+              <div>
+                <dt>Draft</dt>
+                <dd>${escapeHtml(item.draft ? item.draft.artifact : "No draft packet")}</dd>
+              </div>
+            </dl>
+          </div>
+          <span class="state red">Block</span>
+        </article>
+      `
+    )
+    .join("");
+}
+
+function renderLegalModeDistinctions() {
+  const list = document.querySelector("#legalModeDistinctions");
+  if (!list) {
+    return;
+  }
+
+  const modes = buildLegalModeDistinctionsModel();
+  list.innerHTML = modes
+    .map(
+      (item) => `
+        <article class="legal-mode-card">
+          <div>
+            <span class="metric-label">${escapeHtml(item.surface)}</span>
+            <h4>${escapeHtml(item.mode)}</h4>
+            <p>${escapeHtml(item.meaning)}</p>
+            <dl class="control-meta">
+              <div>
+                <dt>Closes</dt>
+                <dd>${escapeHtml(item.closes)}</dd>
+              </div>
+              <div>
+                <dt>Cannot</dt>
+                <dd>${escapeHtml(item.cannot)}</dd>
+              </div>
+            </dl>
+          </div>
+          <span class="state ${escapeHtml(item.tone)}">${escapeHtml(item.status)}</span>
+        </article>
+      `
+    )
+    .join("");
+}
+
+function renderLegalDraftFilings() {
+  const list = document.querySelector("#legalDraftFilingList");
+  if (!list) {
+    return;
+  }
+
+  const model = buildLegalDraftFilingModel();
+  list.innerHTML = model.items
+    .map(
+      (item) => `
+        <article class="legal-draft-card">
+          <div>
+            <span class="metric-label">${escapeHtml(item.status)}</span>
+            <h4>${escapeHtml(item.title)}</h4>
+            <p>
+              Source:
+              <a href="${escapeHtml(item.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.source)}</a>
+            </p>
+            <dl class="control-meta">
+              <div>
+                <dt>Artifact</dt>
+                <dd>${escapeHtml(item.artifact)}</dd>
+              </div>
+              <div>
+                <dt>Fill</dt>
+                <dd>${escapeHtml(item.fields.join("; "))}</dd>
+              </div>
+              <div>
+                <dt>Hold</dt>
+                <dd>${escapeHtml(item.hold)}</dd>
+              </div>
+            </dl>
+          </div>
+          <span class="state amber">Draft</span>
+        </article>
+      `
+    )
+    .join("");
+}
+
+function renderLegalFilingExperiment() {
+  const panel = document.querySelector("#legalFilingExperimentPanel");
+  if (!panel) {
+    return;
+  }
+
+  const model = buildLegalFilingExperimentModel();
+  panel.innerHTML = `
+    <article class="legal-experiment-card">
+      <div>
+        <span class="metric-label">${escapeHtml(model.status)}</span>
+        <h4>${escapeHtml(model.title)}</h4>
+        <p>${escapeHtml(model.hypothesis)}</p>
+        <dl class="control-meta">
+          <div>
+            <dt>Owner</dt>
+            <dd>${escapeHtml(model.owner)}</dd>
+          </div>
+          <div>
+            <dt>Coverage</dt>
+            <dd>${model.draftCoverage} draft worksheet${model.draftCoverage === 1 ? "" : "s"} prepared; live legal demands still open.</dd>
+          </div>
+          <div>
+            <dt>Success</dt>
+            <dd>${escapeHtml(model.successCriteria.join("; "))}</dd>
+          </div>
+          <div>
+            <dt>Kill</dt>
+            <dd>${escapeHtml(model.killCriteria.join("; "))}</dd>
+          </div>
+          <div>
+            <dt>Next</dt>
+            <dd>${escapeHtml(model.nextAction)}</dd>
+          </div>
+        </dl>
+      </div>
+      <span class="state amber">Dry run</span>
+    </article>
+  `;
+}
+
+function renderLegalTryMatrix() {
+  const list = document.querySelector("#legalTryMatrix");
+  if (!list) {
+    return;
+  }
+
+  const tries = buildLegalTryMatrixModel();
+  list.innerHTML = tries
+    .map(
+      (item) => `
+        <article class="legal-try-card">
+          <div>
+            <span class="metric-label">${escapeHtml(item.mode)}</span>
+            <h4>${escapeHtml(item.title)}</h4>
+            <p>${escapeHtml(item.question)}</p>
+            <dl class="control-meta">
+              <div>
+                <dt>Try</dt>
+                <dd>${escapeHtml(item.tryThis)}</dd>
+              </div>
+              <div>
+                <dt>Input</dt>
+                <dd>${escapeHtml(item.inputNeeded)}</dd>
+              </div>
+              <div>
+                <dt>Signal</dt>
+                <dd>${escapeHtml(item.successSignal)}</dd>
+              </div>
+              <div>
+                <dt>Stop</dt>
+                <dd>${escapeHtml(item.stopRule)}</dd>
+              </div>
+            </dl>
+          </div>
+          <span class="state amber">Try</span>
+        </article>
+      `
+    )
+    .join("");
+}
+
+function legalProcedurePacket() {
+  const model = buildMainLegalProcedureModel();
+  const modeLines = buildLegalModeDistinctionsModel().map((item) => (
+    `- ${item.mode}: ${item.meaning} Closes: ${item.closes} Cannot: ${item.cannot}`
+  ));
+  const itemLines = model.items.map((item, index) => [
+    `${index + 1}. ${item.title}`,
+    `   Status: ${item.status}`,
+    `   Owner: ${item.owner}`,
+    `   Timeline: ${item.timeline}`,
+    `   Evidence needed: ${item.evidenceNeeded}`,
+    `   Official source: ${item.source} - ${item.sourceUrl}`
+  ].join("\n"));
+
+  return [
+    "Main Strange Company legal procedure packet",
+    "",
+    `Boundary: ${model.boundary}`,
+    `Draft status: ${model.draftCount} draft filing worksheets are prepared, but they are not submitted and do not close the legal demands.`,
+    "Proceeding rule: live operation and any first paid Strange Company invoice stay blocked until outside evidence is attached and reviewed by the responsible human operator, counsel, and accounting reviewer.",
+    "Source rule: official links must be re-checked before relying on them because legal obligations can change.",
+    "",
+    "Mode distinctions:",
+    modeLines.join("\n"),
+    "",
+    `Open legal demands (${model.openCount}):`,
+    itemLines.join("\n\n"),
+    "",
+    "Operator answer: the repo now tracks the legal demands and can generate this evidence packet, but it does not claim those demands are satisfied until external artifacts and signoffs exist."
+  ].join("\n");
+}
+
+function draftFilingPacket() {
+  const model = buildLegalDraftFilingModel();
+  const itemLines = model.items.map((item, index) => [
+    `${index + 1}. ${item.title}`,
+    `   Status: ${item.status}`,
+    `   Artifact: ${item.artifact}`,
+    `   Fill fields: ${item.fields.join("; ")}`,
+    `   Hold before submission: ${item.hold}`,
+    `   Source: ${item.source} - ${item.sourceUrl}`
+  ].join("\n"));
+
+  return [
+    "DRAFT ONLY - Main Strange Company filing packet",
+    "",
+    "Submission status: not submitted, not filed, not approved.",
+    `Boundary: ${model.boundary}`,
+    "Sensitive-data rule: do not store SSN, ITIN, bank credentials, payment credentials, private keys, or signatures in this repo.",
+    "Proceeding rule: use this packet to prepare counsel/accounting review and final filing inputs; do not submit from the repo.",
+    "",
+    `Prepared draft worksheets (${model.draftCount}):`,
+    itemLines.join("\n\n"),
+    "",
+    "Next evolution step: choose formation state and entity type, confirm registered agent consent, then fill the draft artifacts outside the repo before any submission."
+  ].join("\n");
+}
+
+function legalFilingExperimentPacket() {
+  const model = buildLegalFilingExperimentModel();
+  const tryLines = model.tries.map((item, index) => [
+    `${index + 1}. ${item.title}`,
+    `   Question: ${item.question}`,
+    `   Try: ${item.tryThis}`,
+    `   Input needed: ${item.inputNeeded}`,
+    `   Success signal: ${item.successSignal}`,
+    `   Stop rule: ${item.stopRule}`
+  ].join("\n"));
+  return [
+    "Legal filing experiment packet",
+    "",
+    `Experiment: ${model.title}`,
+    `Status: ${model.status}`,
+    `Owner: ${model.owner}`,
+    `Boundary: ${model.boundary}`,
+    `Hypothesis: ${model.hypothesis}`,
+    "",
+    `Draft coverage: ${model.draftCoverage} prepared worksheets; legal demands remain open.`,
+    "",
+    "Success criteria:",
+    model.successCriteria.map((criterion) => `- ${criterion}`).join("\n"),
+    "",
+    "Kill criteria:",
+    model.killCriteria.map((criterion) => `- ${criterion}`).join("\n"),
+    "",
+    "Try matrix:",
+    tryLines.join("\n\n"),
+    "",
+    `Next action: ${model.nextAction}`,
+    "",
+    "Experiment rule: produce review questions and safer draft inputs only. Do not submit, sign, pay, file, or enter sensitive identifiers from this repo."
+  ].join("\n");
+}
+
+function renderLegalProcedureOutput(text, copied) {
+  const output = document.querySelector("#legalProcedureOutput");
+  if (!output) {
+    return;
+  }
+  const isDraft = text.startsWith("DRAFT ONLY");
+  const isExperiment = text.startsWith("Legal filing experiment");
+  output.classList.add("active");
+  output.innerHTML = `
+    <article>
+      <span class="metric-label">${copied ? (isExperiment ? "Experiment packet copied" : isDraft ? "Draft filing packet copied" : "Legal packet copied") : (isExperiment ? "Experiment packet generated" : isDraft ? "Draft filing packet generated" : "Legal packet generated")}</span>
+      <pre>${escapeHtml(text)}</pre>
+    </article>
+  `;
+}
+
+async function copyLegalProcedurePacket(button) {
+  const packet = legalProcedurePacket();
+  renderLegalProcedureOutput(packet, false);
+  const copied = await copyTextBestEffort(packet);
+  renderLegalProcedureOutput(packet, copied);
+  if (button) {
+    const label = button.querySelector("span");
+    if (label) {
+      const previous = label.textContent;
+      label.textContent = copied ? "Copied" : "Copy unavailable";
+      setTimeout(() => {
+        label.textContent = previous;
+      }, 1500);
+    }
+  }
+}
+
+async function copyDraftFilingPacket(button) {
+  const packet = draftFilingPacket();
+  renderLegalProcedureOutput(packet, false);
+  const copied = await copyTextBestEffort(packet);
+  renderLegalProcedureOutput(packet, copied);
+  if (button) {
+    const label = button.querySelector("span");
+    if (label) {
+      const previous = label.textContent;
+      label.textContent = copied ? "Copied" : "Copy unavailable";
+      setTimeout(() => {
+        label.textContent = previous;
+      }, 1500);
+    }
+  }
+}
+
+async function copyLegalFilingExperiment(button) {
+  const packet = legalFilingExperimentPacket();
+  renderLegalProcedureOutput(packet, false);
+  const copied = await copyTextBestEffort(packet);
+  renderLegalProcedureOutput(packet, copied);
+  if (button) {
+    const label = button.querySelector("span");
+    if (label) {
+      const previous = label.textContent;
+      label.textContent = copied ? "Copied" : "Copy unavailable";
+      setTimeout(() => {
+        label.textContent = previous;
+      }, 1500);
+    }
+  }
 }
 
 function buildLaunchDecision() {
@@ -1108,6 +1868,7 @@ function buildLaunchChecks() {
   const pilotReadiness = buildPilotReadiness();
   const satelliteModel = buildSatelliteCompanyModel();
   const operationsModel = buildOperationsModel();
+  const legalProcedure = buildMainLegalProcedureModel();
 
   return [
     {
@@ -1207,12 +1968,12 @@ function buildLaunchChecks() {
       fix: "Add order"
     },
     {
-      title: "Public trust and legal review complete",
+      title: "Main legal procedure has outside signoff",
       phase: "Live operation",
       passed: false,
       tone: "red",
-      evidence: "External counsel, accounting, privacy, support, and incident communications are not represented in this prototype.",
-      fix: "External review"
+      evidence: `${legalProcedure.openCount} legal demand${legalProcedure.openCount === 1 ? "" : "s"} need outside evidence: state entity, EIN/responsible party, BOI review, tax/bookkeeping/payment, privacy/security/support, and professional signoff.`,
+      fix: "Attach legal packet"
     },
     {
       title: "Payment blockers cleared",
@@ -2118,6 +2879,29 @@ function safeExternalLink(value, allowedPrefixes, label, missingLabel) {
   return `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a>`;
 }
 
+function renderControlMeta(control) {
+  const rows = [
+    ["Owner", control.owner],
+    ["Timeline", control.timeline],
+    ["Evidence", control.evidenceNeeded]
+  ].filter(([, value]) => value);
+
+  if (!rows.length) {
+    return "";
+  }
+
+  return `
+    <dl class="control-meta">
+      ${rows.map(([label, value]) => `
+        <div>
+          <dt>${escapeHtml(label)}</dt>
+          <dd>${escapeHtml(value)}</dd>
+        </div>
+      `).join("")}
+    </dl>
+  `;
+}
+
 function cleanConfiguredUrl(value, allowedPrefixes) {
   return safeExternalUrl(value, allowedPrefixes);
 }
@@ -2462,7 +3246,7 @@ function loadSatelliteCompany() {
         purpose: stored.purpose || base.purpose,
         targetNetProfit: Number(stored.targetNetProfit || base.targetNetProfit),
         services: Array.isArray(stored.services) && stored.services.length ? stored.services : base.services,
-        controls: Array.isArray(stored.controls) && stored.controls.length ? stored.controls : base.controls
+        controls: mergeControlList(base.controls, stored.controls)
       };
     }
   } catch {
@@ -2661,7 +3445,7 @@ function loadOperations() {
         nextInvoiceNumber: Number(stored.nextInvoiceNumber || base.nextInvoiceNumber),
         integration,
         launchChecklist,
-        controls: Array.isArray(stored.controls) && stored.controls.length ? stored.controls : base.controls,
+        controls: mergeControlList(base.controls, stored.controls),
         orders: Array.isArray(stored.orders) ? stored.orders.map((order) => normalizeOperationOrder(order)) : base.orders
       };
     }
@@ -3059,6 +3843,23 @@ function mergeChecklist(baseList, storedList) {
   });
 }
 
+function mergeControlList(baseList, storedList) {
+  if (!Array.isArray(storedList) || !storedList.length) {
+    return baseList;
+  }
+  return baseList.map((item) => {
+    const match = storedList.find((entry) => entry && entry.id === item.id);
+    if (!match) {
+      return item;
+    }
+    return {
+      ...item,
+      done: Boolean(match.done),
+      updatedAt: typeof match.updatedAt === "string" ? match.updatedAt : ""
+    };
+  });
+}
+
 function saveOperations() {
   try {
     localStorage.setItem(OPERATIONS_KEY, JSON.stringify(operations));
@@ -3445,8 +4246,8 @@ function buildSatelliteCompanyModel() {
       ...shared,
       state: "No market proof",
       tone: "red",
-      headline: "The satellite cannot profit until it has external customers.",
-      detail: "Do not count Strange Company payments as profit proof. The second company must survive on normal market revenue first."
+      headline: "The satellite cannot claim profit proof until real customers exist.",
+      detail: "Default buyer counts are model assumptions. Real proof must come from external invoices, paid orders, or named qualified leads."
     };
   }
 
@@ -3477,6 +4278,90 @@ function buildSatelliteCompanyModel() {
     headline: "The satellite can go online as the first profit engine.",
     detail: "External revenue clears the target and controls are closed. Related-party work may be offered only with market pricing and replaceable-vendor rules."
   };
+}
+
+function satelliteReviewerResponsePacket() {
+  const model = buildSatelliteCompanyModel();
+  const collectedMrr = (operations.orders || [])
+    .filter((order) => order.status === "Paid" || order.status === "Delivered")
+    .reduce((total, order) => total + Number(order.amount || 0), 0);
+  const externalAssumptions = model.services
+    .filter((service) => service.active && !service.relatedParty)
+    .map((service) => {
+      const customers = Number(service.customers || 0);
+      const revenue = Number(service.price || 0) * customers;
+      const profit = revenue - Number(service.unitCost || 0) * customers;
+      return `- ${service.title}: model assumption only, ${customers} buyer${customers === 1 ? "" : "s"}, ${money.format(revenue)} modeled MRR, ${money.format(profit)} modeled net.`;
+    });
+  const controlLines = model.openCriticalControls.length
+    ? model.openCriticalControls.map((control, index) => [
+        `${index + 1}. ${control.title}`,
+        `   Owner: ${control.owner || "Satellite operator"}`,
+        `   Timeline: ${control.timeline || "Before first paid invoice"}`,
+        `   Evidence needed: ${control.evidenceNeeded || control.detail}`
+      ].join("\n"))
+    : ["- none open"];
+
+  return [
+    "Jason reviewer answer",
+    "",
+    `You are right: the ${money.format(model.externalProfit)}/month figure is modeled net profit, not earned revenue yet.`,
+    `Collected MRR in Operations is currently ${money.format(collectedMrr)}.`,
+    "The buyer counts are default model assumptions, not a real waitlist or proof of paid demand.",
+    "",
+    "Model assumptions:",
+    externalAssumptions.length ? externalAssumptions.join("\n") : "- no active external model assumptions",
+    "",
+    `Open critical satellite controls (${model.openCriticalControls.length}):`,
+    controlLines.join("\n"),
+    "",
+    "Launch rule: do not accept or mark a first paid invoice until these controls have evidence attached. Real demand must come from paid invoices, qualified lead receipts, or a named waitlist."
+  ].join("\n");
+}
+
+function renderSatelliteReviewerOutput(text, copied) {
+  const output = document.querySelector("#satelliteReviewerOutput");
+  if (!output) {
+    return;
+  }
+  output.classList.add("active");
+  output.innerHTML = `
+    <article>
+      <span class="metric-label">${copied ? "Reviewer answer copied" : "Reviewer answer generated"}</span>
+      <pre>${escapeHtml(text)}</pre>
+    </article>
+  `;
+}
+
+async function copyTextBestEffort(text, timeoutMs = 900) {
+  if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+    return false;
+  }
+  try {
+    return await Promise.race([
+      navigator.clipboard.writeText(text).then(() => true),
+      new Promise((resolve) => {
+        setTimeout(() => resolve(false), timeoutMs);
+      })
+    ]);
+  } catch {
+    return false;
+  }
+}
+
+async function copySatelliteReviewerResponse(button) {
+  const packet = satelliteReviewerResponsePacket();
+  renderSatelliteReviewerOutput(packet, false);
+  const copied = await copyTextBestEffort(packet);
+  renderSatelliteReviewerOutput(packet, copied);
+  if (button) {
+    const label = button.querySelector("span") || button;
+    const previous = label.textContent;
+    label.textContent = copied ? "Copied" : "Copy unavailable";
+    setTimeout(() => {
+      label.textContent = previous;
+    }, 1500);
+  }
 }
 
 function renderSatelliteCompany() {
@@ -3538,7 +4423,7 @@ function renderSatelliteCompany() {
           <span><strong>${model.customersNeededFor3k}</strong><small>Proof-sprint customers to $3K</small></span>
           <span><strong>${model.customersNeededFor5k}</strong><small>Proof-sprint customers to $5K</small></span>
         </div>
-        <p>Related-party work is never market proof. Keep the first profit evidence tied to normal invoices, external buyers, and the manual Stripe plus Sheet ledger route.</p>
+        <p>The default buyer counts are model assumptions, not a waitlist or earned revenue. Related-party work is never market proof; real evidence must tie to normal invoices, external buyers, and the manual Stripe plus Sheet ledger route.</p>
       </article>
     `;
   }
@@ -3557,7 +4442,7 @@ function renderSatelliteCompany() {
             <p>${escapeHtml(service.detail)}</p>
           </div>
           <strong>${money.format(revenue)}</strong>
-          <span class="state ${tone}">${service.active ? `${customers} buyer${customers === 1 ? "" : "s"}` : "Paused"}</span>
+          <span class="state ${tone}">${service.active ? `model: ${customers} buyer${customers === 1 ? "" : "s"}` : "Paused"}</span>
           <div class="satellite-stepper">
             <button type="button" data-adjust-service="${escapeHtml(service.id)}" data-adjust-delta="-1" ${customers <= 0 ? "disabled" : ""}>-</button>
             <button type="button" data-adjust-service="${escapeHtml(service.id)}" data-adjust-delta="1">+</button>
@@ -3574,11 +4459,12 @@ function renderSatelliteCompany() {
       return `
         <article class="satellite-control">
           <div>
-            <span class="metric-label">${control.critical ? "Critical" : "Support"}</span>
-            <h4>${escapeHtml(control.title)}</h4>
-            <p>${escapeHtml(control.detail)}</p>
-          </div>
-          <span class="state ${tone}">${control.done ? "Clear" : "Open"}</span>
+             <span class="metric-label">${control.critical ? "Critical" : "Support"}</span>
+             <h4>${escapeHtml(control.title)}</h4>
+             <p>${escapeHtml(control.detail)}</p>
+             ${renderControlMeta(control)}
+           </div>
+           <span class="state ${tone}">${control.done ? "Clear" : "Open"}</span>
           <label class="pilot-switch">
             <input type="checkbox" data-satellite-control="${escapeHtml(control.id)}" ${control.done ? "checked" : ""} />
             <span>Done</span>
@@ -4090,7 +4976,7 @@ function renderProfitReadiness() {
         <p>${escapeHtml(readiness.nextAction)}</p>
       </div>
       <div class="profit-readiness-metrics">
-        <span><strong>${money.format(readiness.currentExternalProfit)}</strong><small>External profit model</small></span>
+        <span><strong>${money.format(readiness.currentExternalProfit)}</strong><small>Modeled external profit</small></span>
         <span><strong>${money.format(readiness.collectedMrr)}</strong><small>Collected MRR</small></span>
         <span><strong>${readiness.qualifiedLeadCount}</strong><small>Qualified leads</small></span>
         <span><strong>${readiness.invoiceReadyLeadCount}</strong><small>Invoice-ready leads</small></span>
@@ -5394,11 +6280,12 @@ function renderOperations() {
       return `
         <article class="ops-control">
           <div>
-            <span class="metric-label">${control.critical ? "Critical" : "Support"}</span>
-            <h4>${escapeHtml(control.title)}</h4>
-            <p>${escapeHtml(control.detail)}</p>
-          </div>
-          <span class="state ${tone}">${control.done ? "Clear" : "Open"}</span>
+             <span class="metric-label">${control.critical ? "Critical" : "Support"}</span>
+             <h4>${escapeHtml(control.title)}</h4>
+             <p>${escapeHtml(control.detail)}</p>
+             ${renderControlMeta(control)}
+           </div>
+           <span class="state ${tone}">${control.done ? "Clear" : "Open"}</span>
           <label class="pilot-switch">
             <input type="checkbox" data-operation-control="${escapeHtml(control.id)}" ${control.done ? "checked" : ""} />
             <span>Done</span>
@@ -8382,6 +9269,9 @@ function setupResilienceDrills() {
 function setupLaunchGate() {
   const runButton = document.querySelector("#runLaunchCheck");
   const draftButton = document.querySelector("#draftLaunchPacket");
+  const legalButton = document.querySelector("#copyLegalProcedurePacket");
+  const draftFilingButton = document.querySelector("#copyDraftFilingPacket");
+  const experimentButton = document.querySelector("#copyLegalFilingExperiment");
 
   if (runButton) {
     runButton.addEventListener("click", refreshLaunchGateStatus);
@@ -8389,6 +9279,18 @@ function setupLaunchGate() {
 
   if (draftButton) {
     draftButton.addEventListener("click", issueLaunchPacket);
+  }
+
+  if (legalButton) {
+    legalButton.addEventListener("click", () => copyLegalProcedurePacket(legalButton));
+  }
+
+  if (draftFilingButton) {
+    draftFilingButton.addEventListener("click", () => copyDraftFilingPacket(draftFilingButton));
+  }
+
+  if (experimentButton) {
+    experimentButton.addEventListener("click", () => copyLegalFilingExperiment(experimentButton));
   }
 }
 
@@ -8415,6 +9317,7 @@ function setupRevenuePilot() {
 
 function setupSatelliteCompany() {
   const resetButton = document.querySelector("#resetSatelliteCompany");
+  const copyReviewerButton = document.querySelector("#copySatelliteReviewerResponse");
   if (resetButton) {
     resetButton.addEventListener("click", () => {
       satelliteCompany = defaultSatelliteCompany();
@@ -8422,6 +9325,9 @@ function setupSatelliteCompany() {
       renderSatelliteCompany();
       renderLogs();
     });
+  }
+  if (copyReviewerButton) {
+    copyReviewerButton.addEventListener("click", () => copySatelliteReviewerResponse(copyReviewerButton));
   }
 }
 

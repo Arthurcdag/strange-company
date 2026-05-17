@@ -571,6 +571,125 @@ function checkRevenueStartContract() {
   }
 }
 
+function checkMainLegalProcedureContract() {
+  const script = read("script.js");
+  const indexHtml = read("index.html");
+  const legalDoc = read("LEGAL_PROCEDURE.md");
+  const draftFilingsDoc = read("LEGAL_DRAFT_FILINGS.md");
+  const legalExperimentDoc = read("LEGAL_FILING_EXPERIMENT.md");
+  const onlineGateDoc = read("ONLINE_GATE.md");
+  const charterDoc = read("CHARTER.md");
+  const livePilotDoc = read("RUN_LIVE_PILOT.md");
+  const readme = read("README.md");
+  const publicHtml = read("public.html");
+  const publicJs = read("public.js");
+  const publicConfigText = read("public-config.js");
+
+  const requiredScript = [
+    ["main legal procedure items", "const MAIN_LEGAL_PROCEDURE_ITEMS = ["],
+    ["main legal procedure model", "function buildMainLegalProcedureModel"],
+    ["main legal procedure renderer", "function renderLegalProcedure"],
+    ["main legal procedure packet", "function legalProcedurePacket"],
+    ["main legal procedure copy handler", "function copyLegalProcedurePacket"],
+    ["main legal draft filing items", "const MAIN_LEGAL_DRAFT_FILING_ITEMS = ["],
+    ["main legal draft filing model", "function buildLegalDraftFilingModel"],
+    ["main legal draft filing renderer", "function renderLegalDraftFilings"],
+    ["main legal draft filing packet", "function draftFilingPacket"],
+    ["main legal draft filing copy handler", "function copyDraftFilingPacket"],
+    ["legal filing experiment constant", "const LEGAL_FILING_EXPERIMENT = {"],
+    ["legal try matrix constant", "const LEGAL_TRY_MATRIX = ["],
+    ["legal mode distinctions constant", "const LEGAL_MODE_DISTINCTIONS = ["],
+    ["legal mode distinctions model", "function buildLegalModeDistinctionsModel"],
+    ["legal mode distinctions renderer", "function renderLegalModeDistinctions"],
+    ["legal filing experiment model", "function buildLegalFilingExperimentModel"],
+    ["legal filing experiment renderer", "function renderLegalFilingExperiment"],
+    ["legal try matrix model", "function buildLegalTryMatrixModel"],
+    ["legal try matrix renderer", "function renderLegalTryMatrix"],
+    ["legal filing experiment packet", "function legalFilingExperimentPacket"],
+    ["legal filing experiment copy handler", "function copyLegalFilingExperiment"],
+    ["live legal signoff blocker", "Main legal procedure has outside signoff"],
+    ["draft filing not submitted boundary", "Submission status: not submitted, not filed, not approved."],
+    ["legal filing experiment no-submit rule", "Do not submit state filings, IRS EIN applications, BOI reports"],
+    ["legal demand source rule", "official links must be re-checked before relying on them"]
+  ];
+  for (const [label, snippet] of requiredScript) {
+    assert(script.includes(snippet), `script.js is missing ${label}.`);
+  }
+
+  const indexExpectations = [
+    ["legal procedure copy button", 'id="copyLegalProcedurePacket"'],
+    ["draft filing copy button", 'id="copyDraftFilingPacket"'],
+    ["legal filing experiment copy button", 'id="copyLegalFilingExperiment"'],
+    ["legal mode distinctions panel", 'id="legalModeDistinctions"'],
+    ["legal try matrix panel", 'id="legalTryMatrix"'],
+    ["legal procedure list", 'id="legalProcedureList"'],
+    ["legal draft filing list", 'id="legalDraftFilingList"'],
+    ["legal filing experiment panel", 'id="legalFilingExperimentPanel"'],
+    ["legal procedure output", 'id="legalProcedureOutput"']
+  ];
+  for (const [label, snippet] of indexExpectations) {
+    assert(indexHtml.includes(snippet), `index.html is missing ${label}.`);
+  }
+
+  assert(legalDoc.startsWith("# Main Legal Procedure"), "LEGAL_PROCEDURE.md must exist and start with a top-level heading.");
+  assert(legalDoc.includes("not legal advice"), "LEGAL_PROCEDURE.md must state the legal-advice boundary.");
+  assert(legalDoc.includes("SBA business registration"), "LEGAL_PROCEDURE.md must cite SBA registration guidance.");
+  assert(legalDoc.includes("IRS responsible parties and nominees"), "LEGAL_PROCEDURE.md must cite IRS responsible-party guidance.");
+  assert(legalDoc.includes("FinCEN BOI"), "LEGAL_PROCEDURE.md must cite FinCEN BOI guidance.");
+  assert(legalDoc.includes("FTC Protecting Personal Information"), "LEGAL_PROCEDURE.md must cite FTC data-security guidance.");
+  assert(legalDoc.includes("LEGAL_DRAFT_FILINGS.md"), "LEGAL_PROCEDURE.md must link the draft filing doc.");
+  assert(legalDoc.includes("## Mode Distinctions"), "LEGAL_PROCEDURE.md must distinguish demand, draft, experiment, and evidence.");
+  assert(legalDoc.includes("Never promote `Draft` or `Experiment` into `Evidence`"), "LEGAL_PROCEDURE.md must forbid mode promotion.");
+  assert(draftFilingsDoc.startsWith("# Legal Draft Filings"), "LEGAL_DRAFT_FILINGS.md must exist and start with a top-level heading.");
+  assert(draftFilingsDoc.includes("not submitted"), "LEGAL_DRAFT_FILINGS.md must state the no-submit boundary.");
+  assert(draftFilingsDoc.includes("this document is `Draft`"), "LEGAL_DRAFT_FILINGS.md must identify its mode.");
+  assert(draftFilingsDoc.includes("Do not store SSN, ITIN"), "LEGAL_DRAFT_FILINGS.md must keep sensitive identifiers out of repo.");
+  assert(draftFilingsDoc.includes("IRS Form SS-4 instructions"), "LEGAL_DRAFT_FILINGS.md must cite IRS SS-4 guidance.");
+  assert(draftFilingsDoc.includes("FinCEN BOI interim final rule Q&A"), "LEGAL_DRAFT_FILINGS.md must cite FinCEN BOI guidance.");
+  assert(draftFilingsDoc.includes("FTC Protecting Personal Information"), "LEGAL_DRAFT_FILINGS.md must cite FTC data-security guidance.");
+  assert(draftFilingsDoc.includes("LEGAL_FILING_EXPERIMENT.md"), "LEGAL_DRAFT_FILINGS.md must link the legal filing experiment.");
+  assert(legalExperimentDoc.startsWith("# Legal Filing Experiment"), "LEGAL_FILING_EXPERIMENT.md must exist and start with a top-level heading.");
+  assert(legalExperimentDoc.includes("Experiment only. Do not submit"), "LEGAL_FILING_EXPERIMENT.md must state the no-submit experiment boundary.");
+  assert(legalExperimentDoc.includes("this document is `Experiment`"), "LEGAL_FILING_EXPERIMENT.md must identify its mode.");
+  assert(legalExperimentDoc.includes("Pass condition"), "LEGAL_FILING_EXPERIMENT.md must document pass condition.");
+  assert(legalExperimentDoc.includes("does not clear live operation"), "LEGAL_FILING_EXPERIMENT.md must not clear live operation.");
+  assert(legalExperimentDoc.includes("## Try Matrix"), "LEGAL_FILING_EXPERIMENT.md must document the try matrix.");
+  assert(legalExperimentDoc.includes("Formation state candidate"), "LEGAL_FILING_EXPERIMENT.md must include formation-state branch.");
+  assert(legalExperimentDoc.includes("Data-minimization pass"), "LEGAL_FILING_EXPERIMENT.md must include data-minimization branch.");
+  assert(onlineGateDoc.includes("LEGAL_PROCEDURE.md"), "ONLINE_GATE.md must require the legal procedure packet.");
+  assert(onlineGateDoc.includes("LEGAL_DRAFT_FILINGS.md"), "ONLINE_GATE.md must document draft filing mode.");
+  assert(onlineGateDoc.includes("LEGAL_FILING_EXPERIMENT.md"), "ONLINE_GATE.md must document legal filing experiment mode.");
+  assert(onlineGateDoc.includes("`Demand` blocks, `Draft` prepares, `Experiment` measures"), "ONLINE_GATE.md must document legal mode differentiation.");
+  assert(onlineGateDoc.includes("formation-state, entity-type, responsible-party, BOI, data-minimization"), "ONLINE_GATE.md must document legal try matrix branches.");
+  assert(charterDoc.includes("Legal Proceeding Boundary"), "CHARTER.md must document the legal proceeding boundary.");
+  assert(livePilotDoc.includes("Main legal procedure reviewed"), "RUN_LIVE_PILOT.md must include the main legal procedure setup step.");
+  assert(livePilotDoc.includes("Draft filing packet prepared, not submitted"), "RUN_LIVE_PILOT.md must include the draft filing setup step.");
+  assert(livePilotDoc.includes("Legal filing dry run measured"), "RUN_LIVE_PILOT.md must include the legal filing experiment setup step.");
+  assert(readme.includes("LEGAL_PROCEDURE.md"), "README.md must link the main legal procedure doc.");
+  assert(readme.includes("LEGAL_DRAFT_FILINGS.md"), "README.md must link the draft filing doc.");
+  assert(readme.includes("LEGAL_FILING_EXPERIMENT.md"), "README.md must link the legal filing experiment doc.");
+
+  for (const [file, contents] of [
+    ["public.html", publicHtml],
+    ["public.js", publicJs],
+    ["public-config.js", publicConfigText]
+  ]) {
+    assert(!/copyLegalProcedurePacket/.test(contents), `${file} exposes legal procedure copy action.`);
+    assert(!/copyDraftFilingPacket/.test(contents), `${file} exposes draft filing copy action.`);
+    assert(!/copyLegalFilingExperiment/.test(contents), `${file} exposes legal filing experiment copy action.`);
+    assert(!/legalProcedureList/.test(contents), `${file} exposes legal procedure private panel.`);
+    assert(!/legalModeDistinctions/.test(contents), `${file} exposes legal mode distinctions private panel.`);
+    assert(!/legalTryMatrix/.test(contents), `${file} exposes legal try matrix private panel.`);
+    assert(!/legalDraftFilingList/.test(contents), `${file} exposes draft filing private panel.`);
+    assert(!/legalFilingExperimentPanel/.test(contents), `${file} exposes legal filing experiment private panel.`);
+    assert(!/MAIN_LEGAL_PROCEDURE_ITEMS/.test(contents), `${file} exposes private legal procedure internals.`);
+    assert(!/MAIN_LEGAL_DRAFT_FILING_ITEMS/.test(contents), `${file} exposes private draft filing internals.`);
+    assert(!/LEGAL_FILING_EXPERIMENT/.test(contents), `${file} exposes private legal experiment internals.`);
+    assert(!/LEGAL_TRY_MATRIX/.test(contents), `${file} exposes private legal try matrix internals.`);
+    assert(!/LEGAL_MODE_DISTINCTIONS/.test(contents), `${file} exposes private legal mode internals.`);
+  }
+}
+
 function checkConfig() {
   const config = loadPublicConfig();
   const formUrl = String(config.googleFormUrl || "").trim();
@@ -621,6 +740,7 @@ checkDailyPilotRunContract();
 checkPaidPilotProfitReadinessContract();
 checkOperationalV15Contract();
 checkRevenueStartContract();
+checkMainLegalProcedureContract();
 checkConfig();
 
 if (failures.length) {

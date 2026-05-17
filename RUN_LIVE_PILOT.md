@@ -17,6 +17,9 @@ It applies to the satellite operator (Strange Works Studio), not to Strange Comp
 
 Complete every line in the **Operational launch** checklist before sending the first invoice:
 
+- [ ] **Main legal procedure reviewed.** Use [LEGAL_PROCEDURE.md](LEGAL_PROCEDURE.md) to assemble the entity, EIN, BOI, tax/bookkeeping/payment, privacy/security/support, and professional-signoff evidence packet. This packet is required before the sealed Strange Company lane can claim live operation.
+- [ ] **Draft filing packet prepared, not submitted.** Use [LEGAL_DRAFT_FILINGS.md](LEGAL_DRAFT_FILINGS.md) to fill draft-only worksheets outside the repo. Keep SSN, ITIN, bank credentials, payment credentials, and signatures out of git.
+- [ ] **Legal filing dry run measured.** Use [LEGAL_FILING_EXPERIMENT.md](LEGAL_FILING_EXPERIMENT.md) to confirm the draft packet is reviewer-ready without submitting, signing, paying, filing, or entering sensitive identifiers.
 - [ ] **US LLC formed.** Articles of organization filed in the chosen state. See [SBA business registration](https://www.sba.gov/business-guide/launch-your-business/register-your-business).
 - [ ] **Responsible party identified.** The IRS requires a human responsible party for EIN control; a nominee or sealed autonomous system is not enough. See [IRS responsible parties](https://www.irs.gov/businesses/small-businesses-self-employed/responsible-parties-and-nominees).
 - [ ] **EIN issued.** Apply through the IRS after entity formation: [IRS EIN](https://www.irs.gov/businesses/employer-identification-number).
