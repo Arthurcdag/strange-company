@@ -63,6 +63,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [RESILIENCE_DRILLS.md](RESILIENCE_DRILLS.md): how attack drills become receipts and hardening packets.
 - [LAUNCH_PLAN.md](LAUNCH_PLAN.md): practical path to version 0.
 - [ONLINE_GATE.md](ONLINE_GATE.md): when the company may move from local prototype to private sandbox, public beta, or live operation.
+- [LIVE_HANDOFF_CHECKLIST.md](LIVE_HANDOFF_CHECKLIST.md): developer/operator checklist for turning the deployed static prototype into verified live intake.
 - [REVENUE_PILOT.md](REVENUE_PILOT.md): how the prototype moves toward the first controlled paid offer.
 - [SATELLITE_COMPANY.md](SATELLITE_COMPANY.md): how a separate for-profit company can net profit without breaking the sealed Strange Company charter.
 - [REVENUE_START.md](REVENUE_START.md): day-one two-company revenue posture and start packet sequence.
