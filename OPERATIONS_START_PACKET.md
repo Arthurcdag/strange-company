@@ -180,4 +180,6 @@ The next operator action is not a code change. It is to create or verify:
 4. Stripe Hosted Invoice route,
 5. terms and privacy review dates.
 
+Use [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md) for exact field names, Google Form questions, support inbox checks, Stripe evidence, bank evidence boundaries, and the final `public-config.js` patch.
+
 After those are available, update `public-config.js`, run the two required checks, and publish.

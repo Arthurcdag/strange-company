@@ -117,3 +117,5 @@ The satellite is not live while any of these remain true:
 - business bank route is not verified.
 
 The fastest next non-code work is to produce those eight pieces of evidence, then update `public-config.js` and rerun the live-required audit.
+
+Use [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md) for the exact developer/operator instructions to create the support inbox, Google Form, Sheet ledger, terms and privacy review dates, Stripe Hosted Invoice route, and private bank-route evidence.

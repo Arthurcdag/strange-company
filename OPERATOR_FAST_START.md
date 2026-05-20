@@ -4,6 +4,8 @@ Use this when the external setup is ready and the public Order Desk needs to poi
 
 For the shortest safe sequence across both lanes, see [ONLINE_ASAP.md](ONLINE_ASAP.md). The main Strange Company track can remain online as the static public prototype. The satellite track becomes live intake only after the external operating routes below are verified.
 
+For exact Google Form questions, Sheet headers, support inbox checks, Stripe evidence, bank evidence, and review-date rules, use [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md).
+
 ## 30 Minute Config Pass
 
 1. Confirm the monitored support inbox exists.

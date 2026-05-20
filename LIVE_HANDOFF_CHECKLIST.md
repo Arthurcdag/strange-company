@@ -43,6 +43,8 @@ node tools/audit_company_functionality.js
 
 ## 2. External Controls
 
+Use [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md) for the detailed setup instructions and evidence fields.
+
 - [ ] US LLC or approved operating entity is formed.
 - [ ] Responsible human party is identified for tax and banking control.
 - [ ] EIN or required tax identity is issued.

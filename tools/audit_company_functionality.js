@@ -80,9 +80,16 @@ function auditDocs() {
   assertIncludes("README.md", "REVENUE_START.md", "revenue start README link");
   assertIncludes("README.md", "GROWTH_MANAGEMENT.md", "growth management README link");
   assertIncludes("README.md", "ONLINE_ASAP.md", "online ASAP README link");
+  assertIncludes("README.md", "EXTERNAL_LIVE_CONTROLS.md", "external live controls README link");
   assertIncludes("ONLINE_ASAP.md", "Main Track: Strange Company", "main online ASAP lane");
   assertIncludes("ONLINE_ASAP.md", "Satellite Track: Strange Works Studio", "satellite online ASAP lane");
   assertIncludes("ONLINE_ASAP.md", "Set `liveMode: true` last", "live mode last instruction");
+  assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Google Form Intake", "Google Form setup instructions");
+  assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Support Inbox", "support inbox setup instructions");
+  assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Stripe Route", "Stripe route setup instructions");
+  assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Bank Route", "bank route setup instructions");
+  assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "termsReviewedAt", "terms review date instructions");
+  assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "privacyReviewedAt", "privacy review date instructions");
   assertIncludes("OPERATIONS_RUNBOOK.md", "## Functional Definition", "satellite functional definition");
   assertIncludes("OPERATIONS_RUNBOOK.md", "Receipt Chain Timeline Panel", "order timeline runbook section");
   assertIncludes("OPERATIONS_RUNBOOK.md", "Revenue Start Board", "revenue start runbook section");
