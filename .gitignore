@@ -9,6 +9,13 @@ __pycache__/
 .venv/
 node_modules/
 
+# Local live-operation evidence packets. Keep completed evidence private.
+EXTERNAL_LIVE_PACKET.local.json
+EXTERNAL_LIVE_PACKET.*.json
+external-live-packet.local.json
+external-live-packet.*.json
+!EXTERNAL_LIVE_PACKET.template.json
+
 # OS/editor noise
 .DS_Store
 Thumbs.db

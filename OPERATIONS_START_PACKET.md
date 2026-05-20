@@ -132,6 +132,7 @@ Edit `public-config.js` only after sections 1-5 are done.
 Required checks:
 
 ```bash
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live
 node tools/preflight_public_launch.js
 node tools/audit_company_functionality.js --require-live
 ```

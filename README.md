@@ -96,6 +96,8 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [public.js](public.js): payment-safe public request packet builder.
 - [tools/preflight_public_launch.js](tools/preflight_public_launch.js): launch preflight for public/private separation, URL allowlists, live-mode config, and sensitive-data guard coverage.
 - [tools/audit_company_functionality.js](tools/audit_company_functionality.js): repo-level audit for Strange Company, the satellite operator, and the external live-operation gate.
+- [tools/validate_external_live_packet.js](tools/validate_external_live_packet.js): local validator for the ignored external live-readiness evidence packet.
+- [EXTERNAL_LIVE_PACKET.template.json](EXTERNAL_LIVE_PACKET.template.json): safe blank template for live-intake evidence; completed copies stay local and ignored.
 - [index.html](index.html): private/local command center for Operations, Treasury, Decisions, and Research Gate.
 - [styles.css](styles.css): interface design for the prototype.
 - [script.js](script.js): treasury allocation, launch readiness, private order requests, revenue pilot, satellite profit model, revenue start board, growth review, operations console, external signals, execution packets, outcome receipts, outcome evidence reviews, capital routing, resilience drills, cooldown lanes, local receipt chain, logs, and operating loop animation.

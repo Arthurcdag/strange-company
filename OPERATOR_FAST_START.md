@@ -18,11 +18,12 @@ For exact Google Form questions, Sheet headers, support inbox checks, Stripe evi
    - set `termsReviewedAt` and `privacyReviewedAt`,
    - set `liveMode: true` only after the stop rule is clear,
    - adjust service names and prices if the offer changed.
-4. Run `node tools/preflight_public_launch.js`.
-5. Open `public.html` locally and confirm the readiness banner says `Live intake configured`.
-6. Submit a safe test packet.
-7. Confirm the email draft uses the real inbox.
-8. Open the Google Form from the public packet output and paste the packet.
+4. Run `node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live`.
+5. Run `node tools/preflight_public_launch.js`.
+6. Open `public.html` locally and confirm the readiness banner says `Live intake configured`.
+7. Submit a safe test packet.
+8. Confirm the email draft uses the real inbox.
+9. Open the Google Form from the public packet output and paste the packet.
 
 ## Live Smoke
 

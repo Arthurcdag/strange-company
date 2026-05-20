@@ -22,6 +22,30 @@ Collect these values before editing `public-config.js`:
 
 Use ISO dates: `YYYY-MM-DD`. The terms and privacy dates are the actual human review dates, not the commit date unless the review happened that day.
 
+## Readiness Packet
+
+Copy the template and fill it locally after the outside accounts are created:
+
+```bash
+copy EXTERNAL_LIVE_PACKET.template.json EXTERNAL_LIVE_PACKET.local.json
+```
+
+Keep `EXTERNAL_LIVE_PACKET.local.json` out of git. It is ignored on purpose because it can identify private operator accounts, dashboards, bank-route metadata, and test invoice evidence.
+
+Validate the blank template:
+
+```bash
+node tools/validate_external_live_packet.js --template-ok
+```
+
+Validate the completed local packet before changing `public-config.js`:
+
+```bash
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live
+```
+
+Only use the resulting public values in `public-config.js`; keep Stripe dashboard URLs, Sheet URLs, bank last4, and operator names in the private Operations evidence lane.
+
 ## 1. Support Inbox
 
 Target address: `ops@strangeworks.studio` or a documented replacement.

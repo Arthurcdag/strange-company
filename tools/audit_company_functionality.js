@@ -88,6 +88,11 @@ function auditDocs() {
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Support Inbox", "support inbox setup instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Stripe Route", "Stripe route setup instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Bank Route", "bank route setup instructions");
+  assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Readiness Packet", "external readiness packet instructions");
+  assertIncludes("README.md", "EXTERNAL_LIVE_PACKET.template.json", "external live packet template README link");
+  assertIncludes("README.md", "tools/validate_external_live_packet.js", "external live packet validator README link");
+  assertIncludes("EXTERNAL_LIVE_PACKET.template.json", '"schemaVersion": 1', "external live packet template schema");
+  assertIncludes("tools/validate_external_live_packet.js", "External live packet validation", "external live packet validator");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "termsReviewedAt", "terms review date instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "privacyReviewedAt", "privacy review date instructions");
   assertIncludes("OPERATIONS_RUNBOOK.md", "## Functional Definition", "satellite functional definition");
