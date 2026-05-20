@@ -2,6 +2,8 @@
 
 Use this when the external setup is ready and the public Order Desk needs to point at the real operating routes.
 
+For the shortest safe sequence across both lanes, see [ONLINE_ASAP.md](ONLINE_ASAP.md). The main Strange Company track can remain online as the static public prototype. The satellite track becomes live intake only after the external operating routes below are verified.
+
 ## 30 Minute Config Pass
 
 1. Confirm the monitored support inbox exists.

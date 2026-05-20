@@ -12,6 +12,13 @@ Current state:
 - `node tools/preflight_public_launch.js` passes.
 - `node tools/audit_company_functionality.js --require-live` fails by design until external controls are verified.
 
+ASAP interpretation:
+
+- Strange Company main is already online only as a static public prototype.
+- Strange Works Studio is the satellite lane that can become commercially live first.
+- The satellite stays packet-only until real support, intake, ledger, payment, terms, privacy, and bank evidence exists.
+- Use [ONLINE_ASAP.md](ONLINE_ASAP.md) before editing `public-config.js`.
+
 Live-operation blockers:
 
 - `public-config.js liveMode` is `false`.

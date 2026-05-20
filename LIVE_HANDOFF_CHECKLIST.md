@@ -11,6 +11,15 @@ Current state:
 
 Do not set `liveMode: true` until every external control below is real and tested.
 
+## ASAP Track Split
+
+Use [ONLINE_ASAP.md](ONLINE_ASAP.md) for the fastest safe launch sequence.
+
+- **Main track**: keep Strange Company online only as the GitHub Pages static prototype and documentation surface.
+- **Satellite track**: turn Strange Works Studio into live intake only after the support inbox, Google Form, terms, privacy, Stripe, bank, and ledger evidence are real.
+- **Boundary**: the private `index.html` command center remains local/private; GitHub Pages must not become the sealed command center.
+- **Last flag**: `public-config.js liveMode` is the final switch, never the first setup step.
+
 ## 1. Repo Sync
 
 - [ ] Clone or pull the latest `main` from `https://github.com/Arthurcdag/strange-company`.

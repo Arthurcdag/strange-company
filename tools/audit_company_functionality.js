@@ -79,6 +79,10 @@ function auditPrivateConsole() {
 function auditDocs() {
   assertIncludes("README.md", "REVENUE_START.md", "revenue start README link");
   assertIncludes("README.md", "GROWTH_MANAGEMENT.md", "growth management README link");
+  assertIncludes("README.md", "ONLINE_ASAP.md", "online ASAP README link");
+  assertIncludes("ONLINE_ASAP.md", "Main Track: Strange Company", "main online ASAP lane");
+  assertIncludes("ONLINE_ASAP.md", "Satellite Track: Strange Works Studio", "satellite online ASAP lane");
+  assertIncludes("ONLINE_ASAP.md", "Set `liveMode: true` last", "live mode last instruction");
   assertIncludes("OPERATIONS_RUNBOOK.md", "## Functional Definition", "satellite functional definition");
   assertIncludes("OPERATIONS_RUNBOOK.md", "Receipt Chain Timeline Panel", "order timeline runbook section");
   assertIncludes("OPERATIONS_RUNBOOK.md", "Revenue Start Board", "revenue start runbook section");
