@@ -136,6 +136,19 @@ function snapshot(config) {
   };
 }
 
+const validationCommands = [
+  "node tools/check_external_live_packet_gate.js",
+  "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live",
+  "node tools/preflight_public_launch.js",
+  "node tools/audit_company_functionality.js --require-live"
+];
+
+const stopRules = [
+  "Do not set liveMode true until support, Google Form, terms, privacy, Brazil compliance, and AI handoff evidence are real.",
+  "Do not commit EXTERNAL_LIVE_PACKET.local.json, Sheet URLs, Stripe dashboard URLs, bank metadata, private keys, or customer secrets.",
+  "Do not treat this packet as legal, tax, privacy, fiscal, payment, or support approval."
+];
+
 function liveEvidencePacket(config, model) {
   const missing = model.evidenceBlockers.length
     ? model.evidenceBlockers.map((row) => `- ${row.title} (${row.field}): ${row.fix}`).join("\n")
@@ -171,14 +184,10 @@ function liveEvidencePacket(config, model) {
     missing,
     "",
     "[Validation Commands]",
-    "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live",
-    "node tools/preflight_public_launch.js",
-    "node tools/audit_company_functionality.js --require-live",
+    validationCommands.join("\n"),
     "",
     "[Stop Rules]",
-    "Do not set liveMode true until support, Google Form, terms, privacy, Brazil compliance, and AI handoff evidence are real.",
-    "Do not commit EXTERNAL_LIVE_PACKET.local.json, Sheet URLs, Stripe dashboard URLs, bank metadata, private keys, or customer secrets.",
-    "Do not treat this packet as legal, tax, privacy, fiscal, payment, or support approval."
+    stopRules.join("\n")
   ].join("\n");
 }
 
@@ -201,7 +210,9 @@ if (asJson) {
       title: row.title,
       field: row.field,
       passed: row.passed
-    }))
+    })),
+    validationCommands,
+    stopRules
   }, null, 2));
 } else {
   console.log(liveEvidencePacket(config, model));

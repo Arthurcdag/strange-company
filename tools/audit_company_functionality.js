@@ -138,6 +138,7 @@ function auditDocs() {
   assertIncludes("README.md", "tools/generate_external_live_gap_packet.js", "external live gap packet README link");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "node tools/generate_external_live_gap_packet.js", "external live gap packet command");
   assertIncludes("tools/generate_external_live_gap_packet.js", "Strange Company external live evidence gap packet", "external live gap packet generator");
+  assertIncludes("tools/generate_external_live_gap_packet.js", "node tools/check_external_live_packet_gate.js", "external live gap packet regression command");
   assertIncludes("README.md", "EXTERNAL_LIVE_PACKET.template.json", "external live packet template README link");
   assertIncludes("README.md", "tools/validate_external_live_packet.js", "external live packet validator README link");
   assertIncludes("README.md", "tools/check_external_live_packet_gate.js", "external live packet gate regression README link");
