@@ -56,6 +56,9 @@ function externalLiveBlockers(config) {
 function auditPrivateConsole() {
   assertIncludes("index.html", 'id="satellite"', "satellite company view");
   assertIncludes("index.html", 'id="operations"', "operations console view");
+  assertIncludes("index.html", 'src="public-config.js"', "private console public config loader");
+  assertIncludes("index.html", 'id="liveEvidencePanel"', "live evidence panel");
+  assertIncludes("index.html", 'id="copyLiveEvidencePacket"', "live evidence copy action");
   assertIncludes("index.html", 'id="revenueStartPanel"', "revenue start panel");
   assertIncludes("index.html", 'id="issueRevenueStartPacket"', "revenue start issue action");
   assertIncludes("index.html", 'id="brazilComplianceAgentsPanel"', "Brazil compliance agents panel");
@@ -69,6 +72,10 @@ function auditPrivateConsole() {
   assertIncludes("script.js", "function brazilComplianceAgentPacket", "Brazil compliance agent packet");
   assertIncludes("script.js", "function renderBrazilComplianceAgents", "Brazil compliance agent renderer");
   assertIncludes("script.js", "async function copyBrazilComplianceAgentPacket", "Brazil compliance agent copy action");
+  assertIncludes("script.js", "function buildLiveEvidenceModel", "live evidence state model");
+  assertIncludes("script.js", "function liveEvidencePacket", "live evidence packet");
+  assertIncludes("script.js", "function renderLiveEvidencePanel", "live evidence renderer");
+  assertIncludes("script.js", "async function copyLiveEvidencePacket", "live evidence copy action");
   assertIncludes("script.js", "const ADAPTIVE_DAMAGE_ROUTES = [", "adaptive damage route roster");
   assertIncludes("script.js", "function buildAdaptiveOperatorModel", "adaptive operator state model");
   assertIncludes("script.js", "function adaptiveReceiptPacket", "adaptive operator packet");
@@ -121,6 +128,7 @@ function auditDocs() {
   assertIncludes("ONLINE_ASAP.md", "Set `liveMode: true` last", "live mode last instruction");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Google Form Intake", "Google Form setup instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Support Inbox", "support inbox setup instructions");
+  assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Launch Gate Evidence Panel", "live evidence panel instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Stripe Route", "Stripe route setup instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Bank Route", "bank route setup instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Readiness Packet", "external readiness packet instructions");

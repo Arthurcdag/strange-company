@@ -1173,6 +1173,239 @@ function renderLaunchGate() {
       `
     )
     .join("");
+
+  renderLiveEvidencePanel();
+}
+
+function publicOrderConfig() {
+  return window.PUBLIC_ORDER_CONFIG && typeof window.PUBLIC_ORDER_CONFIG === "object"
+    ? window.PUBLIC_ORDER_CONFIG
+    : {};
+}
+
+function isIsoDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim());
+}
+
+function googleFormUrlReady(value) {
+  const url = safeHttpsUrl(value);
+  return Boolean(url && url.startsWith("https://docs.google.com/forms/"));
+}
+
+function coreLiveEvidenceRows(config) {
+  return [
+    {
+      id: "support-inbox",
+      title: "Support inbox verified",
+      field: "supportEmail + supportInboxVerified",
+      passed: Boolean(String(config.supportEmail || "").trim() && config.supportInboxVerified === true),
+      evidence: "SUPPORT_INBOX_EVIDENCE.md plus the support section of EXTERNAL_LIVE_PACKET.local.json.",
+      fix: "Record monitored inbox owner, cadence, test received timestamp, and reply timestamp."
+    },
+    {
+      id: "google-form-url",
+      title: "Google Form URL public and safe",
+      field: "googleFormUrl",
+      passed: googleFormUrlReady(config.googleFormUrl),
+      evidence: "GOOGLE_FORM_INTAKE.md and the Google section of EXTERNAL_LIVE_PACKET.local.json.",
+      fix: "Create the Form, link it to the private Sheet, then paste only the public Form URL."
+    },
+    {
+      id: "google-form-verified",
+      title: "Google Form test response verified",
+      field: "googleFormVerified",
+      passed: config.googleFormVerified === true,
+      evidence: "Safe test response timestamp in the private Sheet ledger and external live packet.",
+      fix: "Submit one safe test response and confirm it lands in the Responses ledger."
+    },
+    {
+      id: "terms-review",
+      title: "Terms reviewed by human",
+      field: "termsReviewedAt",
+      passed: isIsoDate(config.termsReviewedAt),
+      evidence: "TERMS.md / TERMOS.md review note and external live packet legalReview section.",
+      fix: "Record the actual human review date as YYYY-MM-DD."
+    },
+    {
+      id: "privacy-review",
+      title: "Privacy reviewed by human",
+      field: "privacyReviewedAt",
+      passed: isIsoDate(config.privacyReviewedAt),
+      evidence: "PRIVACY.md / AVISO_DE_PRIVACIDADE.md review note and external live packet legalReview section.",
+      fix: "Record the actual privacy review date as YYYY-MM-DD."
+    },
+    {
+      id: "brazil-compliance-review",
+      title: "Brazil compliance review closed",
+      field: "brazilComplianceReviewedAt",
+      passed: isIsoDate(config.brazilComplianceReviewedAt),
+      evidence: "BRAZIL_COMPLIANCE.md, BRAZIL_COMPLIANCE_AGENTS.md, and human accounting/legal review notes.",
+      fix: "Close CNPJ/fiscal/LGPD/payment support review with a responsible human."
+    },
+    {
+      id: "ai-handoff-review",
+      title: "AI legal handoff reviewed",
+      field: "aiHandoffReviewedAt",
+      passed: isIsoDate(config.aiHandoffReviewedAt),
+      evidence: "AI_LEGAL_HANDOFF.md and the responsible human review record.",
+      fix: "Confirm which AI-prepared text remains draft-only and which human-owned changes are accepted."
+    },
+    {
+      id: "brazil-config",
+      title: "Public config remains Brazil-first",
+      field: "jurisdiction + aiGeneratedLegalDocsRequireHumanReview",
+      passed: config.jurisdiction === "BR" && config.aiGeneratedLegalDocsRequireHumanReview === true,
+      evidence: "public-config.js jurisdiction and AI review flags.",
+      fix: "Keep jurisdiction BR and require human review for AI-generated legal docs."
+    }
+  ];
+}
+
+function buildLiveEvidenceModel() {
+  const config = publicOrderConfig();
+  const coreRows = coreLiveEvidenceRows(config);
+  const evidenceBlockers = coreRows.filter((row) => !row.passed);
+  const liveModeSafe = config.liveMode !== true || evidenceBlockers.length === 0;
+  const rows = [
+    ...coreRows,
+    {
+      id: "live-mode-last",
+      title: "Live mode stays last",
+      field: "liveMode",
+      passed: liveModeSafe,
+      evidence: "public-config.js must stay false until all external evidence rows are real.",
+      fix: "Set liveMode true only after --require-live passes with real external evidence.",
+      stateLabel: config.liveMode === true ? "On" : "Off"
+    }
+  ];
+  const blockers = rows.filter((row) => !row.passed);
+  const readyToTurnOn = evidenceBlockers.length === 0 && liveModeSafe;
+  return {
+    config,
+    rows,
+    blockers,
+    evidenceBlockers,
+    readyToTurnOn,
+    liveMode: config.liveMode === true,
+    state: readyToTurnOn ? "External evidence ready" : "External evidence blocked",
+    tone: blockers.length ? "red" : "green",
+    nextAction: evidenceBlockers.length
+      ? evidenceBlockers[0].fix
+      : config.liveMode === true
+        ? "Keep monitoring support, intake, reviews, payments, incidents, and receipt-chain seals."
+        : "Run the external live packet validator and --require-live before flipping liveMode."
+  };
+}
+
+function liveEvidencePacket() {
+  const model = buildLiveEvidenceModel();
+  const config = model.config;
+  const missing = model.evidenceBlockers.length
+    ? model.evidenceBlockers.map((row) => `- ${row.title} (${row.field}): ${row.fix}`).join("\n")
+    : "- No missing external evidence rows detected in the public config.";
+  const rows = model.rows
+    .map((row) => `- ${row.title}: ${row.passed ? "pass" : "block"} / ${row.field}`)
+    .join("\n");
+  return [
+    "Strange Company external live evidence packet",
+    `Generated: ${new Date().toISOString()}`,
+    `Operator: ${config.operatorName || "not configured"}`,
+    `Jurisdiction: ${config.jurisdiction || "not configured"}`,
+    `Live mode: ${config.liveMode === true ? "true" : "false"}`,
+    "",
+    "[Public Config Snapshot]",
+    `supportEmail: ${config.supportEmail || ""}`,
+    `supportInboxVerified: ${config.supportInboxVerified === true}`,
+    `googleFormUrl: ${config.googleFormUrl || ""}`,
+    `googleFormVerified: ${config.googleFormVerified === true}`,
+    `termsReviewedAt: ${config.termsReviewedAt || ""}`,
+    `privacyReviewedAt: ${config.privacyReviewedAt || ""}`,
+    `brazilComplianceReviewedAt: ${config.brazilComplianceReviewedAt || ""}`,
+    `aiHandoffReviewedAt: ${config.aiHandoffReviewedAt || ""}`,
+    "",
+    "[Gate Rows]",
+    rows,
+    "",
+    "[Missing Evidence]",
+    missing,
+    "",
+    "[Validation Commands]",
+    "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live",
+    "node tools/audit_company_functionality.js --require-live",
+    "",
+    "[Stop Rules]",
+    "Do not set liveMode true until support, Google Form, terms, privacy, Brazil compliance, and AI handoff evidence are real.",
+    "Do not commit EXTERNAL_LIVE_PACKET.local.json, Sheet URLs, Stripe dashboard URLs, bank metadata, private keys, or customer secrets.",
+    "Do not treat this packet as legal, tax, privacy, fiscal, payment, or support approval."
+  ].join("\n");
+}
+
+function renderLiveEvidenceOutput(text, copied) {
+  const output = document.querySelector("#liveEvidenceOutput");
+  if (!output || !text) {
+    return;
+  }
+  output.classList.add("active");
+  output.innerHTML = `
+    <article>
+      <span class="metric-label">${copied ? "Live evidence packet copied" : "Live evidence packet generated"}</span>
+      <pre>${escapeHtml(text)}</pre>
+    </article>
+  `;
+}
+
+function renderLiveEvidencePanel() {
+  const panel = document.querySelector("#liveEvidencePanel");
+  if (!panel) {
+    return;
+  }
+  const model = buildLiveEvidenceModel();
+  const rows = model.rows
+    .map((row) => `
+      <article class="launch-evidence-row">
+        <div>
+          <span class="metric-label">${escapeHtml(row.field)}</span>
+          <h4>${escapeHtml(row.title)}</h4>
+          <p>${escapeHtml(row.evidence)}</p>
+        </div>
+        <span class="state ${row.passed ? "green" : "red"}">${escapeHtml(row.passed ? row.stateLabel || "Ready" : "Block")}</span>
+        <strong>${escapeHtml(row.passed ? "Evidence held" : row.fix)}</strong>
+      </article>
+    `)
+    .join("");
+  panel.innerHTML = `
+    <article class="launch-evidence-summary ${escapeHtml(model.tone)}">
+      <div>
+        <span class="metric-label">External live evidence</span>
+        <h3>${escapeHtml(model.state)}</h3>
+        <p>${escapeHtml(model.nextAction)} This panel reads the public config into the private command center; it does not verify outside accounts by itself.</p>
+      </div>
+      <div class="launch-evidence-counts">
+        <span><strong>${model.evidenceBlockers.length}</strong><small>Evidence gaps</small></span>
+        <span><strong>${model.liveMode ? "On" : "Off"}</strong><small>liveMode</small></span>
+      </div>
+    </article>
+    ${rows}
+  `;
+}
+
+async function copyLiveEvidencePacket(button) {
+  const packet = liveEvidencePacket();
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(packet);
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  renderLiveEvidenceOutput(packet, copied);
+  if (button) {
+    const previous = button.getAttribute("title") || "Copy live evidence packet";
+    button.setAttribute("title", copied ? "Copied" : "Copy failed");
+    setTimeout(() => {
+      button.setAttribute("title", previous);
+    }, 1500);
+  }
 }
 
 function buildLaunchDecision() {
@@ -8027,6 +8260,13 @@ function collectReceiptEvents() {
     });
   }
 
+  const liveEvidence = buildLiveEvidenceModel();
+  push("Live Evidence", "external-live-evidence", "External live evidence packet", "Launch gate", liveEvidence.state, "baseline", {
+    blockers: liveEvidence.evidenceBlockers.map((row) => row.id),
+    liveMode: liveEvidence.liveMode,
+    readyToTurnOn: liveEvidence.readyToTurnOn
+  });
+
   const pilotReadiness = buildPilotReadiness();
   const pilotTimes = [
     ...(revenuePilot.leads || []).map((lead) => lead.updatedAt || lead.createdAt),
@@ -9311,6 +9551,7 @@ function setupResilienceDrills() {
 function setupLaunchGate() {
   const runButton = document.querySelector("#runLaunchCheck");
   const draftButton = document.querySelector("#draftLaunchPacket");
+  const copyEvidenceButton = document.querySelector("#copyLiveEvidencePacket");
 
   if (runButton) {
     runButton.addEventListener("click", refreshLaunchGateStatus);
@@ -9318,6 +9559,10 @@ function setupLaunchGate() {
 
   if (draftButton) {
     draftButton.addEventListener("click", issueLaunchPacket);
+  }
+
+  if (copyEvidenceButton) {
+    copyEvidenceButton.addEventListener("click", () => copyLiveEvidencePacket(copyEvidenceButton));
   }
 }
 

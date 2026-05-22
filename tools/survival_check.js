@@ -94,8 +94,11 @@ function checkStaticSurvivalSurface() {
   assert(publicJs.includes("if (!readiness.liveReady)"), "public.js must block public submits before live readiness.", "public submit live gate", "public.js");
   assert(publicJs.includes('readiness.liveReady ? `<a href="${mailtoUrl(order)}">Open email draft</a>` : ""'), "public.js must hide email draft action before live readiness.", "public email action live gate", "public.js");
 
+  assert(read("index.html").includes('id="liveEvidencePanel"'), "index.html must expose the private live evidence panel.", "live evidence panel", "index.html");
   assert(script.includes("function buildReceiptChain"), "script.js must include receipt-chain construction.", "receipt-chain builder", "script.js");
   assert(script.includes("function sealReceiptChain"), "script.js must include receipt-chain sealing.", "receipt-chain sealer", "script.js");
+  assert(script.includes("function buildLiveEvidenceModel"), "script.js must include live evidence state modeling.", "live evidence model", "script.js");
+  assert(script.includes("function liveEvidencePacket"), "script.js must include live evidence packet generation.", "live evidence packet", "script.js");
   assert(script.includes("function runResilienceDrill"), "script.js must include resilience drill execution.", "resilience drill runner", "script.js");
   assert(script.includes("function issueDrillHardeningPacket"), "script.js must include drill hardening packet issuance.", "hardening packet issuer", "script.js");
   assert(script.includes("const BRAZIL_COMPLIANCE_AGENTS = ["), "script.js must include Brazil compliance agents.", "Brazil compliance agents", "script.js");

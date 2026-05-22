@@ -259,6 +259,8 @@ h3 {
 .order-offer-card,
 .order-output,
 .launch-panel,
+.launch-evidence-summary,
+.launch-evidence-row,
 .launch-phase,
 .launch-check,
 .pilot-verdict,
@@ -649,6 +651,106 @@ h3 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 18px;
+}
+
+.launch-evidence-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.launch-evidence-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.55fr);
+  gap: 18px;
+  align-items: center;
+  padding: 18px;
+  border-left: 3px solid var(--amber);
+}
+
+.launch-evidence-summary.green {
+  border-left-color: var(--green);
+}
+
+.launch-evidence-summary.red {
+  border-left-color: var(--red);
+}
+
+.launch-evidence-summary h3,
+.launch-evidence-summary p,
+.launch-evidence-row h4,
+.launch-evidence-row p {
+  margin: 0;
+}
+
+.launch-evidence-summary p,
+.launch-evidence-row p {
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.44;
+}
+
+.launch-evidence-counts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.launch-evidence-counts span {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f3efe8;
+}
+
+.launch-evidence-counts strong,
+.launch-evidence-counts small {
+  display: block;
+}
+
+.launch-evidence-counts strong {
+  font-size: 20px;
+}
+
+.launch-evidence-counts small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.launch-evidence-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px 210px;
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+}
+
+.launch-evidence-output {
+  display: none;
+  margin-bottom: 18px;
+}
+
+.launch-evidence-output.active {
+  display: block;
+}
+
+.launch-evidence-output article {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.launch-evidence-output pre {
+  margin: 12px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .launch-section-header {
@@ -3195,6 +3297,7 @@ input[type="range"] {
   .order-verdict,
   .order-layout,
   .launch-panel,
+  .launch-evidence-summary,
   .pilot-verdict,
   .satellite-verdict,
   .pilot-layout,
@@ -3299,6 +3402,7 @@ input[type="range"] {
   .ops-launch-item,
   .revenue-start-packet,
   .adaptive-receipt-card,
+  .launch-evidence-row,
   .growth-channel,
   .sales-lead-card,
   .signal-card,

@@ -46,6 +46,12 @@ node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --re
 
 Only use the resulting public values in `public-config.js`; keep Stripe dashboard URLs, Sheet URLs, bank last4, and operator names in the private Operations evidence lane.
 
+## Launch Gate Evidence Panel
+
+The private Launch Gate view reads `public-config.js` and shows an **External live evidence** panel. Use **Copy live evidence packet** to capture the current public config snapshot, the missing evidence rows, and the exact validation commands before editing `public-config.js`.
+
+The panel is a handoff aid only. It does not verify Google, Stripe, bank, support, legal, tax, privacy, fiscal, or AI-review evidence by itself, and it must not be used as approval to set `liveMode: true`.
+
 ## 1. Support Inbox
 
 Target address: `ops@strangeworks.studio` or a documented replacement.
