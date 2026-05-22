@@ -1,11 +1,16 @@
 window.PUBLIC_ORDER_CONFIG = {
   operatorName: "Strange Works Studio",
-  supportEmail: "ops@strangeworks.studio",
+  jurisdiction: "BR",
+  complianceMode: "brazil-draft",
+  aiGeneratedLegalDocsRequireHumanReview: true,
+  supportEmail: "tuiidagnese+strangeworks@gmail.com",
   googleFormUrl: "",
-  supportInboxVerified: false,
+  supportInboxVerified: true,
   googleFormVerified: false,
   termsReviewedAt: "",
   privacyReviewedAt: "",
+  brazilComplianceReviewedAt: "",
+  aiHandoffReviewedAt: "",
   liveMode: false,
   services: [
     {

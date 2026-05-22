@@ -275,6 +275,7 @@ h3 {
 .revenue-start-card,
 .revenue-start-lane,
 .revenue-start-packet,
+.compliance-agent-card,
 .growth-review-card,
 .growth-channel,
 .sales-lead-form,
@@ -3068,6 +3069,7 @@ input[type="range"] {
   .ops-layout,
   .revenue-start-card,
   .revenue-start-lanes,
+  .compliance-agent-list,
   .growth-review-card,
   .sales-pipeline-layout,
   .signal-layout,
@@ -3881,6 +3883,196 @@ input[type="range"] {
   font-size: 12px;
 }
 
+.compliance-agents {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.compliance-agent-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.compliance-agent-summary.green {
+  border-color: var(--green);
+}
+
+.compliance-agent-summary.amber {
+  border-color: var(--amber);
+}
+
+.compliance-agent-summary.red {
+  border-color: var(--red);
+}
+
+.compliance-agent-summary h3,
+.compliance-agent-card h4,
+.compliance-agent-summary p,
+.compliance-agent-card p,
+.compliance-agent-work,
+.compliance-agent-work dd {
+  margin: 0;
+}
+
+.compliance-agent-summary h3 {
+  margin-top: 4px;
+  font-size: 18px;
+}
+
+.compliance-agent-summary p,
+.compliance-agent-card p {
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.compliance-agent-counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(92px, 1fr));
+  gap: 8px;
+  align-self: start;
+}
+
+.compliance-agent-counts > span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+}
+
+.compliance-agent-counts strong,
+.compliance-agent-counts small {
+  display: block;
+}
+
+.compliance-agent-counts small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.compliance-agent-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.compliance-agent-card {
+  display: grid;
+  gap: 12px;
+  padding: 15px;
+  border-left: 3px solid var(--amber);
+}
+
+.compliance-agent-card.green {
+  border-left-color: var(--green);
+}
+
+.compliance-agent-card.red {
+  border-left-color: var(--red);
+}
+
+.compliance-agent-head,
+.compliance-agent-footer,
+.compliance-agent-evidence li {
+  display: flex;
+  gap: 10px;
+  align-items: start;
+  justify-content: space-between;
+}
+
+.compliance-agent-head h4 {
+  margin-top: 4px;
+  font-size: 16px;
+}
+
+.compliance-agent-work {
+  display: grid;
+  gap: 8px;
+}
+
+.compliance-agent-work > div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--surface-2);
+}
+
+.compliance-agent-work dt {
+  margin-bottom: 4px;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.compliance-agent-work dd,
+.compliance-agent-footer span,
+.compliance-agent-evidence {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.compliance-agent-evidence {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.compliance-agent-evidence li {
+  border-top: 1px solid var(--line);
+  padding-top: 7px;
+}
+
+.compliance-agent-evidence span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.compliance-agent-footer {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.compliance-agent-footer button {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  min-height: 36px;
+  white-space: nowrap;
+}
+
+.compliance-agent-footer svg {
+  width: 15px;
+  height: 15px;
+}
+
+.compliance-agent-output article {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.compliance-agent-output pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .acq-target-row {
   display: flex;
   flex-wrap: wrap;
@@ -4016,11 +4208,23 @@ input[type="range"] {
 
 @media (max-width: 720px) {
   .setup-evidence-summary,
+  .compliance-agent-summary,
   .acq-summary {
     grid-template-columns: 1fr;
   }
 
   .setup-evidence-card {
     grid-template-columns: 1fr;
+  }
+
+  .compliance-agent-counts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .compliance-agent-head,
+  .compliance-agent-footer,
+  .compliance-agent-evidence li {
+    display: grid;
+    justify-content: stretch;
   }
 }

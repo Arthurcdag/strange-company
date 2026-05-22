@@ -1,11 +1,16 @@
 const DEFAULT_PUBLIC_ORDER_CONFIG = {
   operatorName: "Strange Works Studio",
-  supportEmail: "ops@strangeworks.studio",
+  jurisdiction: "BR",
+  complianceMode: "brazil-draft",
+  aiGeneratedLegalDocsRequireHumanReview: true,
+  supportEmail: "tuiidagnese+strangeworks@gmail.com",
   googleFormUrl: "",
-  supportInboxVerified: false,
+  supportInboxVerified: true,
   googleFormVerified: false,
   termsReviewedAt: "",
   privacyReviewedAt: "",
+  brazilComplianceReviewedAt: "",
+  aiHandoffReviewedAt: "",
   liveMode: false,
   services: [
     {
@@ -31,9 +36,9 @@ const PUBLIC_ORDER_CONFIG = {
     : DEFAULT_PUBLIC_ORDER_CONFIG.services
 };
 
-const money = new Intl.NumberFormat("en-US", {
+const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
-  currency: "USD",
+  currency: "BRL",
   maximumFractionDigits: 0
 });
 
@@ -85,12 +90,17 @@ function publicReadinessModel() {
   const formReady = Boolean(formUrl && PUBLIC_ORDER_CONFIG.googleFormVerified);
   const termsReady = Boolean(PUBLIC_ORDER_CONFIG.termsReviewedAt);
   const privacyReady = Boolean(PUBLIC_ORDER_CONFIG.privacyReviewedAt);
-  const liveReady = Boolean(PUBLIC_ORDER_CONFIG.liveMode && supportReady && formReady && termsReady && privacyReady);
+  const brazilReady = PUBLIC_ORDER_CONFIG.jurisdiction === "BR"
+    && PUBLIC_ORDER_CONFIG.aiGeneratedLegalDocsRequireHumanReview === true
+    && Boolean(PUBLIC_ORDER_CONFIG.brazilComplianceReviewedAt)
+    && Boolean(PUBLIC_ORDER_CONFIG.aiHandoffReviewedAt);
+  const liveReady = Boolean(PUBLIC_ORDER_CONFIG.liveMode && supportReady && formReady && termsReady && privacyReady && brazilReady);
   const blockers = [];
   if (!supportReady) blockers.push("support inbox");
   if (!formReady) blockers.push("Google intake");
   if (!termsReady) blockers.push("terms review");
   if (!privacyReady) blockers.push("privacy review");
+  if (!brazilReady) blockers.push("Brazil compliance and AI human review");
   if (!PUBLIC_ORDER_CONFIG.liveMode) blockers.push("live-mode flag");
   return {
     formUrl,
@@ -98,6 +108,7 @@ function publicReadinessModel() {
     formReady,
     termsReady,
     privacyReady,
+    brazilReady,
     liveReady,
     blockers
   };
@@ -113,15 +124,16 @@ function renderReadiness() {
   target.innerHTML = `
     <div>
       <span class="metric-label">Public intake status</span>
-      <h2>${model.liveReady ? "Live intake configured" : "Packet-only mode"}</h2>
+      <h2>${model.liveReady ? "Live intake configured" : "Public intake closed"}</h2>
       <p>${model.liveReady
-        ? "Support, Google intake, terms, and privacy review are configured for manual pilot intake."
-        : `Still waiting on: ${escapeHtml(model.blockers.join(", "))}. Requests can be packaged, but the operator must review them manually.`}</p>
+        ? "Support, Google intake, Brazil review gates, terms, and privacy review are configured for manual pilot intake."
+        : `Still waiting on: ${escapeHtml(model.blockers.join(", "))}. Public intake is closed; use the private command center for test packets until the live gate is reviewed.`}</p>
     </div>
     <div class="readiness-pill ${tone}">${model.liveReady ? "Ready" : "Manual"}</div>
     <div class="readiness-checks">
       <span class="state ${model.supportReady ? "green" : "amber"}">Support</span>
       <span class="state ${model.formReady ? "green" : "amber"}">Google intake</span>
+      <span class="state ${model.brazilReady ? "green" : "amber"}">Brazil</span>
       <span class="state ${model.termsReady ? "green" : "amber"}">Terms</span>
       <span class="state ${model.privacyReady ? "green" : "amber"}">Privacy</span>
     </div>
@@ -132,6 +144,7 @@ function requestPacket(order) {
   return [
     `Request ID: ${order.id}`,
     `Operator: ${PUBLIC_ORDER_CONFIG.operatorName}`,
+    `Jurisdiction: Brazil`,
     `Customer: ${order.customer}`,
     `Contact: ${order.contact}`,
     `Service: ${order.serviceTitle}`,
@@ -144,7 +157,8 @@ function requestPacket(order) {
     "Controls:",
     "Manual invoice request only.",
     "No payment data is collected by this site.",
-    "No protected health information, credentials, private keys, or regulated source documents are accepted in v1."
+    "No protected health information, credentials, private keys, sensitive personal data, or regulated source documents are accepted in v1.",
+    "AI-generated legal, tax, privacy, and compliance copy requires human review before use."
   ].join("\n");
 }
 
@@ -172,8 +186,8 @@ function renderPacket(order) {
     <strong>${escapeHtml(order.id)} / ${escapeHtml(order.customer)}</strong>
     <p>${readiness.formReady ? "Open the verified Google intake and paste the packet there." : "Forward this packet manually until the Google intake is verified."}</p>
     <div class="order-output-actions">
-      <a href="${mailtoUrl(order)}">Open email draft</a>
-      ${readiness.formReady ? `<a href="${escapeHtml(readiness.formUrl)}" target="_blank" rel="noreferrer">Open Google intake</a>` : ""}
+      ${readiness.liveReady ? `<a href="${mailtoUrl(order)}">Open email draft</a>` : ""}
+      ${readiness.liveReady && readiness.formReady ? `<a href="${escapeHtml(readiness.formUrl)}" target="_blank" rel="noreferrer">Open Google intake</a>` : ""}
       <button type="button" id="copyPublicPacket">Copy packet</button>
     </div>
     <pre>${escapeHtml(packet)}</pre>
@@ -205,6 +219,11 @@ function setupForm() {
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
+    const readiness = publicReadinessModel();
+    if (!readiness.liveReady) {
+      renderBlocked(`Public intake is closed until these gates are reviewed: ${readiness.blockers.join(", ")}.`);
+      return;
+    }
     const formData = new FormData(form);
     const customer = String(formData.get("customer") || "").trim().slice(0, 120);
     const contact = String(formData.get("contact") || "").trim().slice(0, 160);

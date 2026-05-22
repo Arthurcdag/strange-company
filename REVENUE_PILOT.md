@@ -24,13 +24,13 @@ Promise:
 Default pilot price:
 
 ```text
-$750/month per pilot customer
+R$750/month per pilot customer
 ```
 
 Target:
 
 ```text
-$4,000/month committed recurring revenue
+R$4,000/month committed recurring revenue
 ```
 
 ## Slow Functional Path
@@ -47,22 +47,24 @@ $4,000/month committed recurring revenue
 
 The Revenue Pilot now hands off to the Operations `Revenue start` board.
 
-That board keeps the first payment out of the sealed Strange Company lane. The pilot can start revenue only through the second company lane, where Strange Works Studio has separate setup evidence, manual invoice handling, Sheet ledger tracking, support, delivery closeout, and incident handling.
+That board keeps the first payment out of the sealed Strange Company lane. The pilot can start revenue only through the second company lane, where Strange Works Studio has separate Brazil setup evidence, manual payment/invoice handling, NFS-e or receipt handling, Sheet ledger tracking, support, delivery closeout, and incident handling.
 
 ## Payment Gate
 
 The prototype blocks the mental move from interest to revenue until critical blockers are done:
 
 - legal wrapper selected,
+- Brazilian entity/CNPJ or approved operating route confirmed,
+- tax/NFS-e or reviewed fiscal receipt route ready,
 - payment route ready,
 - accounting lane ready,
-- terms and privacy copy ready.
+- terms, privacy, LGPD contact, and AI-human review boundary ready.
 
 Support route is tracked too, but it is not a critical payment blocker in the prototype.
 
 ## Operating Rule
 
-No real money should move through Strange Company until the legal, payment, accounting, and customer terms lanes are real. Before that point, the Revenue Pilot is a commitment tracker and discovery desk.
+No real money should move through Strange Company until the legal, tax, NFS-e/receipt, payment, accounting, privacy, and customer terms lanes are real. Before that point, the Revenue Pilot is a commitment tracker and discovery desk.
 
 ## Why This Fits The Charter
 

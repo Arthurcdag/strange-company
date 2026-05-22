@@ -70,15 +70,22 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [ORDER_DESK.md](ORDER_DESK.md): how public invoice requests become manual order packets.
 - [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md): the manual order, invoice, payment, delivery, and receipt loop for the first functional operator.
 - [OPERATIONS_START_PACKET.md](OPERATIONS_START_PACKET.md): current start sequence and evidence checklist for opening live intake.
-- [RUN_LIVE_PILOT.md](RUN_LIVE_PILOT.md): operational v1 daily loop for the real US manual paid pilot (LLC, EIN, bank, Stripe, Sheet ledger).
+- [RUN_LIVE_PILOT.md](RUN_LIVE_PILOT.md): operational v1 daily loop for the Brazil-first manual paid pilot (CNPJ/operator, NFS-e, payment route, Sheet ledger).
+- [BRAZIL_COMPLIANCE.md](BRAZIL_COMPLIANCE.md): Brazil legal, LGPD, consumer-law, tax, payment, and AI-use gate for launch.
+- [BRAZIL_COMPLIANCE_AGENTS.md](BRAZIL_COMPLIANCE_AGENTS.md): private agent queues that turn missing Brazil compliance gates into AI-prepared handoffs and human evidence tasks.
+- [AI_LEGAL_HANDOFF.md](AI_LEGAL_HANDOFF.md): what AI prepared and what must be finished by a human, lawyer, accountant, bank, payment provider, or public authority.
+- [GOOGLE_FORM_INTAKE.md](GOOGLE_FORM_INTAKE.md): created Drive Sheet ledger/control workbook, pending Google Form build, and verification gate.
 - [GROWTH_MANAGEMENT.md](GROWTH_MANAGEMENT.md): private growth review that turns acquisition and pipeline receipts into the next operator action.
 - [OPERATOR_FAST_START.md](OPERATOR_FAST_START.md): the quick config and smoke-test path for turning the public desk toward real routes.
 - [GOOGLE_SHEET_LEDGER.md](GOOGLE_SHEET_LEDGER.md): Google Sheet tabs, columns, and first public intake route.
 - [TOOLING_POLICY.md](TOOLING_POLICY.md): how market data, research, Zotero, and GitHub tools are allowed in v1.
 - [EXTERNAL_SIGNALS.md](EXTERNAL_SIGNALS.md): private read-only signal packets from market, citation, research, and GitHub evidence tools.
-- [TERMS.md](TERMS.md): draft v0 service terms for the satellite company.
-- [PRIVACY.md](PRIVACY.md): draft v0 privacy notice for the static prototype and operating loop.
+- [TERMOS.md](TERMOS.md): customer-facing Portuguese draft terms for the Brazil-first public desk.
+- [AVISO_DE_PRIVACIDADE.md](AVISO_DE_PRIVACIDADE.md): customer-facing Portuguese draft privacy notice for LGPD review.
+- [TERMS.md](TERMS.md): English operator reference draft for the satellite company.
+- [PRIVACY.md](PRIVACY.md): English operator reference privacy draft for the static prototype and operating loop.
 - [SUPPORT.md](SUPPORT.md): manual support and incident handling route.
+- [SUPPORT_INBOX_EVIDENCE.md](SUPPORT_INBOX_EVIDENCE.md): verified pilot support/privacy inbox evidence and branded-domain stop rule.
 - [RESEARCH_GATE.md](RESEARCH_GATE.md): how `reactive-research-tools` is used as a decision sanity layer.
 - [TREASURY_OS.md](TREASURY_OS.md): how treasury spend proposals are gated before approval.
 - [EXECUTION_MARKET.md](EXECUTION_MARKET.md): how approved capital becomes external work packets.
@@ -94,9 +101,11 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [public.js](public.js): payment-safe public request packet builder.
 - [tools/preflight_public_launch.js](tools/preflight_public_launch.js): launch preflight for public/private separation, URL allowlists, live-mode config, and sensitive-data guard coverage.
 - [tools/audit_company_functionality.js](tools/audit_company_functionality.js): repo-level audit for Strange Company, the satellite operator, and the external live-operation gate.
+- [tools/survival_check.js](tools/survival_check.js): survival drill that confirms the charter, resilience model, receipt chain, Brazil/AI gates, public/private boundary, and expected live-gate behavior still hold.
+- [tools/google_apps_script_create_intake_form.gs](tools/google_apps_script_create_intake_form.gs): Apps Script builder for creating the Google Form intake and linking it to the private Sheet ledger.
 - [index.html](index.html): private/local command center for Operations, Treasury, Decisions, and Research Gate.
 - [styles.css](styles.css): interface design for the prototype.
-- [script.js](script.js): treasury allocation, launch readiness, private order requests, revenue pilot, satellite profit model, revenue start board, growth review, operations console, external signals, execution packets, outcome receipts, outcome evidence reviews, capital routing, resilience drills, cooldown lanes, local receipt chain, logs, and operating loop animation.
+- [script.js](script.js): treasury allocation, launch readiness, private order requests, revenue pilot, satellite profit model, revenue start board, Brazil compliance agents, growth review, operations console, external signals, execution packets, outcome receipts, outcome evidence reviews, capital routing, resilience drills, cooldown lanes, local receipt chain, logs, and operating loop animation.
 
 Open `index.html` directly in a browser for private/local operation. Open `public.html` to test the public request surface. No build step is required.
 
@@ -104,6 +113,7 @@ Before turning on `liveMode` or merging public config changes, run:
 
 ```bash
 node tools/preflight_public_launch.js
+node tools/survival_check.js
 ```
 
 Pull requests also run the same syntax and public launch preflight checks through the `Validate static site` workflow.

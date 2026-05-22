@@ -14,9 +14,10 @@ The audit and defense layer includes a receipt chain: material launch, gate, tre
 
 ## Legal Wrapper
 
-Practical candidates:
+Practical candidates depend on jurisdiction:
 
-- purpose trust owning an LLC,
+- Brazilian operating entity or approved Brazilian structure for the first local revenue path,
+- purpose trust owning an LLC, if a later US structure is reviewed,
 - foundation-owned company,
 - public benefit corporation with locked reinvestment policy,
 - nonprofit foundation plus taxable subsidiary,
@@ -25,9 +26,9 @@ Practical candidates:
 
 The first version should not pretend law can be automated away. It should use a conventional legal entity with unusual internal rules.
 
-Recommended v0:
+Brazil-first v0:
 
-**A manager-managed LLC governed by a purpose charter, with a small guardian board and strict treasury policy.**
+**A conventional Brazilian operator with CNPJ/tax/NFS-e support, governed internally by the purpose charter, with strict treasury policy and human review for legal, tax, privacy, refund, and incident decisions.**
 
 This is not the final form, but it is simple enough to test.
 
@@ -172,7 +173,7 @@ The company should prefer small, testable work packets over broad roles.
 
 Strange Company v0 should launch many small tools, not one grand platform.
 
-The first functional step is a controlled revenue pilot: a narrow productized service that can be sold, delivered manually, measured, and then converted into reusable packets or software. It should not accept payment until the legal, payment, accounting, and customer terms gates are clear.
+The first functional step is a controlled revenue pilot: a narrow productized service that can be sold, delivered manually, measured, and then converted into reusable packets or software. It should not accept payment until the legal, payment, accounting, Brazilian fiscal, LGPD, and customer terms gates are clear.
 
 Selection criteria:
 

@@ -2,23 +2,30 @@
 
 Use this when the external setup is ready and the public Order Desk needs to point at the real operating routes.
 
+This fast start is Brazil-first. Do not use it until `BRAZIL_COMPLIANCE.md` and `AI_LEGAL_HANDOFF.md` have been reviewed for the real route.
+
 ## 30 Minute Config Pass
 
-1. Confirm the monitored support inbox exists.
-2. Create the Google Form linked to the ledger Sheet.
-3. Edit `public-config.js`:
+1. Confirm the monitored support inbox and LGPD contact path exist.
+2. Confirm Brazilian entity/CNPJ or approved operating structure, tax regime, NFS-e/receipt route, and payment route are ready.
+3. Create the Google Form linked to the ledger Sheet.
+4. Edit `public-config.js`:
    - set `supportEmail`,
    - set `googleFormUrl`,
+   - confirm `jurisdiction: "BR"`,
+   - keep `aiGeneratedLegalDocsRequireHumanReview: true`,
    - set `supportInboxVerified: true` after sending and receiving a test email,
    - set `googleFormVerified: true` after a test response lands in the Sheet,
    - set `termsReviewedAt` and `privacyReviewedAt`,
+   - set `brazilComplianceReviewedAt` and `aiHandoffReviewedAt`,
    - set `liveMode: true` only after the stop rule is clear,
    - adjust service names and prices if the offer changed.
-4. Run `node tools/preflight_public_launch.js`.
-5. Open `public.html` locally and confirm the readiness banner says `Live intake configured`.
-6. Submit a safe test packet.
-7. Confirm the email draft uses the real inbox.
-8. Open the Google Form from the public packet output and paste the packet.
+5. Run `node tools/preflight_public_launch.js`.
+6. Run `node tools/audit_company_functionality.js --require-live`.
+7. Open `public.html` locally and confirm the readiness banner says `Live intake configured`.
+8. Submit a safe test packet.
+9. Confirm the email draft uses the real inbox.
+10. Open the Google Form from the public packet output and paste the packet.
 
 ## Live Smoke
 
@@ -27,10 +34,11 @@ Use this when the external setup is ready and the public Order Desk needs to poi
 3. Open the live public page.
 4. Submit one test request with no sensitive data.
 5. Confirm the request arrives in the support inbox or Google Form response Sheet.
-6. Create one Stripe test invoice manually.
-7. Paste the hosted invoice URL into the private Operations console.
-8. Advance the private order through `Sent`, `Paid`, and `Delivered`.
+6. Create one manual payment request or hosted invoice.
+7. Confirm the NFS-e/receipt evidence path for the test.
+8. Paste the hosted payment/invoice URL into the private Operations console.
+9. Advance the private order through `Sent`, `Paid`, and `Delivered`.
 
 ## Stop Rule
 
-Do not use the public page for real customers if the support inbox, Google Form, ledger Sheet, terms review, privacy review, Stripe account, or business bank account is missing.
+Do not use the public page for real customers if the support inbox, LGPD contact path, Google Form, ledger Sheet, terms review, privacy review, Brazilian entity/CNPJ route, tax/NFS-e route, payment provider, or business bank/payment account is missing.

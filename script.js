@@ -256,21 +256,21 @@ function defaultRevenuePilot() {
       {
         id: "payments",
         title: "Payment route ready",
-        detail: "Bank account, processor, receipt format, and refund path are defined.",
+        detail: "Brazil bank/payment route, fiscal receipt/NFS-e process, reconciliation, and refund path are defined.",
         done: false,
         critical: true
       },
       {
         id: "accounting",
         title: "Accounting lane ready",
-        detail: "Bookkeeping, tax category, and monthly reconciliation owner are defined.",
+        detail: "Bookkeeping, tax regime, CNAE/NFS-e owner, and monthly reconciliation owner are defined.",
         done: false,
         critical: true
       },
       {
         id: "terms",
         title: "Terms and privacy copy ready",
-        detail: "Scope, data handling, support, cancellation, and limits are visible.",
+        detail: "Brazil scope, data handling, LGPD path, support, cancellation, and limits are visible.",
         done: false,
         critical: true
       },
@@ -415,7 +415,7 @@ function defaultSatelliteCompany() {
 function defaultOperations() {
   return {
     operatorName: "Strange Works Studio",
-    supportEmail: "ops@strangeworks.studio",
+    supportEmail: "tuiidagnese+strangeworks@gmail.com",
     paymentMode: "Manual invoice only",
     invoicePrefix: "SWS",
     nextInvoiceNumber: 1001,
@@ -429,30 +429,30 @@ function defaultOperations() {
     },
     launchChecklist: [
       {
-        id: "llc-formed",
-        title: "US LLC formed",
-        detail: "Articles of organization are filed in the chosen state. SBA: sba.gov/business-guide/launch-your-business/register-your-business.",
+        id: "brazil-operator-confirmed",
+        title: "Brazilian operator confirmed",
+        detail: "CNPJ or approved Brazilian operating structure is recorded with a responsible human operator.",
         done: false,
         completedAt: ""
       },
       {
-        id: "ein-issued",
-        title: "EIN issued",
-        detail: "Federal Employer Identification Number obtained from the IRS after entity formation.",
+        id: "tax-route-reviewed",
+        title: "Tax and NFS-e route reviewed",
+        detail: "Accountant confirms tax regime, CNAE, municipal setup needs, and NFS-e or reviewed receipt path.",
         done: false,
         completedAt: ""
       },
       {
         id: "bank-open",
-        title: "Business bank account open",
-        detail: "Operating account opened in the LLC name. Used for receiving Stripe payouts and paying expenses.",
+        title: "Business bank/payment account open",
+        detail: "Operating account opened in the Brazilian operator's name and ready for payment-provider payouts.",
         done: false,
         completedAt: ""
       },
       {
-        id: "stripe-active",
-        title: "Stripe account active",
-        detail: "Stripe account verified for the LLC, payouts wired to the business bank, invoicing enabled.",
+        id: "payment-route-active",
+        title: "Manual payment route active",
+        detail: "Payment provider or manual invoice route is verified for the operator, with payouts, refunds, and reconciliation understood.",
         done: false,
         completedAt: ""
       },
@@ -480,14 +480,14 @@ function defaultOperations() {
       {
         id: "privacy-reviewed",
         title: "Privacy notice reviewed",
-        detail: "Privacy notice reviewed before taking the first payment.",
+        detail: "LGPD privacy notice, legal bases, rights request path, and processor list reviewed before taking the first payment.",
         done: false,
         completedAt: ""
       },
       {
         id: "first-invoice-sent",
-        title: "First customer invoice sent",
-        detail: "At least one real Stripe Hosted Invoice has been sent to a real customer.",
+        title: "First safe test order completed",
+        detail: "At least one safe test request has completed payment/fiscal evidence, delivery, and receipt-chain closeout.",
         done: false,
         completedAt: ""
       }
@@ -496,21 +496,21 @@ function defaultOperations() {
       {
         id: "entity",
         title: "Entity and tax identity ready",
-        detail: "Legal name, tax identity, signer authority, and customer contract path are confirmed.",
+        detail: "Brazilian legal name, CNPJ or approved route, signer authority, and customer contract path are confirmed.",
         done: false,
         critical: true
       },
       {
         id: "payment",
         title: "Payment route ready",
-        detail: "Bank, processor or manual invoice route, refund path, and failed-payment handling are ready.",
+        detail: "Bank, payment provider or manual invoice route, NFS-e/receipt path, refund path, and failed-payment handling are ready.",
         done: false,
         critical: true
       },
       {
         id: "accounting",
         title: "Bookkeeping lane ready",
-        detail: "Invoice numbers, revenue categories, tax review, and monthly reconciliation are defined.",
+        detail: "Invoice numbers, fiscal receipt/NFS-e evidence, tax review, and monthly reconciliation are defined.",
         done: false,
         critical: true
       },
@@ -531,14 +531,14 @@ function defaultOperations() {
       {
         id: "privacy",
         title: "Privacy notice published",
-        detail: "Data handling, local storage, retention, and contact route are visible.",
+        detail: "Data handling, local storage, retention, LGPD rights, AI boundary, and contact route are visible.",
         done: true,
         critical: true
       },
       {
         id: "no-regulated-data",
         title: "No regulated data in v0",
-        detail: "The first service accepts summaries and document lists, not protected health, payment, or credential data.",
+        detail: "The first service accepts summaries and document lists, not protected health, payment, credential, sensitive personal, or regulated source data.",
         done: true,
         critical: false
       }
@@ -643,9 +643,9 @@ const logs = [
   ["C", "Consider purpose trust wrapper after v0 revenue proof.", "Guardians", "Deferred", "red"]
 ];
 
-const money = new Intl.NumberFormat("en-US", {
+const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
-  currency: "USD",
+  currency: "BRL",
   maximumFractionDigits: 0
 });
 
@@ -673,15 +673,91 @@ const INCIDENT_SEVERITIES = ["info", "low", "medium", "high"];
 const INCIDENT_STATUSES = ["open", "mitigating", "resolved", "closed"];
 const SETUP_EVIDENCE_STATUSES = ["missing", "pending", "verified", "blocked"];
 const SETUP_EVIDENCE_SLOTS = [
-  { id: "llc", label: "US LLC formation", detail: "Articles of organization filed; entity is in good standing." },
-  { id: "ein", label: "EIN", detail: "Federal Employer Identification Number issued by the IRS for the LLC." },
-  { id: "bank", label: "Business bank account", detail: "Operating account opened in the LLC name with payouts wired in." },
-  { id: "stripe", label: "Stripe account active", detail: "Stripe account verified for the LLC with payouts and invoicing enabled." },
+  { id: "entity", label: "Brazilian operator/CNPJ", detail: "Brazilian entity, CNPJ, or approved operating structure confirmed with responsible human owner." },
+  { id: "tax-regime", label: "Tax regime and CNAE", detail: "Accountant-reviewed tax regime, CNAE, municipal registration needs, and bookkeeping owner." },
+  { id: "nfse", label: "NFS-e or fiscal receipt route", detail: "NFS-e portal or legally reviewed fiscal receipt route tested before paid operation." },
+  { id: "bank", label: "Business bank/payment account", detail: "Operating bank or payment account opened in the Brazilian operator's name with payouts wired in." },
+  { id: "payment", label: "Payment route active", detail: "Payment provider or manual invoice route verified with payout, refund, and reconciliation process." },
   { id: "support-inbox", label: "Support inbox monitored", detail: "Real monitored inbox is reachable and read every business day." },
+  { id: "lgpd-contact", label: "LGPD contact path", detail: "Privacy and data-subject requests route to a responsible human operator." },
   { id: "google-sheet", label: "Google Sheet ledger", detail: "Live Sheet with Requests, Invoices, Customers, Delivery, Incidents, Leads tabs." },
   { id: "google-form", label: "Google Form intake", detail: "Public intake form points at the verified sheet and obeys boundaries." },
   { id: "terms-review", label: "Terms reviewed", detail: "Customer-facing terms reviewed before sending the first paid invoice." },
-  { id: "privacy-review", label: "Privacy notice reviewed", detail: "Privacy notice reviewed before collecting any customer detail." }
+  { id: "privacy-review", label: "LGPD privacy notice reviewed", detail: "Privacy notice reviewed for legal bases, rights request path, retention, processors, and AI boundary before collecting customer detail." }
+];
+const BRAZIL_COMPLIANCE_AGENTS = [
+  {
+    id: "entity-cnpj",
+    title: "Entity/CNPJ agent",
+    setupIds: ["entity"],
+    aiCan: "Prepare the entity route comparison, data-free founder checklist, and evidence packet template.",
+    humanMust: "Founder, accountant, or lawyer confirms the operating structure, CNPJ route, municipal needs, and responsible legal owner.",
+    evidence: "CNPJ/entity artifact or reviewed operating-structure note stored outside the repo, then referenced in Setup Evidence.",
+    stopRule: "Do not ask for payment or issue fiscal documents while the operating entity route is unresolved."
+  },
+  {
+    id: "tax-nfse",
+    title: "Tax/NFS-e agent",
+    setupIds: ["tax-regime", "nfse"],
+    aiCan: "Prepare CNAE questions, NFS-e test script, bookkeeping handoff, and the invoice evidence checklist.",
+    humanMust: "Accountant or responsible operator validates CNAE, tax regime, municipal registration, NFS-e access, and fiscal receipt route.",
+    evidence: "Accountant-reviewed tax note plus successful NFS-e or legally reviewed fiscal receipt test.",
+    stopRule: "Do not mark an invoice sent until fiscal issuance and tax owner are verified."
+  },
+  {
+    id: "payment-reconciliation",
+    title: "Payment/reconciliation agent",
+    setupIds: ["bank", "payment"],
+    aiCan: "Prepare payout, refund, chargeback, and ledger reconciliation procedures without touching credentials.",
+    humanMust: "Operator opens and verifies the bank/payment route, runs a payout path, and confirms refund handling.",
+    evidence: "Bank/payment account proof, provider route, payout owner, and reconciliation note.",
+    stopRule: "Do not collect money through an unverified account or a route without refund and reconciliation ownership."
+  },
+  {
+    id: "support-incidents",
+    title: "Support/incident agent",
+    setupIds: ["support-inbox"],
+    aiCan: "Draft response macros, incident triage categories, and daily inbox review checklist.",
+    humanMust: "Operator verifies a monitored support inbox and confirms who reads it every business day.",
+    evidence: "Reachable support inbox, monitoring schedule, escalation owner, and incident logging route.",
+    stopRule: "Do not open intake when no human can receive support, refund, privacy, or complaint messages."
+  },
+  {
+    id: "lgpd-privacy",
+    title: "LGPD/privacy agent",
+    setupIds: ["lgpd-contact", "privacy-review"],
+    aiCan: "Prepare a privacy review diff, data inventory, processor list, retention questions, and rights-request packet.",
+    humanMust: "Privacy owner or lawyer reviews LGPD basis, data-subject rights path, retention, processors, security, and AI boundary.",
+    evidence: "Reviewed privacy notice, LGPD contact route, and human owner for data-subject requests.",
+    stopRule: "Do not collect customer detail before the rights path and privacy notice are human-reviewed."
+  },
+  {
+    id: "consumer-terms",
+    title: "Consumer/terms agent",
+    setupIds: ["terms-review"],
+    aiCan: "Prepare terms redlines for scope, cancellation, refund, delivery, consumer information, and support promises.",
+    humanMust: "Lawyer or responsible operator confirms the offer terms, customer disclosures, refund path, and service limitation language.",
+    evidence: "Human-reviewed terms date and customer-facing support/refund route.",
+    stopRule: "Do not send the first paid offer with AI-only terms or unclear cancellation/refund language."
+  },
+  {
+    id: "intake-ledger",
+    title: "Intake/ledger agent",
+    setupIds: ["google-sheet", "google-form"],
+    aiCan: "Prepare form-field boundaries, Sheet tab checks, TSV import test rows, and no-sensitive-data warnings.",
+    humanMust: "Operator verifies the live Google Form writes to the correct Sheet and excludes regulated or sensitive data.",
+    evidence: "Live Sheet, live Form URL, test submission, and owner note for ledger maintenance.",
+    stopRule: "Do not rely on public intake until the form route and ledger tabs are verified."
+  },
+  {
+    id: "ai-human-review",
+    title: "AI human-review agent",
+    setupIds: ["terms-review", "privacy-review", "lgpd-contact"],
+    aiCan: "Prepare a no-submit handoff with every AI-drafted legal, tax, privacy, and compliance artifact that needs human approval.",
+    humanMust: "Lawyer, accountant, founder, or operator signs off the relevant artifact and records dates in public-config.js before live mode.",
+    evidence: "AI_LEGAL_HANDOFF.md reviewed, terms/privacy review dates set, Brazil compliance review date set, and AI handoff review date set.",
+    stopRule: "Do not treat AI output as legal, accounting, privacy, or tax approval."
+  }
 ];
 const ACQUISITION_LEAD_SOURCES = ["referral", "email", "form", "direct", "partner"];
 const REVENUE_START_LANES = [
@@ -726,7 +802,7 @@ const REVENUE_START_LANES = [
       {
         id: "setup-evidence",
         title: "External setup evidence checked",
-        detail: "LLC, EIN, bank, Stripe, support, Sheet, Form, terms, and privacy evidence are reviewed outside the repo.",
+        detail: "Brazilian entity/CNPJ, tax regime, NFS-e, bank/payment, support, LGPD, Sheet, Form, terms, and privacy evidence are reviewed outside the repo.",
         required: true
       },
       {
@@ -738,7 +814,7 @@ const REVENUE_START_LANES = [
       {
         id: "manual-invoice-route",
         title: "Manual invoice route ready",
-        detail: "Stripe Hosted Invoice and Sheet ledger paths are configured before the first invoice is sent.",
+        detail: "Manual payment request, Sheet ledger, and NFS-e/receipt paths are configured before the first invoice is sent.",
         required: true
       },
       {
@@ -758,19 +834,20 @@ const REVENUE_START_LANES = [
 ];
 const DAILY_RUN_CHECKS = [
   { id: "review-requests", title: "Review new requests", detail: "Sheet Requests tab, support inbox, and Order Desk submissions." },
-  { id: "qualify-customer", title: "Qualify customer", detail: "Real US business, allowed service, no regulated data in the request." },
-  { id: "stripe-invoice", title: "Create Stripe invoice", detail: "Manually create the Hosted Invoice and copy the URL." },
-  { id: "ledger-update", title: "Update ledger", detail: "Stripe URL pasted into the order; ledger row up to date." },
+  { id: "qualify-customer", title: "Qualify customer", detail: "Real external buyer, allowed service, consumer-law status checked, no regulated data in the request." },
+  { id: "manual-payment", title: "Create manual payment request", detail: "Manually create the reviewed hosted payment/invoice route and copy the URL." },
+  { id: "ledger-update", title: "Update ledger", detail: "Payment URL and fiscal/NFS-e status pasted into the order or ledger row." },
   { id: "track-payment", title: "Track payment", detail: "Move the order to Paid only after settlement." },
   { id: "deliver", title: "Deliver", detail: "Send the scoped proof packet; record artifact URL and acceptance note." },
   { id: "log-incidents", title: "Log incidents", detail: "Anything off-script becomes an incident row in the Sheet and the chain." },
   { id: "seal-chain", title: "Seal receipt chain", detail: "Decisions view: capture the day's root before closing the run." }
 ];
 const DAILY_RUN_STOP_RULES = [
-  { id: "stripe-hold", title: "Stripe account on hold", detail: "Stripe has flagged, restricted, or held the account or payouts." },
-  { id: "bank-restricted", title: "Business bank restricted", detail: "The LLC bank account is frozen, restricted, or under review." },
-  { id: "regulated-data", title: "Regulated data submitted", detail: "An intake included regulated source documents the operator did not solicit." },
-  { id: "sheet-outage", title: "Sheet ledger outage", detail: "The Google Sheet ledger is inaccessible or out of sync with Stripe." },
+  { id: "payment-hold", title: "Payment route on hold", detail: "Payment provider, bank, or payout route has flagged, restricted, or held the account or payouts." },
+  { id: "bank-restricted", title: "Business bank/payment account restricted", detail: "The Brazilian operator's bank or payment account is frozen, restricted, or under review." },
+  { id: "regulated-data", title: "Regulated or sensitive data submitted", detail: "An intake included regulated source documents, secrets, or sensitive personal data the operator did not solicit." },
+  { id: "fiscal-route-blocked", title: "Fiscal receipt route blocked", detail: "NFS-e, receipt, tax, or accounting route is blocked or unreconciled." },
+  { id: "sheet-outage", title: "Sheet ledger outage", detail: "The Google Sheet ledger is inaccessible or out of sync with payment/fiscal evidence." },
   { id: "support-outage", title: "Support inbox outage", detail: "The support inbox is unmonitored or unreachable for the day." },
   { id: "terms-change", title: "Terms or privacy change required", detail: "Terms or privacy require an unscheduled change before sending more invoices." }
 ];
@@ -3538,7 +3615,7 @@ function renderSatelliteCompany() {
           <span><strong>${model.customersNeededFor3k}</strong><small>Proof-sprint customers to $3K</small></span>
           <span><strong>${model.customersNeededFor5k}</strong><small>Proof-sprint customers to $5K</small></span>
         </div>
-        <p>Related-party work is never market proof. Keep the first profit evidence tied to normal invoices, external buyers, and the manual Stripe plus Sheet ledger route.</p>
+        <p>Related-party work is never market proof. Keep the first profit evidence tied to normal invoices, external buyers, the reviewed payment route, fiscal evidence, and the Sheet ledger.</p>
       </article>
     `;
   }
@@ -3772,7 +3849,7 @@ function leadQualificationPacket(lead) {
 function leadInvoicePacket(lead) {
   const service = leadService(lead);
   return [
-    `Stripe invoice creation packet for ${lead.customer}`,
+    `Manual payment and fiscal packet for ${lead.customer}`,
     `Lead id: ${lead.id}`,
     `Contact: ${lead.contact || "Not recorded"}`,
     `Service: ${service?.title || lead.serviceId}`,
@@ -3780,11 +3857,12 @@ function leadInvoicePacket(lead) {
     `Qualification note: ${lead.qualificationNote || "Not recorded"}`,
     "",
     "Manual steps:",
-    "1. Create the Stripe Hosted Invoice manually in the LLC Stripe account.",
-    "2. Copy the hosted invoice URL.",
-    "3. Convert or update the Operations order.",
-    "4. Paste the hosted URL into the order and Sheet ledger.",
-    "5. Mark Sent only after the invoice is actually sent.",
+    "1. Create the reviewed hosted payment request or manual invoice for the Brazilian operator.",
+    "2. Confirm the NFS-e or fiscal receipt step with the accountant-approved process.",
+    "3. Copy the hosted payment/invoice URL.",
+    "4. Convert or update the Operations order.",
+    "5. Paste the hosted URL into the order and Sheet ledger.",
+    "6. Mark Sent only after the payment request is actually sent.",
     "",
     "Static site boundary: no card data, no auto-created invoices, no customer-private records."
   ].join("\n");
@@ -3843,6 +3921,115 @@ function buildSetupEvidenceModel() {
   };
 }
 
+function buildBrazilComplianceAgentsModel() {
+  const setupModel = buildSetupEvidenceModel();
+  const byId = new Map(setupModel.records.map((record) => [record.id, record]));
+  const agents = BRAZIL_COMPLIANCE_AGENTS.map((agent) => {
+    const records = agent.setupIds
+      .map((id) => byId.get(id))
+      .filter(Boolean);
+    const verified = records.filter((record) => record.status === "verified");
+    const pending = records.filter((record) => record.status === "pending");
+    const blocked = records.filter((record) => record.status === "blocked");
+    const missing = records.filter((record) => record.status === "missing");
+    const openRecords = records.filter((record) => record.status !== "verified");
+    let status = "Missing evidence";
+    let tone = "red";
+    if (blocked.length) {
+      status = "Blocked";
+      tone = "red";
+    } else if (records.length && verified.length === records.length) {
+      status = "Ready for human sign-off";
+      tone = "green";
+    } else if (pending.length || verified.length) {
+      status = "In review";
+      tone = "amber";
+    }
+    const nextRecord = openRecords[0];
+    const nextAction = nextRecord
+      ? `Close Setup Evidence: ${nextRecord.label}.`
+      : "Record the human sign-off dates before enabling live mode.";
+    return {
+      ...agent,
+      records,
+      verifiedCount: verified.length,
+      totalCount: records.length,
+      pendingCount: pending.length,
+      blockedCount: blocked.length,
+      missingCount: missing.length,
+      openRecords,
+      allVerified: records.length > 0 && verified.length === records.length,
+      status,
+      tone,
+      nextAction
+    };
+  });
+  const ready = agents.filter((agent) => agent.allVerified);
+  const blockedAgents = agents.filter((agent) => agent.blockedCount > 0);
+  const missingAgents = agents.filter((agent) => agent.missingCount > 0);
+  let state = "Human closure needed";
+  let tone = "amber";
+  if (blockedAgents.length) {
+    state = "Compliance blocked";
+    tone = "red";
+  } else if (ready.length === agents.length) {
+    state = "Prepared for final review";
+    tone = "green";
+  } else if (ready.length === 0 && missingAgents.length === agents.length) {
+    state = "Not started";
+    tone = "red";
+  }
+  const firstOpen = agents.find((agent) => !agent.allVerified);
+  return {
+    agents,
+    readyCount: ready.length,
+    blockedCount: blockedAgents.length,
+    missingCount: missingAgents.length,
+    totalCount: agents.length,
+    state,
+    tone,
+    nextAction: firstOpen ? firstOpen.nextAction : "Have the lawyer/accountant/operator review the final Brazil and AI handoff gates."
+  };
+}
+
+function brazilComplianceAgentPacket(agentId) {
+  const model = buildBrazilComplianceAgentsModel();
+  const agent = model.agents.find((item) => item.id === agentId) || model.agents[0];
+  if (!agent) {
+    return "No Brazil compliance agent found.";
+  }
+  const evidenceRows = agent.records.length
+    ? agent.records.map((record) => {
+      const verifiedAt = record.verifiedAt ? `; verified ${formatReceiptDate(record.verifiedAt)}` : "";
+      const url = record.evidenceUrl ? `; evidence ${record.evidenceUrl}` : "";
+      const note = record.operatorNote ? `; note ${record.operatorNote}` : "";
+      return `- ${record.label}: ${record.status}${verifiedAt}${url}${note}`;
+    })
+    : ["- No linked Setup Evidence rows."];
+  return [
+    `Brazil compliance agent: ${agent.title}`,
+    `Status: ${agent.status}`,
+    `Next action: ${agent.nextAction}`,
+    "",
+    "AI can prepare:",
+    agent.aiCan,
+    "",
+    "Human must close:",
+    agent.humanMust,
+    "",
+    "Evidence required:",
+    agent.evidence,
+    "",
+    "Linked Setup Evidence:",
+    ...evidenceRows,
+    "",
+    "Stop rule:",
+    agent.stopRule,
+    "",
+    "Boundary: AI output is draft preparation only. It is not legal, tax, accounting, privacy, payment-provider, or public-authority approval."
+  ].join("\n");
+}
+
 function buildProfitReadiness() {
   const satelliteModel = buildSatelliteCompanyModel();
   const operationsModel = buildOperationsModel();
@@ -3886,7 +4073,7 @@ function buildProfitReadiness() {
   } else if (!blockers.length && invoiceReadyLeads.length > 0) {
     state = "Invoice ready";
     tone = "green";
-    nextAction = "Create a manual Stripe Hosted Invoice for the invoice-ready lead.";
+    nextAction = "Create the manual payment request and fiscal evidence packet for the invoice-ready lead.";
   } else if (!blockers.length) {
     state = "Sell today";
     tone = "green";
@@ -4050,7 +4237,7 @@ function buildOperationsModel() {
       state: "Ready for intake",
       tone: "amber",
       headline: "The operating lane is ready to accept the first order.",
-      detail: "Add an external customer order, issue a manual Stripe invoice, and deliver only the scoped service."
+      detail: "Add an external customer order, issue the reviewed manual payment request, and deliver only the scoped service."
     };
   }
 
@@ -4060,7 +4247,7 @@ function buildOperationsModel() {
       state: "Ready to invoice",
       tone: "amber",
       headline: "Orders can move through manual Stripe invoicing.",
-      detail: "Create the Stripe invoice, paste the hosted URL into the order, and mark Paid only after funds settle."
+      detail: "Create the payment request, paste the hosted URL into the order, and mark Paid only after funds settle and fiscal evidence reconciles."
     };
   }
 
@@ -4187,7 +4374,7 @@ function buildRevenueStartModel() {
   } else if (!openRequired.length && !readiness.blockers.length && readiness.invoiceReadyLeadCount > 0) {
     state = "Invoice ready";
     tone = "green";
-    nextAction = "Create the manual Stripe Hosted Invoice and move the order through the Sheet ledger.";
+    nextAction = "Create the manual payment request, handle the fiscal evidence, and move the order through the Sheet ledger.";
   } else if (!openRequired.length && !readiness.blockers.length) {
     state = "Sell today";
     tone = "green";
@@ -4381,7 +4568,7 @@ function revenueStartPacket(packet) {
     "Day-one sequence:",
     "1. Keep Strange Company sealed; do not invoice customers directly from the sealed lane.",
     "2. Run revenue through Strange Works Studio only after external setup evidence and commercial controls are real.",
-    "3. Use a manually created Stripe Hosted Invoice and mirror the row into the Sheet ledger.",
+    "3. Use a manually created payment request or hosted invoice and mirror the row into the Sheet ledger.",
     "4. Start and close the Daily pilot run, attach incidents if any, and seal the receipt chain after material changes.",
     "",
     "Boundary: this packet is an operator receipt. It is not legal formation, tax advice, accounting software, payment automation, or customer-data storage."
@@ -4783,7 +4970,7 @@ function renderSetupEvidence() {
       <div>
         <span class="metric-label">Setup evidence</span>
         <h3>${escapeHtml(model.state)}</h3>
-        <p>Operator-asserted proof of external setup. The repo cannot certify LLC, EIN, bank, or Stripe completion by itself; verified rows mean the operator confirmed the artifact outside this prototype.</p>
+        <p>Operator-asserted proof of external setup. The repo cannot certify Brazilian entity, CNPJ, tax regime, NFS-e, bank/payment, support, or LGPD completion by itself; verified rows mean the operator confirmed the artifact outside this prototype.</p>
       </div>
       <div class="setup-evidence-counts">
         <span><strong>${verifiedCount}/${total}</strong><small>Verified</small></span>
@@ -4813,6 +5000,115 @@ function renderSetupEvidence() {
   document.querySelectorAll("[data-save-evidence]").forEach((btn) => {
     btn.addEventListener("click", () => saveSetupEvidenceCard(btn.dataset.saveEvidence, btn));
   });
+  renderBrazilComplianceAgents();
+}
+
+function renderBrazilComplianceAgents() {
+  const panel = document.querySelector("#brazilComplianceAgentsPanel");
+  if (!panel) return;
+  const model = buildBrazilComplianceAgentsModel();
+  const agentCards = model.agents
+    .map((agent) => {
+      const rows = agent.records
+        .map((record) => {
+          const tone = record.status === "verified" ? "green" : record.status === "blocked" ? "red" : record.status === "pending" ? "amber" : "";
+          return `
+            <li>
+              <span>${escapeHtml(record.label)}</span>
+              <strong class="state ${tone}">${escapeHtml(record.status)}</strong>
+            </li>
+          `;
+        })
+        .join("");
+      return `
+        <article class="compliance-agent-card ${escapeHtml(agent.tone)}">
+          <div class="compliance-agent-head">
+            <div>
+              <span class="metric-label">AI prep / human closure</span>
+              <h4>${escapeHtml(agent.title)}</h4>
+            </div>
+            <span class="state ${escapeHtml(agent.tone)}">${escapeHtml(agent.status)}</span>
+          </div>
+          <p>${escapeHtml(agent.nextAction)}</p>
+          <dl class="compliance-agent-work">
+            <div>
+              <dt>AI prepares</dt>
+              <dd>${escapeHtml(agent.aiCan)}</dd>
+            </div>
+            <div>
+              <dt>Human closes</dt>
+              <dd>${escapeHtml(agent.humanMust)}</dd>
+            </div>
+            <div>
+              <dt>Evidence</dt>
+              <dd>${escapeHtml(agent.evidence)}</dd>
+            </div>
+          </dl>
+          <ul class="compliance-agent-evidence">${rows}</ul>
+          <div class="compliance-agent-footer">
+            <span>${escapeHtml(agent.stopRule)}</span>
+            <button type="button" data-copy-compliance-agent="${escapeHtml(agent.id)}">
+              <i data-lucide="copy"></i>
+              <span>Copy packet</span>
+            </button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+  panel.innerHTML = `
+    <article class="compliance-agent-summary ${escapeHtml(model.tone)}">
+      <div>
+        <span class="metric-label">Brazil compliance agents</span>
+        <h3>${escapeHtml(model.state)}</h3>
+        <p>${escapeHtml(model.nextAction)} Agents organize draft work for CNPJ/entity, tax, NFS-e, LGPD, consumer terms, payment, intake, support, and AI handoff. They do not certify legal compliance.</p>
+      </div>
+      <div class="compliance-agent-counts">
+        <span><strong>${model.readyCount}/${model.totalCount}</strong><small>Ready</small></span>
+        <span><strong>${model.blockedCount}</strong><small>Blocked</small></span>
+        <span><strong>${model.missingCount}</strong><small>Missing</small></span>
+      </div>
+    </article>
+    <div class="compliance-agent-list">${agentCards}</div>
+    <div class="compliance-agent-output" id="complianceAgentOutput" aria-live="polite"></div>
+  `;
+  document.querySelectorAll("[data-copy-compliance-agent]").forEach((button) => {
+    button.addEventListener("click", () => copyBrazilComplianceAgentPacket(button.dataset.copyComplianceAgent, button));
+  });
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+}
+
+function renderComplianceAgentOutput(text, copied) {
+  const output = document.querySelector("#complianceAgentOutput");
+  if (!output) return;
+  output.innerHTML = `
+    <article>
+      <span class="metric-label">${copied ? "Agent packet copied" : "Agent packet generated"}</span>
+      <pre>${escapeHtml(text)}</pre>
+    </article>
+  `;
+}
+
+async function copyBrazilComplianceAgentPacket(agentId, button) {
+  const packet = brazilComplianceAgentPacket(agentId);
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(packet);
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  renderComplianceAgentOutput(packet, copied);
+  if (button) {
+    const label = button.querySelector("span") || button;
+    const previous = label.textContent;
+    label.textContent = copied ? "Copied" : "Copy failed";
+    setTimeout(() => {
+      label.textContent = previous;
+    }, 1500);
+  }
 }
 
 function showSetupEvidenceError(slotId, message) {
@@ -5291,6 +5587,7 @@ function renderOperations() {
   renderProfitReadiness();
   renderRevenueStart();
   renderSalesPipeline();
+  renderBrazilComplianceAgents();
   renderGrowthReview();
   const services = operationServices();
   const selectedService = serviceSelect.value || services[0]?.id || "";
@@ -5351,10 +5648,10 @@ function renderOperations() {
   policy.innerHTML = `
     <span class="metric-label">Operating route</span>
     <h3>${escapeHtml(operations.paymentMode)}</h3>
-    <p>Stripe Hosted Invoices are created manually. The static site never collects payment data. Each row is mirrored to the Sheet ledger.</p>
+    <p>Manual payment requests are created outside the static site. The static site never collects payment data. Each row is mirrored to the Sheet ledger and reconciled with the fiscal route.</p>
     <div class="ops-link-grid">
-      <a href="TERMS.md" target="_blank" rel="noreferrer">Terms</a>
-      <a href="PRIVACY.md" target="_blank" rel="noreferrer">Privacy</a>
+      <a href="TERMOS.md" target="_blank" rel="noreferrer">Termos</a>
+      <a href="AVISO_DE_PRIVACIDADE.md" target="_blank" rel="noreferrer">Privacidade</a>
       <a href="SUPPORT.md" target="_blank" rel="noreferrer">Support</a>
       <a href="RUN_LIVE_PILOT.md" target="_blank" rel="noreferrer">Live pilot</a>
       <span>${escapeHtml(operations.supportEmail)}</span>
@@ -5433,8 +5730,8 @@ function renderOperations() {
         const stripeLine = safeStripeInvoiceUrl
           ? `<a href="${escapeHtml(safeStripeInvoiceUrl)}" target="_blank" rel="noreferrer">Hosted invoice</a>`
           : stripeMissing
-            ? `<span class="state amber">Paste Stripe URL before send</span>`
-            : `<span class="metric-label">No Stripe URL yet</span>`;
+            ? `<span class="state amber">Paste payment URL before send</span>`
+            : `<span class="metric-label">No payment URL yet</span>`;
         const dueLine = order.deliveryDue
           ? `Delivery due ${escapeHtml(order.deliveryDue)}`
           : "Delivery date not set";
@@ -5481,7 +5778,7 @@ function renderOperations() {
             <span class="state ${tone}">${escapeHtml(order.status)}</span>
             <div class="ops-order-fields">
               <label>
-                <span>Stripe hosted invoice URL</span>
+                <span>Hosted payment/invoice URL</span>
                 <input type="text" inputmode="url" placeholder="https://invoice.stripe.com/i/..." value="${escapeHtml(order.stripeInvoiceUrl || "")}" data-stripe-url-order="${escapeHtml(order.id)}" />
               </label>
               <label>
@@ -6001,8 +6298,8 @@ function renderOrderDesk() {
     <p>${escapeHtml(firstService?.detail || "A scoped compliance proof packet service for the first operating loop.")}</p>
     <p>Use this desk for invoice requests only. Do not submit protected health information, payment credentials, passwords, private keys, or regulated source documents.</p>
     <div class="ops-link-grid">
-      <a href="TERMS.md" target="_blank" rel="noreferrer">Terms</a>
-      <a href="PRIVACY.md" target="_blank" rel="noreferrer">Privacy</a>
+      <a href="TERMOS.md" target="_blank" rel="noreferrer">Termos</a>
+      <a href="AVISO_DE_PRIVACIDADE.md" target="_blank" rel="noreferrer">Privacidade</a>
       <a href="SUPPORT.md" target="_blank" rel="noreferrer">Support</a>
       <span>${escapeHtml(operations.supportEmail)}</span>
     </div>
@@ -6428,7 +6725,7 @@ function orderAdvanceBlock(order, model) {
     return pausedReason;
   }
   if (order.status === "Draft" && !safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS)) {
-    return "Paste a Stripe Hosted Invoice URL before marking Sent.";
+    return "Paste the reviewed hosted payment/invoice URL before marking Sent.";
   }
   if (order.status === "Sent" && model.openCriticalControls.length > 0) {
     return `Close ${model.openCriticalControls.length} critical control${model.openCriticalControls.length === 1 ? "" : "s"} before marking Paid.`;
@@ -6746,7 +7043,7 @@ function operationPacket(order) {
     `Status: ${order.status}`,
     `Source: ${order.source || "Operations console"}`,
     `Payment route: ${operations.paymentMode}`,
-    `Stripe invoice URL: ${order.stripeInvoiceUrl || "Not yet created"}`,
+    `Hosted payment/invoice URL: ${order.stripeInvoiceUrl || "Not yet created"}`,
     `Delivery due: ${order.deliveryDue || "Not set"}`,
     `Sheet ledger: ${integration.googleSheetUrl || "Not configured"}`,
     "",
@@ -6761,7 +7058,7 @@ function operationPacket(order) {
     "",
     "Controls:",
     "Do not request protected health information, payment credentials, passwords, or regulated source documents in v0.",
-    "Payment is collected only through a manually created Stripe Hosted Invoice. The static site never collects card data."
+    "Payment is collected only through a reviewed manual payment or hosted invoice route. The static site never collects card data."
   ].join("\n");
 }
 
