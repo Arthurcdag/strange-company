@@ -52,6 +52,13 @@ The private Launch Gate view reads `public-config.js` and shows an **External li
 
 The panel is a handoff aid only. It does not verify Google, Stripe, bank, support, legal, tax, privacy, fiscal, or AI-review evidence by itself, and it must not be used as approval to set `liveMode: true`.
 
+For a terminal-only handoff, generate the same gap packet from `public-config.js`:
+
+```bash
+node tools/generate_external_live_gap_packet.js
+node tools/generate_external_live_gap_packet.js --json
+```
+
 ## 1. Support Inbox
 
 Target address: `ops@strangeworks.studio` or a documented replacement.

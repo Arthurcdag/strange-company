@@ -106,6 +106,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [tools/audit_company_functionality.js](tools/audit_company_functionality.js): repo-level audit for Strange Company, the satellite operator, and the external live-operation gate.
 - [tools/survival_check.js](tools/survival_check.js): survival drill that confirms the charter, resilience model, receipt chain, Brazil/AI gates, public/private boundary, and expected live-gate behavior still hold.
 - [tools/google_apps_script_create_intake_form.gs](tools/google_apps_script_create_intake_form.gs): Apps Script builder for creating the Google Form intake and linking it to the private Sheet ledger.
+- [tools/generate_external_live_gap_packet.js](tools/generate_external_live_gap_packet.js): shell generator for the current `public-config.js` live-evidence gap packet.
 - [tools/validate_external_live_packet.js](tools/validate_external_live_packet.js): local validator for the ignored external live-readiness evidence packet.
 - [EXTERNAL_LIVE_PACKET.template.json](EXTERNAL_LIVE_PACKET.template.json): safe blank template for live-intake evidence; completed copies stay local and ignored.
 - [index.html](index.html): private/local command center for Operations, Treasury, Decisions, and Research Gate.

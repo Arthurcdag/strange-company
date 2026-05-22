@@ -132,6 +132,9 @@ function auditDocs() {
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Stripe Route", "Stripe route setup instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Bank Route", "bank route setup instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Readiness Packet", "external readiness packet instructions");
+  assertIncludes("README.md", "tools/generate_external_live_gap_packet.js", "external live gap packet README link");
+  assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "node tools/generate_external_live_gap_packet.js", "external live gap packet command");
+  assertIncludes("tools/generate_external_live_gap_packet.js", "Strange Company external live evidence gap packet", "external live gap packet generator");
   assertIncludes("README.md", "EXTERNAL_LIVE_PACKET.template.json", "external live packet template README link");
   assertIncludes("README.md", "tools/validate_external_live_packet.js", "external live packet validator README link");
   assertIncludes("EXTERNAL_LIVE_PACKET.template.json", '"schemaVersion": 1', "external live packet template schema");
