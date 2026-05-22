@@ -4,6 +4,8 @@ This file is the handoff between AI-prepared work and the human/legal/accounting
 
 Use `HUMAN_REVIEW_PACKET.md` as the live-intake close sheet for collecting the actual human review dates, Brazil compliance review, AI handoff review, Google Form evidence, Stripe route, bank route, and final attestation.
 
+Use `CONKA8_LAW_INSTRUCTIONS.md` when conka8 is working on law-sensitive repo changes, review packets, or live-intake evidence.
+
 ## What AI Prepared
 
 - Brazil-first customer-facing Portuguese `TERMOS.md` draft.

@@ -124,6 +124,7 @@ function auditDocs() {
   assertIncludes("README.md", "ONLINE_ASAP.md", "online ASAP README link");
   assertIncludes("README.md", "EXTERNAL_LIVE_CONTROLS.md", "external live controls README link");
   assertIncludes("README.md", "HUMAN_REVIEW_PACKET.md", "human review packet README link");
+  assertIncludes("README.md", "CONKA8_LAW_INSTRUCTIONS.md", "conka8 law instructions README link");
   assertIncludes("ONLINE_ASAP.md", "Main Track: Strange Company", "main online ASAP lane");
   assertIncludes("ONLINE_ASAP.md", "Satellite Track: Strange Works Studio", "satellite online ASAP lane");
   assertIncludes("ONLINE_ASAP.md", "Set `liveMode: true` last", "live mode last instruction");
@@ -154,7 +155,13 @@ function auditDocs() {
   assertIncludes("HUMAN_REVIEW_PACKET.md", "Manual Close Sheet", "human review manual close sheet");
   assertIncludes("HUMAN_REVIEW_PACKET.md", "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live", "human review validation command");
   assertIncludes("HUMAN_REVIEW_PACKET.md", "Do not put Sheet URLs, Stripe dashboard URLs, bank metadata, tax IDs, private reviewer notes, or credentials in `public-config.js`.", "human review public config boundary");
+  assertIncludes("HUMAN_REVIEW_PACKET.md", "CONKA8_LAW_INSTRUCTIONS.md", "human review packet conka8 link");
+  assertIncludes("CONKA8_LAW_INSTRUCTIONS.md", "Do not set `liveMode: true`, `googleFormVerified: true`, `brazilComplianceReviewedAt`, or `aiHandoffReviewedAt` unless the evidence is real", "conka8 live gate stop rule");
+  assertIncludes("CONKA8_LAW_INSTRUCTIONS.md", "Law-Sensitive Areas", "conka8 law-sensitive matrix");
+  assertIncludes("CONKA8_LAW_INSTRUCTIONS.md", "node tools/audit_company_functionality.js --require-live", "conka8 live audit command");
+  assertIncludes("CONKA8_LAW_INSTRUCTIONS.md", "Never put private Sheet URLs, Stripe dashboard URLs, bank details, CNPJ documents, tax IDs, reviewer notes, or credentials in `public-config.js`.", "conka8 public config boundary");
   assertIncludes("AI_LEGAL_HANDOFF.md", "HUMAN_REVIEW_PACKET.md", "AI handoff human review packet link");
+  assertIncludes("AI_LEGAL_HANDOFF.md", "CONKA8_LAW_INSTRUCTIONS.md", "AI handoff conka8 law instructions link");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "termsReviewedAt", "terms review date instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "privacyReviewedAt", "privacy review date instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "brazilComplianceReviewedAt", "Brazil compliance review date instructions");

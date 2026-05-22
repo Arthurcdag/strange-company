@@ -2,6 +2,8 @@
 
 This packet is the AI-prepared handoff for the remaining live-intake blockers. It does not approve launch. A responsible human operator, accountant, lawyer, bank, payment provider, or account owner must close the evidence rows before `public-config.js` can move to `liveMode: true`.
 
+If conka8 is handling law-sensitive work, use `CONKA8_LAW_INSTRUCTIONS.md` before collecting or patching any legal/compliance evidence.
+
 Use this packet with:
 
 ```bash

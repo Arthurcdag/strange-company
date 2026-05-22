@@ -62,6 +62,7 @@ function checkStaticSurvivalSurface() {
   const aiHandoff = read("AI_LEGAL_HANDOFF.md");
   const googleFormIntake = read("GOOGLE_FORM_INTAKE.md");
   const humanReviewPacket = read("HUMAN_REVIEW_PACKET.md");
+  const conka8LawInstructions = read("CONKA8_LAW_INSTRUCTIONS.md");
   const supportEvidence = read("SUPPORT_INBOX_EVIDENCE.md");
   const termos = read("TERMOS.md");
   const avisoPrivacidade = read("AVISO_DE_PRIVACIDADE.md");
@@ -84,9 +85,14 @@ function checkStaticSurvivalSurface() {
   assert(brazilAgents.includes("Human must close"), "BRAZIL_COMPLIANCE_AGENTS.md must keep human closure language.", "Brazil compliance human closure", "BRAZIL_COMPLIANCE_AGENTS.md");
   assert(aiHandoff.includes("Before setting `liveMode: true`"), "AI_LEGAL_HANDOFF.md must gate live mode on human review.", "AI human review live gate", "AI_LEGAL_HANDOFF.md");
   assert(aiHandoff.includes("HUMAN_REVIEW_PACKET.md"), "AI_LEGAL_HANDOFF.md must link the live human review packet.", "AI handoff human review packet link", "AI_LEGAL_HANDOFF.md");
+  assert(aiHandoff.includes("CONKA8_LAW_INSTRUCTIONS.md"), "AI_LEGAL_HANDOFF.md must link conka8 law instructions.", "AI handoff conka8 law instructions link", "AI_LEGAL_HANDOFF.md");
   assert(humanReviewPacket.includes("Manual Close Sheet"), "HUMAN_REVIEW_PACKET.md must include the manual close sheet.", "human review manual close sheet", "HUMAN_REVIEW_PACKET.md");
   assert(humanReviewPacket.includes("node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live"), "HUMAN_REVIEW_PACKET.md must include the live packet validation command.", "human review packet validation command", "HUMAN_REVIEW_PACKET.md");
   assert(humanReviewPacket.includes("Do not put Sheet URLs, Stripe dashboard URLs, bank metadata, tax IDs, private reviewer notes, or credentials in `public-config.js`."), "HUMAN_REVIEW_PACKET.md must keep private evidence out of public config.", "human review public config boundary", "HUMAN_REVIEW_PACKET.md");
+  assert(humanReviewPacket.includes("CONKA8_LAW_INSTRUCTIONS.md"), "HUMAN_REVIEW_PACKET.md must link conka8 law instructions.", "human review conka8 link", "HUMAN_REVIEW_PACKET.md");
+  assert(conka8LawInstructions.includes("Do not set `liveMode: true`, `googleFormVerified: true`, `brazilComplianceReviewedAt`, or `aiHandoffReviewedAt` unless the evidence is real"), "CONKA8_LAW_INSTRUCTIONS.md must keep the live gate stop rule.", "conka8 live gate stop rule", "CONKA8_LAW_INSTRUCTIONS.md");
+  assert(conka8LawInstructions.includes("Law-Sensitive Areas"), "CONKA8_LAW_INSTRUCTIONS.md must include the law-sensitive area matrix.", "conka8 law-sensitive matrix", "CONKA8_LAW_INSTRUCTIONS.md");
+  assert(conka8LawInstructions.includes("node tools/audit_company_functionality.js --require-live"), "CONKA8_LAW_INSTRUCTIONS.md must include the live audit command.", "conka8 live audit command", "CONKA8_LAW_INSTRUCTIONS.md");
   assert(googleFormIntake.includes("Do not set googleFormVerified true"), "GOOGLE_FORM_INTAKE.md must keep the Google Form verification stop rule.", "Google Form verification stop rule", "GOOGLE_FORM_INTAKE.md");
   assert(read("tools/google_apps_script_create_intake_form.gs").includes("FormApp.create"), "Apps Script builder must create the Google Form.", "Google Form Apps Script builder", "tools/google_apps_script_create_intake_form.gs");
   assert(supportEvidence.includes("19e4c73fcdbf42a2"), "SUPPORT_INBOX_EVIDENCE.md must record the Gmail receiving test.", "support inbox receiving test", "SUPPORT_INBOX_EVIDENCE.md");

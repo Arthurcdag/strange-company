@@ -68,6 +68,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [ONLINE_ASAP.md](ONLINE_ASAP.md): shortest safe path for keeping the main prototype online and switching the satellite to live intake once outside controls are verified.
 - [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md): developer/operator instructions for creating the support inbox, Google Form, Sheet ledger, review dates, Stripe invoice route, and bank evidence.
 - [HUMAN_REVIEW_PACKET.md](HUMAN_REVIEW_PACKET.md): AI-prepared packet for the manual human/legal/accounting/payment evidence needed before live intake.
+- [CONKA8_LAW_INSTRUCTIONS.md](CONKA8_LAW_INSTRUCTIONS.md): law-sensitive operating instructions for conka8, including AI/human boundaries and launch stop rules.
 - [REVENUE_PILOT.md](REVENUE_PILOT.md): how the prototype moves toward the first controlled paid offer.
 - [SATELLITE_COMPANY.md](SATELLITE_COMPANY.md): how a separate for-profit company can net profit without breaking the sealed Strange Company charter.
 - [REVENUE_START.md](REVENUE_START.md): day-one two-company revenue posture and start packet sequence.
