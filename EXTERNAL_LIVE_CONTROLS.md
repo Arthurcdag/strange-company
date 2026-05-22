@@ -30,7 +30,15 @@ Copy the template and fill it locally after the outside accounts are created:
 copy EXTERNAL_LIVE_PACKET.template.json EXTERNAL_LIVE_PACKET.local.json
 ```
 
+Or generate a draft from the current public config:
+
+```bash
+node tools/draft_external_live_packet.js --write-local
+```
+
 Keep `EXTERNAL_LIVE_PACKET.local.json` out of git. It is ignored on purpose because it can identify private operator accounts, dashboards, bank-route metadata, and test invoice evidence.
+
+The draft generator copies only public-safe values from `public-config.js`. It leaves private evidence fields blank and must still fail `--require-live` until the operator fills real support, Google, legal/privacy, Stripe, bank, and attestation evidence.
 
 Validate the blank template:
 

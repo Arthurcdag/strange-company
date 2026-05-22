@@ -99,6 +99,7 @@ function checkStaticSurvivalSurface() {
   assert(script.includes("function sealReceiptChain"), "script.js must include receipt-chain sealing.", "receipt-chain sealer", "script.js");
   assert(script.includes("function buildLiveEvidenceModel"), "script.js must include live evidence state modeling.", "live evidence model", "script.js");
   assert(script.includes("function liveEvidencePacket"), "script.js must include live evidence packet generation.", "live evidence packet", "script.js");
+  assert(read("tools/draft_external_live_packet.js").includes("draft-from-public-config"), "external live packet draft tool must keep local evidence in draft mode.", "external live packet draft tool", "tools/draft_external_live_packet.js");
   assert(read("tools/generate_external_live_gap_packet.js").includes("Strange Company external live evidence gap packet"), "live evidence gap packet tool must generate a handoff packet.", "live evidence gap packet tool", "tools/generate_external_live_gap_packet.js");
   assert(script.includes("function runResilienceDrill"), "script.js must include resilience drill execution.", "resilience drill runner", "script.js");
   assert(script.includes("function issueDrillHardeningPacket"), "script.js must include drill hardening packet issuance.", "hardening packet issuer", "script.js");
