@@ -669,6 +669,7 @@ const DAILY_PILOT_RUN_KEY = "strange-company-daily-pilot-run";
 const EXTERNAL_SIGNALS_KEY = "strange-company-external-signals";
 const SETUP_EVIDENCE_KEY = "strange-company-setup-evidence";
 const CUSTOMER_ACQUISITION_KEY = "strange-company-customer-acquisition";
+const ADAPTIVE_OPERATOR_KEY = "strange-company-adaptive-operator";
 const INCIDENT_SEVERITIES = ["info", "low", "medium", "high"];
 const INCIDENT_STATUSES = ["open", "mitigating", "resolved", "closed"];
 const SETUP_EVIDENCE_STATUSES = ["missing", "pending", "verified", "blocked"];
@@ -851,6 +852,62 @@ const DAILY_RUN_STOP_RULES = [
   { id: "support-outage", title: "Support inbox outage", detail: "The support inbox is unmonitored or unreachable for the day." },
   { id: "terms-change", title: "Terms or privacy change required", detail: "Terms or privacy require an unscheduled change before sending more invoices." }
 ];
+const ADAPTIVE_DAMAGE_ROUTES = [
+  {
+    id: "live-gate",
+    label: "Live gate blocker",
+    lane: "public-config.js / OPERATOR_FAST_START.md / LIVE_HANDOFF_CHECKLIST.md / OPERATIONS_START_PACKET.md",
+    countermeasure: "Keep liveMode false, record the missing external evidence, and rerun the live audit only after the artifact is real."
+  },
+  {
+    id: "brazil-compliance",
+    label: "Brazil compliance blocker",
+    lane: "BRAZIL_COMPLIANCE.md / BRAZIL_COMPLIANCE_AGENTS.md / AI_LEGAL_HANDOFF.md",
+    countermeasure: "Prepare the smallest legal, tax, LGPD, fiscal, or AI handoff packet and leave final closure to the responsible human."
+  },
+  {
+    id: "google-form",
+    label: "Google Form or ledger blocker",
+    lane: "GOOGLE_FORM_INTAKE.md / tools/google_apps_script_create_intake_form.gs / GOOGLE_SHEET_LEDGER.md",
+    countermeasure: "Narrow the intake route to a manual Form or Sheet verification step, then require one safe test response before marking the route verified."
+  },
+  {
+    id: "support-incident",
+    label: "Support or incident failure",
+    lane: "SUPPORT.md / SUPPORT_INBOX_EVIDENCE.md / OPERATIONS_RUNBOOK.md",
+    countermeasure: "Pause affected work, record the incident response, and verify the monitored inbox or escalation owner before reopening the lane."
+  },
+  {
+    id: "customer-order",
+    label: "Customer order or delivery failure",
+    lane: "ORDER_DESK.md / OPERATIONS_RUNBOOK.md / receipt-chain order timeline",
+    countermeasure: "Keep the order in its current safe state, add missing payment, fiscal, delivery, or acceptance evidence, and avoid advancing the status early."
+  },
+  {
+    id: "growth-experiment",
+    label: "Experiment or spend weakness",
+    lane: "AUTONOMOUS_CYCLE.md / OUTCOME_REVIEW.md / CAPITAL_ROUTER.md",
+    countermeasure: "Route the weak outcome to revise or kill, narrow the next experiment, and require a Research Gate receipt before new spend."
+  },
+  {
+    id: "security-resilience",
+    label: "Security or resilience weakness",
+    lane: "RESILIENCE_MODEL.md / RESILIENCE_DRILLS.md / tools/survival_check.js",
+    countermeasure: "Issue a hardening packet, add a survival check if the weakness is structural, and keep private state off the public surface."
+  },
+  {
+    id: "failed-command",
+    label: "Failed command or workflow",
+    lane: "ADAPTIVE_OPERATOR_PROTOCOL.md / OPERATING_SYSTEM.md",
+    countermeasure: "Capture the exact failure, change one condition, retry only when the cause is addressed, and leave a reproducible command for the next operator."
+  },
+  {
+    id: "customer-objection",
+    label: "Customer objection or rejection",
+    lane: "CUSTOMER_ACQUISITION.md / GROWTH_MANAGEMENT.md / ORDER_DESK.md",
+    countermeasure: "Turn the objection into a qualification note, narrow the offer or refund path, and do not scale the channel until the concern is resolved."
+  }
+];
 
 let activeScenario = "base";
 let loopAnimationId = 0;
@@ -874,6 +931,7 @@ let dailyPilotRun = loadDailyPilotRun();
 let externalSignals = loadExternalSignals();
 let setupEvidence = loadSetupEvidence();
 let customerAcquisition = loadCustomerAcquisition();
+let adaptiveOperator = loadAdaptiveOperator();
 
 function activateView(target) {
   document.querySelectorAll(".view").forEach((view) => {
@@ -2690,6 +2748,65 @@ function loadCustomerAcquisition() {
 function saveCustomerAcquisition() {
   try {
     localStorage.setItem(CUSTOMER_ACQUISITION_KEY, JSON.stringify(customerAcquisition));
+  } catch {
+    // Local storage can be unavailable in hardened browser contexts.
+  }
+}
+
+function defaultAdaptiveOperator() {
+  return {
+    receipts: []
+  };
+}
+
+function adaptiveRouteFor(damageType) {
+  return ADAPTIVE_DAMAGE_ROUTES.find((route) => route.id === damageType) || ADAPTIVE_DAMAGE_ROUTES[0];
+}
+
+function normalizeAdaptiveReceipt(receipt) {
+  if (!receipt || typeof receipt !== "object") {
+    return null;
+  }
+  const route = adaptiveRouteFor(receipt.damageType);
+  const damage = String(receipt.damage || receipt.description || "").trim().slice(0, 1200);
+  if (!damage) {
+    return null;
+  }
+  const status = ["open", "routed", "closed"].includes(receipt.status) ? receipt.status : "open";
+  return {
+    id: typeof receipt.id === "string" && receipt.id ? receipt.id : `adapt-${Date.now().toString(36)}`,
+    createdAt: typeof receipt.createdAt === "string" ? receipt.createdAt : new Date().toISOString(),
+    closedAt: typeof receipt.closedAt === "string" ? receipt.closedAt : "",
+    damageType: route.id,
+    damage,
+    revealed: String(receipt.revealed || "").trim().slice(0, 1200),
+    countermeasure: String(receipt.countermeasure || route.countermeasure).trim().slice(0, 1200),
+    nextEvolution: String(receipt.nextEvolution || "").trim().slice(0, 900),
+    routeLane: String(receipt.routeLane || route.lane).trim().slice(0, 300),
+    status
+  };
+}
+
+function loadAdaptiveOperator() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(ADAPTIVE_OPERATOR_KEY) || "null");
+    if (stored && typeof stored === "object") {
+      const receipts = Array.isArray(stored.receipts)
+        ? stored.receipts.map((receipt) => normalizeAdaptiveReceipt(receipt)).filter(Boolean).slice(0, 50)
+        : [];
+      return { receipts };
+    }
+  } catch {
+    // Fall through to an empty adaptive operator log.
+  }
+  return defaultAdaptiveOperator();
+}
+
+function saveAdaptiveOperator() {
+  try {
+    localStorage.setItem(ADAPTIVE_OPERATOR_KEY, JSON.stringify({
+      receipts: (adaptiveOperator.receipts || []).slice(0, 50)
+    }));
   } catch {
     // Local storage can be unavailable in hardened browser contexts.
   }
@@ -4911,6 +5028,317 @@ function draftGrowthTreasuryProposal(button) {
   }
 }
 
+function buildAdaptiveOperatorModel() {
+  const receipts = adaptiveOperator.receipts || [];
+  const latestReceipt = receipts[0] || null;
+  const openReceipts = receipts.filter((receipt) => receipt.status !== "closed");
+  const setupModel = buildSetupEvidenceModel();
+  const complianceModel = buildBrazilComplianceAgentsModel();
+  const revenueStartModel = buildRevenueStartModel();
+  const operationsModel = buildOperationsModel();
+  const launchDecision = buildLaunchDecision();
+  const currentDamage = [];
+  if (launchDecision.blockers && launchDecision.blockers.length) currentDamage.push("live gate blockers");
+  if (!setupModel.allVerified) currentDamage.push("missing setup evidence");
+  if (setupModel.blockedIds.length) currentDamage.push("blocked setup evidence");
+  if (complianceModel.blockedCount) currentDamage.push("Brazil compliance blockers");
+  if (operationsModel.pausedReason) currentDamage.push("daily run stop rules");
+  if (revenueStartModel.blockers.length) currentDamage.push("revenue start blockers");
+
+  let state = "Protocol armed";
+  let tone = "amber";
+  let nextAction = "Use the protocol when a command, plan, customer step, or live gate fails.";
+  if (openReceipts.length) {
+    state = "Adaptation open";
+    tone = "red";
+    nextAction = `Close or route ${openReceipts.length} open adaptation receipt${openReceipts.length === 1 ? "" : "s"}.`;
+  } else if (currentDamage.length) {
+    state = "Damage detected";
+    tone = "amber";
+    nextAction = `Record the highest-risk signal: ${currentDamage[0]}.`;
+  } else if (latestReceipt) {
+    state = "Adapted";
+    tone = "green";
+    nextAction = "Keep the latest countermeasure in the receipt chain and watch for the next blocker.";
+  }
+
+  return {
+    receipts,
+    latestReceipt,
+    openReceipts,
+    currentDamage: Array.from(new Set(currentDamage)),
+    state,
+    tone,
+    nextAction
+  };
+}
+
+function adaptiveReceiptPacket(receipt) {
+  const route = adaptiveRouteFor(receipt.damageType);
+  return [
+    "Strange Company adaptive operator receipt",
+    `Receipt id: ${receipt.id}`,
+    `Created: ${receipt.createdAt}`,
+    `Status: ${receipt.status}`,
+    `Damage type: ${route.label}`,
+    `Routing lane: ${receipt.routeLane || route.lane}`,
+    "",
+    "[Damage Received]",
+    receipt.damage,
+    "",
+    "[Adaptation Complete]",
+    receipt.revealed || "Not recorded.",
+    "",
+    "[Countermeasure]",
+    receipt.countermeasure || route.countermeasure,
+    "",
+    "[Next Evolution]",
+    receipt.nextEvolution || "If this countermeasure fails, narrow the scope and issue a human handoff or hardening packet.",
+    "",
+    "Boundary: this receipt cannot turn on live intake, certify legal/tax/privacy review, accept payment, expose private state, or replace external evidence."
+  ].join("\n");
+}
+
+function renderAdaptiveOperatorOutput(text, copied) {
+  const output = document.querySelector("#adaptiveOperatorOutput");
+  if (!output || !text) {
+    return;
+  }
+  output.innerHTML = `
+    <article>
+      <span class="metric-label">${copied ? "Adaptive receipt copied" : "Adaptive receipt generated"}</span>
+      <pre>${escapeHtml(text)}</pre>
+    </article>
+  `;
+}
+
+function renderAdaptiveOperator() {
+  const panel = document.querySelector("#adaptiveOperatorPanel");
+  if (!panel) {
+    return;
+  }
+  const model = buildAdaptiveOperatorModel();
+  const routeOptions = ADAPTIVE_DAMAGE_ROUTES
+    .map((route) => `<option value="${escapeHtml(route.id)}">${escapeHtml(route.label)}</option>`)
+    .join("");
+  const currentDamage = model.currentDamage.length
+    ? model.currentDamage.map((item) => `<span class="state amber">${escapeHtml(item)}</span>`).join("")
+    : `<span class="state green">no automatic blocker signal</span>`;
+  const receiptCards = model.receipts.length
+    ? model.receipts.slice(0, 8).map((receipt) => {
+        const route = adaptiveRouteFor(receipt.damageType);
+        const tone = receipt.status === "closed" ? "green" : receipt.status === "routed" ? "amber" : "red";
+        return `
+          <article class="adaptive-receipt-card">
+            <div>
+              <span class="metric-label">${escapeHtml(formatReceiptDate(receipt.createdAt))}</span>
+              <h4>${escapeHtml(route.label)}</h4>
+              <p>${escapeHtml(receipt.damage)}</p>
+              <p><strong>Route:</strong> ${escapeHtml(receipt.routeLane || route.lane)}</p>
+            </div>
+            <span class="state ${tone}">${escapeHtml(receipt.status)}</span>
+            <div class="adaptive-receipt-actions">
+              <button type="button" data-copy-adaptive-receipt="${escapeHtml(receipt.id)}">Copy</button>
+              <button type="button" data-close-adaptive-receipt="${escapeHtml(receipt.id)}" ${receipt.status === "closed" ? "disabled" : ""}>Close</button>
+              <button type="button" data-remove-adaptive-receipt="${escapeHtml(receipt.id)}">Remove</button>
+            </div>
+          </article>
+        `;
+      }).join("")
+    : `
+      <article class="adaptive-receipt-card empty">
+        <span class="metric-label">No adaptation receipts yet</span>
+        <p>Record one when a command fails, an external gate blocks progress, a customer objects, or a plan needs to change.</p>
+      </article>
+    `;
+
+  panel.innerHTML = `
+    <article class="adaptive-operator-card ${escapeHtml(model.tone)}">
+      <div>
+        <span class="metric-label">Adaptive operator protocol</span>
+        <h3>${escapeHtml(model.state)}</h3>
+        <p>${escapeHtml(model.nextAction)} Damage is information; the next action must become smaller, safer, or better evidenced.</p>
+      </div>
+      <div class="adaptive-operator-metrics">
+        <span><strong>${model.receipts.length}</strong><small>Receipts</small></span>
+        <span><strong>${model.openReceipts.length}</strong><small>Open</small></span>
+        <span><strong>${model.currentDamage.length}</strong><small>Current blockers</small></span>
+        <span><strong>${escapeHtml(model.latestReceipt ? adaptiveRouteFor(model.latestReceipt.damageType).label : "None")}</strong><small>Latest route</small></span>
+      </div>
+      <div class="growth-review-blockers">${currentDamage}</div>
+    </article>
+    <form class="adaptive-operator-form" id="adaptiveOperatorForm" autocomplete="off">
+      <div class="field-row">
+        <label class="field" for="adaptiveDamageType">
+          <span>Damage type</span>
+          <select id="adaptiveDamageType" name="damageType">${routeOptions}</select>
+        </label>
+        <label class="field" for="adaptiveStatus">
+          <span>Status</span>
+          <select id="adaptiveStatus" name="status">
+            <option value="open">open</option>
+            <option value="routed">routed</option>
+            <option value="closed">closed</option>
+          </select>
+        </label>
+      </div>
+      <label class="field" for="adaptiveDamage">
+        <span>Damage received</span>
+        <textarea id="adaptiveDamage" name="damage" rows="3" required placeholder="What failed, changed, became unsafe, or blocked progress?"></textarea>
+      </label>
+      <label class="field" for="adaptiveRevealed">
+        <span>What the damage revealed</span>
+        <textarea id="adaptiveRevealed" name="revealed" rows="2" placeholder="What assumption was weak or incomplete?"></textarea>
+      </label>
+      <label class="field" for="adaptiveCountermeasure">
+        <span>Countermeasure</span>
+        <textarea id="adaptiveCountermeasure" name="countermeasure" rows="2" placeholder="Next smallest safe action. Leave blank to use the route default."></textarea>
+      </label>
+      <label class="field" for="adaptiveNextEvolution">
+        <span>Next evolution if this fails</span>
+        <textarea id="adaptiveNextEvolution" name="nextEvolution" rows="2" placeholder="What to try next if this countermeasure fails?"></textarea>
+      </label>
+      <button class="primary-action" type="submit">
+        <i data-lucide="file-plus-2"></i>
+        <span>Record adaptation</span>
+      </button>
+      <p class="evidence-form-error" id="adaptiveOperatorError" hidden></p>
+    </form>
+    <div class="adaptive-operator-output" id="adaptiveOperatorOutput" aria-live="polite"></div>
+    <div class="adaptive-receipt-list">${receiptCards}</div>
+  `;
+
+  const form = document.querySelector("#adaptiveOperatorForm");
+  if (form) {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      recordAdaptiveReceipt(form);
+    });
+  }
+  document.querySelectorAll("[data-copy-adaptive-receipt]").forEach((button) => {
+    button.addEventListener("click", () => copyAdaptiveReceipt(button.dataset.copyAdaptiveReceipt, button));
+  });
+  document.querySelectorAll("[data-close-adaptive-receipt]").forEach((button) => {
+    button.addEventListener("click", () => closeAdaptiveReceipt(button.dataset.closeAdaptiveReceipt));
+  });
+  document.querySelectorAll("[data-remove-adaptive-receipt]").forEach((button) => {
+    button.addEventListener("click", () => removeAdaptiveReceipt(button.dataset.removeAdaptiveReceipt));
+  });
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+}
+
+function showAdaptiveOperatorError(message) {
+  const target = document.querySelector("#adaptiveOperatorError");
+  if (!target) return;
+  target.textContent = message || "";
+  target.hidden = !message;
+}
+
+function recordAdaptiveReceipt(form) {
+  const formData = new FormData(form);
+  const damageType = String(formData.get("damageType") || "");
+  const route = adaptiveRouteFor(damageType);
+  const damage = String(formData.get("damage") || "").trim();
+  const revealed = String(formData.get("revealed") || "").trim();
+  const countermeasure = String(formData.get("countermeasure") || "").trim() || route.countermeasure;
+  const nextEvolution = String(formData.get("nextEvolution") || "").trim();
+  const status = String(formData.get("status") || "open");
+  if (!damage) {
+    showAdaptiveOperatorError("Record what failed or changed first.");
+    return;
+  }
+  const sensitive = findSensitiveData([damage, revealed, countermeasure, nextEvolution].join("\n"));
+  if (sensitive.length) {
+    showAdaptiveOperatorError(`Receipt text contains ${sensitive.join(", ")}. Strip and retry.`);
+    return;
+  }
+  const receipt = normalizeAdaptiveReceipt({
+    id: `adapt-${Date.now().toString(36)}`,
+    createdAt: new Date().toISOString(),
+    damageType: route.id,
+    damage,
+    revealed,
+    countermeasure,
+    nextEvolution,
+    routeLane: route.lane,
+    status
+  });
+  if (!receipt) {
+    showAdaptiveOperatorError("Unable to create adaptation receipt.");
+    return;
+  }
+  adaptiveOperator.receipts = [receipt, ...(adaptiveOperator.receipts || [])].slice(0, 50);
+  saveAdaptiveOperator();
+  form.reset();
+  renderAdaptiveOperator();
+  renderAdaptiveOperatorOutput(adaptiveReceiptPacket(receipt), false);
+  renderReceiptChain();
+  renderLogs();
+}
+
+async function copyAdaptiveReceipt(receiptId, button) {
+  const receipt = (adaptiveOperator.receipts || []).find((item) => item.id === receiptId);
+  if (!receipt) {
+    return;
+  }
+  const packet = adaptiveReceiptPacket(receipt);
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(packet);
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  renderAdaptiveOperatorOutput(packet, copied);
+  if (button) {
+    const previous = button.textContent;
+    button.textContent = copied ? "Copied" : "Copy failed";
+    setTimeout(() => {
+      button.textContent = previous;
+    }, 1500);
+  }
+}
+
+function copyLatestAdaptiveReceipt(button) {
+  const latest = (adaptiveOperator.receipts || [])[0];
+  if (!latest) {
+    renderAdaptiveOperatorOutput("No adaptive receipt exists yet.", false);
+    return;
+  }
+  copyAdaptiveReceipt(latest.id, button);
+}
+
+function closeAdaptiveReceipt(receiptId) {
+  const now = new Date().toISOString();
+  adaptiveOperator.receipts = (adaptiveOperator.receipts || []).map((receipt) =>
+    receipt.id === receiptId
+      ? { ...receipt, status: "closed", closedAt: receipt.closedAt || now }
+      : receipt
+  );
+  saveAdaptiveOperator();
+  renderAdaptiveOperator();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function removeAdaptiveReceipt(receiptId) {
+  adaptiveOperator.receipts = (adaptiveOperator.receipts || []).filter((receipt) => receipt.id !== receiptId);
+  saveAdaptiveOperator();
+  renderAdaptiveOperator();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function resetAdaptiveOperator() {
+  adaptiveOperator = defaultAdaptiveOperator();
+  saveAdaptiveOperator();
+  renderAdaptiveOperator();
+  renderReceiptChain();
+  renderLogs();
+}
+
 function renderSetupEvidence() {
   const panel = document.querySelector("#setupEvidencePanel");
   if (!panel) return;
@@ -5588,6 +6016,7 @@ function renderOperations() {
   renderRevenueStart();
   renderSalesPipeline();
   renderBrazilComplianceAgents();
+  renderAdaptiveOperator();
   renderGrowthReview();
   const services = operationServices();
   const selectedService = serviceSelect.value || services[0]?.id || "";
@@ -7577,6 +8006,32 @@ function collectReceiptEvents() {
     outreachTarget: growthReview.acquisition.target
   });
 
+  const adaptiveModel = buildAdaptiveOperatorModel();
+  push(
+    "Adaptation",
+    "adaptive-operator",
+    "Adaptive operator protocol",
+    "Operations console",
+    adaptiveModel.state,
+    adaptiveModel.latestReceipt ? adaptiveModel.latestReceipt.createdAt : "baseline",
+    {
+      currentDamage: adaptiveModel.currentDamage.slice(0, 12),
+      latestReceiptId: adaptiveModel.latestReceipt ? adaptiveModel.latestReceipt.id : "",
+      openReceipts: adaptiveModel.openReceipts.length,
+      receiptCount: adaptiveModel.receipts.length
+    }
+  );
+  adaptiveModel.receipts.forEach((receipt) => {
+    const route = adaptiveRouteFor(receipt.damageType);
+    push("Adaptation Receipt", receipt.id, route.label, "Adaptive operator", receipt.status, receipt.closedAt || receipt.createdAt, {
+      countermeasure: receipt.countermeasure,
+      damage: receipt.damage,
+      nextEvolution: receipt.nextEvolution,
+      revealed: receipt.revealed,
+      routeLane: receipt.routeLane || route.lane
+    });
+  });
+
   operations.orders.forEach((order) => {
     push("Order", order.id, order.customer, "Operations console", order.status, order.updatedAt || order.createdAt, {
       acceptanceNote: order.acceptanceNote || "",
@@ -8389,6 +8844,14 @@ function renderLogs() {
     growthReview.state,
     growthReview.tone
   ]];
+  const adaptiveModel = buildAdaptiveOperatorModel();
+  const adaptiveRows = [[
+    "Adapt",
+    `Adaptive operator: ${adaptiveModel.receipts.length} receipt${adaptiveModel.receipts.length === 1 ? "" : "s"}`,
+    "Operations console",
+    adaptiveModel.state,
+    adaptiveModel.tone
+  ]];
   const signalRows = externalSignals.slice(0, 4).map((signal) => [
     "Signal",
     `${signal.source}: ${signal.subject}`,
@@ -8465,7 +8928,7 @@ function renderLogs() {
     run.recommendation,
     toneForRecommendation(run.recommendation)
   ]);
-  log.innerHTML = [...receiptRows, ...launchRows, ...pilotRows, ...satelliteRows, ...operationsRows, ...profitRows, ...revenueStartRows, ...growthRows, ...signalRows, ...drillRows, ...routeRows, ...outcomeRows, ...executionRows, ...treasuryRows, ...gateLogRows, ...logs]
+  log.innerHTML = [...receiptRows, ...launchRows, ...pilotRows, ...satelliteRows, ...operationsRows, ...profitRows, ...revenueStartRows, ...growthRows, ...adaptiveRows, ...signalRows, ...drillRows, ...routeRows, ...outcomeRows, ...executionRows, ...treasuryRows, ...gateLogRows, ...logs]
     .map(
       ([className, entry, owner, state, tone]) => `
         <div class="log-row" role="row">
@@ -8797,6 +9260,14 @@ function setupOperations() {
   const resetAcquisitionButton = document.querySelector("#resetCustomerAcquisition");
   if (resetAcquisitionButton) {
     resetAcquisitionButton.addEventListener("click", () => resetCustomerAcquisition());
+  }
+  const copyLatestAdaptiveButton = document.querySelector("#copyLatestAdaptiveReceipt");
+  if (copyLatestAdaptiveButton) {
+    copyLatestAdaptiveButton.addEventListener("click", () => copyLatestAdaptiveReceipt(copyLatestAdaptiveButton));
+  }
+  const resetAdaptiveButton = document.querySelector("#resetAdaptiveOperator");
+  if (resetAdaptiveButton) {
+    resetAdaptiveButton.addEventListener("click", resetAdaptiveOperator);
   }
   const copyGrowthReviewButton = document.querySelector("#copyGrowthReview");
   if (copyGrowthReviewButton) {

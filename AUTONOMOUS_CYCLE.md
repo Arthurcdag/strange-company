@@ -79,6 +79,20 @@ Before the route button can draft a Treasury proposal or cool a lane, the operat
 
 The approved review is carried forward as `evidenceReviewId` and `evidenceReviewNote`. It is an accountability checkpoint only; it does not approve spend or replace the Research Gate.
 
+## Damage-To-Adaptation Loop
+
+The autonomous cycle also handles damage: failed checks, rejected plans, weak outcomes, customer objections, missing evidence, live-gate blockers, compliance blockers, and unsafe public/private boundary signals.
+
+When damage appears, the operator uses [ADAPTIVE_OPERATOR_PROTOCOL.md](ADAPTIVE_OPERATOR_PROTOCOL.md) before trying the same path again. The next action must either:
+
+- produce a safer countermeasure,
+- narrow the experiment,
+- issue a human handoff for legal, tax, payment, credential, or external evidence work,
+- route the outcome to `revise` or `kill`,
+- or add a resilience hardening packet.
+
+Damage never authorizes turning on live intake early. It is a routing signal for the next verified receipt.
+
 ## Hardening Path
 
 The next version should add:

@@ -276,6 +276,9 @@ h3 {
 .revenue-start-lane,
 .revenue-start-packet,
 .compliance-agent-card,
+.adaptive-operator-card,
+.adaptive-operator-form,
+.adaptive-receipt-card,
 .growth-review-card,
 .growth-channel,
 .sales-lead-form,
@@ -1340,6 +1343,136 @@ h3 {
 
 .revenue-start-packet button {
   min-width: 110px;
+}
+
+.adaptive-operator {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.adaptive-operator-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.95fr);
+  gap: 18px;
+  border-left: 3px solid var(--amber);
+}
+
+.adaptive-operator-card.green {
+  border-left-color: var(--green);
+}
+
+.adaptive-operator-card.red {
+  border-left-color: var(--red);
+}
+
+.adaptive-operator-card h3,
+.adaptive-operator-card p,
+.adaptive-receipt-card h4,
+.adaptive-receipt-card p {
+  margin: 0;
+}
+
+.adaptive-operator-card h3 {
+  font-size: 19px;
+}
+
+.adaptive-operator-card p,
+.adaptive-receipt-card p {
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.adaptive-operator-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.adaptive-operator-metrics span {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f3efe8;
+}
+
+.adaptive-operator-metrics strong,
+.adaptive-operator-metrics small {
+  display: block;
+}
+
+.adaptive-operator-metrics strong {
+  overflow-wrap: anywhere;
+  font-size: 18px;
+}
+
+.adaptive-operator-metrics small {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.adaptive-operator-form {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.adaptive-operator-form input,
+.adaptive-operator-form select,
+.adaptive-operator-form textarea {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.adaptive-operator-output article {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.adaptive-operator-output pre,
+.adaptive-receipt-card pre {
+  margin: 12px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.adaptive-receipt-list {
+  display: grid;
+  gap: 10px;
+}
+
+.adaptive-receipt-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px 130px;
+  gap: 12px;
+  align-items: start;
+  padding: 14px;
+}
+
+.adaptive-receipt-card.empty {
+  grid-template-columns: 1fr;
+}
+
+.adaptive-receipt-card h4 {
+  font-size: 16px;
+}
+
+.adaptive-receipt-actions {
+  display: grid;
+  gap: 8px;
 }
 
 .growth-review {
@@ -3070,6 +3203,7 @@ input[type="range"] {
   .revenue-start-card,
   .revenue-start-lanes,
   .compliance-agent-list,
+  .adaptive-operator-card,
   .growth-review-card,
   .sales-pipeline-layout,
   .signal-layout,
@@ -3094,6 +3228,7 @@ input[type="range"] {
   .profit-target-grid,
   .profit-readiness-metrics,
   .revenue-start-metrics,
+  .adaptive-operator-metrics,
   .growth-review-metrics,
   .growth-channels,
   .signal-policy-grid,
@@ -3141,6 +3276,7 @@ input[type="range"] {
   .satellite-metrics-grid,
   .ops-metrics-grid,
   .revenue-start-metrics,
+  .adaptive-operator-metrics,
   .growth-review-metrics,
   .growth-channels,
   .signal-policy-grid,
@@ -3162,6 +3298,7 @@ input[type="range"] {
   .ops-order,
   .ops-launch-item,
   .revenue-start-packet,
+  .adaptive-receipt-card,
   .growth-channel,
   .sales-lead-card,
   .signal-card,

@@ -210,6 +210,20 @@ Every product runs through the same loop:
 
 Kill criteria matter. Strange Company should not emotionally attach to products.
 
+## Adaptive Operator Protocol
+
+The operating system treats roadblocks as evidence, not embarrassment. A failed command, rejected plan, customer objection, missing receipt, legal blocker, fiscal blocker, privacy blocker, or unsafe public/private leak is damage that must change the next action.
+
+Operators and AI agents follow [ADAPTIVE_OPERATOR_PROTOCOL.md](ADAPTIVE_OPERATOR_PROTOCOL.md) when damage occurs:
+
+1. identify what failed or changed,
+2. explain what the damage revealed,
+3. adapt the strategy,
+4. execute the next smallest safe countermeasure,
+5. and define the next evolution if the countermeasure fails.
+
+This loop can narrow scope, change tactics, create a handoff, or stop an unsafe launch. It cannot bypass the live gate, professional review, Brazil compliance, LGPD duties, fiscal obligations, customer terms, support readiness, or receipt requirements.
+
 ## Metrics
 
 Primary:

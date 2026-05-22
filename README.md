@@ -61,6 +61,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [OPERATING_SYSTEM.md](OPERATING_SYSTEM.md): how the company makes decisions and executes work.
 - [RESILIENCE_MODEL.md](RESILIENCE_MODEL.md): how the company survives attacks and shocks.
 - [RESILIENCE_DRILLS.md](RESILIENCE_DRILLS.md): how attack drills become receipts and hardening packets.
+- [ADAPTIVE_OPERATOR_PROTOCOL.md](ADAPTIVE_OPERATOR_PROTOCOL.md): how operators and AI agents convert roadblocks, failed commands, criticism, and missing evidence into safer next actions.
 - [LAUNCH_PLAN.md](LAUNCH_PLAN.md): practical path to version 0.
 - [ONLINE_GATE.md](ONLINE_GATE.md): when the company may move from local prototype to private sandbox, public beta, or live operation.
 - [LIVE_HANDOFF_CHECKLIST.md](LIVE_HANDOFF_CHECKLIST.md): developer/operator checklist for turning the deployed static prototype into verified live intake.

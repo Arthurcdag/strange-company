@@ -59,6 +59,8 @@ function auditPrivateConsole() {
   assertIncludes("index.html", 'id="revenueStartPanel"', "revenue start panel");
   assertIncludes("index.html", 'id="issueRevenueStartPacket"', "revenue start issue action");
   assertIncludes("index.html", 'id="brazilComplianceAgentsPanel"', "Brazil compliance agents panel");
+  assertIncludes("index.html", 'id="adaptiveOperatorPanel"', "adaptive operator panel");
+  assertIncludes("index.html", 'id="copyLatestAdaptiveReceipt"', "adaptive operator copy action");
   assertIncludes("index.html", 'id="growthReviewPanel"', "growth review panel");
   assertIncludes("index.html", 'id="copyGrowthReview"', "growth review copy action");
   assertIncludes("script.js", "const REVENUE_START_LANES = [", "two-company revenue lanes");
@@ -67,6 +69,11 @@ function auditPrivateConsole() {
   assertIncludes("script.js", "function brazilComplianceAgentPacket", "Brazil compliance agent packet");
   assertIncludes("script.js", "function renderBrazilComplianceAgents", "Brazil compliance agent renderer");
   assertIncludes("script.js", "async function copyBrazilComplianceAgentPacket", "Brazil compliance agent copy action");
+  assertIncludes("script.js", "const ADAPTIVE_DAMAGE_ROUTES = [", "adaptive damage route roster");
+  assertIncludes("script.js", "function buildAdaptiveOperatorModel", "adaptive operator state model");
+  assertIncludes("script.js", "function adaptiveReceiptPacket", "adaptive operator packet");
+  assertIncludes("script.js", "function renderAdaptiveOperator", "adaptive operator renderer");
+  assertIncludes("script.js", "function recordAdaptiveReceipt", "adaptive operator receipt action");
   assertIncludes("script.js", "function buildRevenueStartModel", "revenue start state model");
   assertIncludes("script.js", "function snapshotRevenueStartLanes", "start packet lane snapshots");
   assertIncludes("script.js", "function buildGrowthReviewModel", "growth review state model");
@@ -82,6 +89,7 @@ function auditPrivateConsole() {
   assertIncludes("script.js", '"Revenue Start",', "revenue start receipt");
   assertIncludes("script.js", '"Revenue Packet",', "revenue packet receipt");
   assertIncludes("script.js", '"Growth Review",', "growth review receipt");
+  assertIncludes("script.js", '"Adaptation Receipt",', "adaptive operator receipt");
 }
 
 function auditDocs() {
@@ -96,6 +104,10 @@ function auditDocs() {
   assertIncludes("README.md", "GOOGLE_FORM_INTAKE.md", "Google Form intake README link");
   assertIncludes("README.md", "tools/google_apps_script_create_intake_form.gs", "Google Form Apps Script README link");
   assertIncludes("README.md", "tools/survival_check.js", "survival check README link");
+  assertIncludes("README.md", "ADAPTIVE_OPERATOR_PROTOCOL.md", "adaptive operator README link");
+  assertIncludes("OPERATIONS_RUNBOOK.md", "Adaptive Operator Protocol", "adaptive operator runbook section");
+  assertIncludes("ADAPTIVE_OPERATOR_PROTOCOL.md", "Damage is information", "adaptive damage rule");
+  assertIncludes("ADAPTIVE_OPERATOR_PROTOCOL.md", "Damage-to-adaptation receipts", "adaptive receipt console docs");
   assertIncludes("OPERATIONS_RUNBOOK.md", "## Functional Definition", "satellite functional definition");
   assertIncludes("OPERATIONS_RUNBOOK.md", "Receipt Chain Timeline Panel", "order timeline runbook section");
   assertIncludes("OPERATIONS_RUNBOOK.md", "Revenue Start Board", "revenue start runbook section");
@@ -147,6 +159,9 @@ function auditPublicBoundary() {
     [/issueRevenueStartPacket/, "private revenue start action"],
     [/brazilComplianceAgentsPanel/, "private Brazil compliance agents panel"],
     [/BRAZIL_COMPLIANCE_AGENTS/, "Brazil compliance agent internals"],
+    [/adaptiveOperatorPanel/, "private adaptive operator panel"],
+    [/strange-company-adaptive-operator/, "adaptive operator storage key"],
+    [/ADAPTIVE_DAMAGE_ROUTES/, "adaptive damage route internals"],
     [/growthReviewPanel/, "private growth review panel"],
     [/copyGrowthReview/, "private growth review action"],
     [/strange-company-operations/, "operations storage key"],

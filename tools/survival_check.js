@@ -55,6 +55,7 @@ function checkStaticSurvivalSurface() {
   const charter = read("CHARTER.md");
   const resilienceModel = read("RESILIENCE_MODEL.md");
   const resilienceDrills = read("RESILIENCE_DRILLS.md");
+  const adaptiveProtocol = read("ADAPTIVE_OPERATOR_PROTOCOL.md");
   const operatingSystem = read("OPERATING_SYSTEM.md");
   const brazilCompliance = read("BRAZIL_COMPLIANCE.md");
   const brazilAgents = read("BRAZIL_COMPLIANCE_AGENTS.md");
@@ -73,6 +74,9 @@ function checkStaticSurvivalSurface() {
   assert(resilienceModel.includes("## Threat Model"), "RESILIENCE_MODEL.md must define the threat model.", "threat model", "RESILIENCE_MODEL.md");
   assert(resilienceModel.includes("Every incident must produce at least one permanent improvement"), "RESILIENCE_MODEL.md must keep the anti-fragility rule.", "anti-fragility rule", "RESILIENCE_MODEL.md");
   assert(resilienceDrills.includes("Every serious weakness must become a hardening packet"), "RESILIENCE_DRILLS.md must keep the hardening packet rule.", "hardening packet rule", "RESILIENCE_DRILLS.md");
+  assert(adaptiveProtocol.includes("Damage is information"), "ADAPTIVE_OPERATOR_PROTOCOL.md must keep the adaptive damage rule.", "adaptive damage rule", "ADAPTIVE_OPERATOR_PROTOCOL.md");
+  assert(adaptiveProtocol.includes("Do not set `liveMode: true`"), "ADAPTIVE_OPERATOR_PROTOCOL.md must keep the liveMode stop rule.", "adaptive liveMode stop rule", "ADAPTIVE_OPERATOR_PROTOCOL.md");
+  assert(adaptiveProtocol.includes("Damage-to-adaptation receipts"), "ADAPTIVE_OPERATOR_PROTOCOL.md must document adaptive receipts.", "adaptive receipt docs", "ADAPTIVE_OPERATOR_PROTOCOL.md");
   assert(operatingSystem.includes("receipt chain"), "OPERATING_SYSTEM.md must describe the receipt chain.", "receipt-chain operating layer", "OPERATING_SYSTEM.md");
   assert(brazilCompliance.includes("Keep `public-config.js` at `liveMode: false`"), "BRAZIL_COMPLIANCE.md must keep the liveMode stop rule.", "Brazil liveMode stop rule", "BRAZIL_COMPLIANCE.md");
   assert(brazilAgents.includes("Human must close"), "BRAZIL_COMPLIANCE_AGENTS.md must keep human closure language.", "Brazil compliance human closure", "BRAZIL_COMPLIANCE_AGENTS.md");
@@ -94,6 +98,9 @@ function checkStaticSurvivalSurface() {
   assert(script.includes("function runResilienceDrill"), "script.js must include resilience drill execution.", "resilience drill runner", "script.js");
   assert(script.includes("function issueDrillHardeningPacket"), "script.js must include drill hardening packet issuance.", "hardening packet issuer", "script.js");
   assert(script.includes("const BRAZIL_COMPLIANCE_AGENTS = ["), "script.js must include Brazil compliance agents.", "Brazil compliance agents", "script.js");
+  assert(script.includes("const ADAPTIVE_DAMAGE_ROUTES = ["), "script.js must include adaptive damage routes.", "adaptive damage routes", "script.js");
+  assert(script.includes("function recordAdaptiveReceipt"), "script.js must include adaptive receipt recording.", "adaptive receipt recorder", "script.js");
+  assert(script.includes('"Adaptation Receipt",'), "script.js must include adaptive receipts in the receipt chain.", "adaptive receipt chain", "script.js");
   assert(script.includes("const SETUP_EVIDENCE_SLOTS = ["), "script.js must include setup evidence slots.", "setup evidence slots", "script.js");
 
   for (const [file, contents] of [
@@ -102,6 +109,8 @@ function checkStaticSurvivalSurface() {
     ["public-config.js", publicConfig]
   ]) {
     assert(!/brazilComplianceAgentsPanel/.test(contents), `${file} must not expose the private Brazil compliance agents panel.`, "public/private boundary", file);
+    assert(!/adaptiveOperatorPanel/.test(contents), `${file} must not expose the private adaptive operator panel.`, "public/private boundary", file);
+    assert(!/strange-company-adaptive-operator/.test(contents), `${file} must not expose private adaptive operator storage.`, "public adaptive storage absent", file);
     assert(!/strange-company-operations/.test(contents), `${file} must not expose private operations storage.`, "public operations storage absent", file);
     assert(!/strange-company-revenue-start/.test(contents), `${file} must not expose private revenue-start storage.`, "public revenue-start storage absent", file);
   }
