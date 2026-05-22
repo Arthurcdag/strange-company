@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "mode": "template",
+  "support": {
+    "supportEmail": "",
+    "owner": "",
+    "monitoringCadence": "",
+    "testReceivedAt": "",
+    "testRepliedAt": "",
+    "fallbackContact": "",
+    "verified": false
+  },
+  "google": {
+    "sheetUrl": "",
+    "formUrl": "",
+    "testResponseTimestamp": "",
+    "requestsHeaderVerified": false,
+    "invoicesHeaderVerified": false,
+    "leadsHeaderVerified": false,
+    "formLinkedToSheet": false,
+    "verified": false
+  },
+  "legalReview": {
+    "termsReviewedAt": "",
+    "privacyReviewedAt": "",
+    "supportReviewedAt": "",
+    "reviewer": "",
+    "documentsChanged": false
+  },
+  "stripe": {
+    "dashboardUrl": "",
+    "testInvoiceId": "",
+    "testHostedInvoiceUrl": "",
+    "payoutRouteVerifiedBy": "",
+    "reconciliationOwner": "",
+    "weeklyReconciliationDay": "",
+    "hostedInvoicesEnabled": false,
+    "verified": false
+  },
+  "bank": {
+    "entityName": "",
+    "responsiblePartyRecorded": false,
+    "bankName": "",
+    "bankAccountLast4": "",
+    "stripePayoutTestStatus": "",
+    "reconciliationOwner": "",
+    "verified": false
+  },
+  "publicConfig": {
+    "operatorName": "Strange Works Studio",
+    "supportEmail": "",
+    "googleFormUrl": "",
+    "supportInboxVerified": false,
+    "googleFormVerified": false,
+    "termsReviewedAt": "",
+    "privacyReviewedAt": "",
+    "liveMode": false
+  },
+  "attestation": {
+    "operator": "",
+    "reviewedAt": "",
+    "noSecretsInRepo": true,
+    "strangeCompanyRemainsSealed": true,
+    "satelliteIsRevenueOperator": true
+  }
+}

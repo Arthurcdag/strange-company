@@ -14,6 +14,13 @@ Current state:
 - `node tools/preflight_public_launch.js` passes.
 - `node tools/audit_company_functionality.js --require-live` fails by design until external controls are verified.
 
+ASAP interpretation:
+
+- Strange Company main is already online only as a static public prototype.
+- Strange Works Studio is the satellite lane that can become commercially live first.
+- The satellite stays packet-only until real support, intake, ledger, payment, terms, privacy, and bank evidence exists.
+- Use [ONLINE_ASAP.md](ONLINE_ASAP.md) before editing `public-config.js`.
+
 Live-operation blockers:
 
 - `public-config.js liveMode` is `false`.
@@ -143,6 +150,7 @@ Edit `public-config.js` only after sections 1-5 are done.
 Required checks:
 
 ```bash
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live
 node tools/preflight_public_launch.js
 node tools/audit_company_functionality.js --require-live
 ```
@@ -193,5 +201,7 @@ The next operator action is not a code change. It is to create or verify:
 4. payment route,
 5. terms and privacy review dates,
 6. AI/human review owner.
+
+Use [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md) for exact field names, Google Form questions, support inbox checks, Stripe evidence, bank evidence boundaries, and the final `public-config.js` patch.
 
 After those are available, update `public-config.js`, run the two required checks, and publish.

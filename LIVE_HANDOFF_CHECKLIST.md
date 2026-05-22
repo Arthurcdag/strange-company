@@ -14,6 +14,15 @@ Current state:
 
 Do not set `liveMode: true` until every external control below is real and tested.
 
+## ASAP Track Split
+
+Use [ONLINE_ASAP.md](ONLINE_ASAP.md) for the fastest safe launch sequence.
+
+- **Main track**: keep Strange Company online only as the GitHub Pages static prototype and documentation surface.
+- **Satellite track**: turn Strange Works Studio into live intake only after the support inbox, Google Form, terms, privacy, Stripe, bank, and ledger evidence are real.
+- **Boundary**: the private `index.html` command center remains local/private; GitHub Pages must not become the sealed command center.
+- **Last flag**: `public-config.js liveMode` is the final switch, never the first setup step.
+
 ## 1. Repo Sync
 
 - [ ] Clone or pull the latest `main` from `https://github.com/Arthurcdag/strange-company`.
@@ -36,6 +45,8 @@ node tools/audit_company_functionality.js
 ```
 
 ## 2. External Controls
+
+Use [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md) for the detailed setup instructions and evidence fields.
 
 - [ ] Brazilian entity/CNPJ or approved operating structure is confirmed.
 - [ ] Responsible human party is identified for tax, banking/payment, support, privacy, and customer control.
@@ -89,6 +100,7 @@ Edit `public-config.js` only after sections 2 and 3 are complete.
 Then run:
 
 ```bash
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live
 node tools/preflight_public_launch.js
 node tools/audit_company_functionality.js --require-live
 ```

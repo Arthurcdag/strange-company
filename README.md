@@ -65,6 +65,8 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [LAUNCH_PLAN.md](LAUNCH_PLAN.md): practical path to version 0.
 - [ONLINE_GATE.md](ONLINE_GATE.md): when the company may move from local prototype to private sandbox, public beta, or live operation.
 - [LIVE_HANDOFF_CHECKLIST.md](LIVE_HANDOFF_CHECKLIST.md): developer/operator checklist for turning the deployed static prototype into verified live intake.
+- [ONLINE_ASAP.md](ONLINE_ASAP.md): shortest safe path for keeping the main prototype online and switching the satellite to live intake once outside controls are verified.
+- [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md): developer/operator instructions for creating the support inbox, Google Form, Sheet ledger, review dates, Stripe invoice route, and bank evidence.
 - [REVENUE_PILOT.md](REVENUE_PILOT.md): how the prototype moves toward the first controlled paid offer.
 - [SATELLITE_COMPANY.md](SATELLITE_COMPANY.md): how a separate for-profit company can net profit without breaking the sealed Strange Company charter.
 - [REVENUE_START.md](REVENUE_START.md): day-one two-company revenue posture and start packet sequence.
@@ -104,6 +106,8 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [tools/audit_company_functionality.js](tools/audit_company_functionality.js): repo-level audit for Strange Company, the satellite operator, and the external live-operation gate.
 - [tools/survival_check.js](tools/survival_check.js): survival drill that confirms the charter, resilience model, receipt chain, Brazil/AI gates, public/private boundary, and expected live-gate behavior still hold.
 - [tools/google_apps_script_create_intake_form.gs](tools/google_apps_script_create_intake_form.gs): Apps Script builder for creating the Google Form intake and linking it to the private Sheet ledger.
+- [tools/validate_external_live_packet.js](tools/validate_external_live_packet.js): local validator for the ignored external live-readiness evidence packet.
+- [EXTERNAL_LIVE_PACKET.template.json](EXTERNAL_LIVE_PACKET.template.json): safe blank template for live-intake evidence; completed copies stay local and ignored.
 - [index.html](index.html): private/local command center for Operations, Treasury, Decisions, and Research Gate.
 - [styles.css](styles.css): interface design for the prototype.
 - [script.js](script.js): treasury allocation, launch readiness, private order requests, revenue pilot, satellite profit model, revenue start board, Brazil compliance agents, growth review, operations console, external signals, execution packets, outcome receipts, outcome evidence reviews, capital routing, resilience drills, cooldown lanes, local receipt chain, logs, and operating loop animation.
@@ -120,6 +124,8 @@ node tools/survival_check.js
 Pull requests also run the same syntax and public launch preflight checks through the `Validate static site` workflow.
 
 The GitHub repository deploys `public.html` as the GitHub Pages homepage from `main`. The private command center is not the public homepage and should not be treated as live autonomous business operation.
+
+For the fastest launch path, use [ONLINE_ASAP.md](ONLINE_ASAP.md). The main track can stay online as a static public prototype while Strange Works Studio, the satellite operator, remains packet-only until `public-config.js` has verified support, Google Form, terms, privacy, Stripe, and bank evidence. The exact external setup instructions are in [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md).
 
 If cloning from GitHub, initialize the research-tool submodule first:
 

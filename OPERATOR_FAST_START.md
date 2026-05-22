@@ -2,7 +2,11 @@
 
 Use this when the external setup is ready and the public Order Desk needs to point at the real operating routes.
 
+For the shortest safe sequence across both lanes, see [ONLINE_ASAP.md](ONLINE_ASAP.md). The main Strange Company track can remain online as the static public prototype. The satellite track becomes live intake only after the external operating routes below are verified.
+
 This fast start is Brazil-first. Do not use it until `BRAZIL_COMPLIANCE.md` and `AI_LEGAL_HANDOFF.md` have been reviewed for the real route.
+
+For exact Google Form questions, Sheet headers, support inbox checks, Stripe evidence, bank evidence, and review-date rules, use [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md).
 
 ## 30 Minute Config Pass
 
@@ -20,12 +24,13 @@ This fast start is Brazil-first. Do not use it until `BRAZIL_COMPLIANCE.md` and 
    - set `brazilComplianceReviewedAt` and `aiHandoffReviewedAt`,
    - set `liveMode: true` only after the stop rule is clear,
    - adjust service names and prices if the offer changed.
-5. Run `node tools/preflight_public_launch.js`.
-6. Run `node tools/audit_company_functionality.js --require-live`.
-7. Open `public.html` locally and confirm the readiness banner says `Live intake configured`.
-8. Submit a safe test packet.
-9. Confirm the email draft uses the real inbox.
-10. Open the Google Form from the public packet output and paste the packet.
+5. Run `node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live`.
+6. Run `node tools/preflight_public_launch.js`.
+7. Run `node tools/audit_company_functionality.js --require-live`.
+8. Open `public.html` locally and confirm the readiness banner says `Live intake configured`.
+9. Submit a safe test packet.
+10. Confirm the email draft uses the real inbox.
+11. Open the Google Form from the public packet output and paste the packet.
 
 ## Live Smoke
 
