@@ -48,6 +48,12 @@ Validate the blank template:
 node tools/validate_external_live_packet.js --template-ok
 ```
 
+Run the gate regression that proves an otherwise-complete live packet still fails without Brazil compliance and AI handoff review dates:
+
+```bash
+node tools/check_external_live_packet_gate.js
+```
+
 Validate the completed local packet before changing `public-config.js`:
 
 ```bash

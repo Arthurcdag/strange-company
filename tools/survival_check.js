@@ -103,6 +103,7 @@ function checkStaticSurvivalSurface() {
   assert(read("tools/generate_external_live_gap_packet.js").includes("Strange Company external live evidence gap packet"), "live evidence gap packet tool must generate a handoff packet.", "live evidence gap packet tool", "tools/generate_external_live_gap_packet.js");
   assert(read("tools/validate_external_live_packet.js").includes("public Brazil compliance review date"), "external live packet validator must require Brazil compliance review date.", "external packet Brazil review gate", "tools/validate_external_live_packet.js");
   assert(read("tools/validate_external_live_packet.js").includes("public AI handoff review date"), "external live packet validator must require AI handoff review date.", "external packet AI review gate", "tools/validate_external_live_packet.js");
+  assert(read("tools/check_external_live_packet_gate.js").includes("External live packet gate regression passed"), "external live packet gate regression must protect the Brazil/AI review-date gate.", "external packet gate regression", "tools/check_external_live_packet_gate.js");
   assert(script.includes("function runResilienceDrill"), "script.js must include resilience drill execution.", "resilience drill runner", "script.js");
   assert(script.includes("function issueDrillHardeningPacket"), "script.js must include drill hardening packet issuance.", "hardening packet issuer", "script.js");
   assert(script.includes("const BRAZIL_COMPLIANCE_AGENTS = ["), "script.js must include Brazil compliance agents.", "Brazil compliance agents", "script.js");
@@ -162,6 +163,7 @@ try {
 
 if (!failures.length) {
   checkStaticSurvivalSurface();
+  checkCommand("external live packet gate regression", ["tools/check_external_live_packet_gate.js"]);
   checkCommand("public launch preflight", ["tools/preflight_public_launch.js"]);
   checkCommand("company functionality audit", ["tools/audit_company_functionality.js"]);
 }

@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { spawnSync } = require("child_process");
 const vm = require("vm");
 
 const root = path.resolve(__dirname, "..");
@@ -25,6 +26,15 @@ function compileJavaScript(relativePath) {
   } catch (error) {
     fail(`${relativePath} does not parse: ${error.message}`);
   }
+}
+
+function checkExternalLivePacketGate() {
+  const result = spawnSync(process.execPath, ["tools/check_external_live_packet_gate.js"], {
+    cwd: root,
+    encoding: "utf8"
+  });
+  const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
+  assert(result.status === 0, `external live packet gate regression failed:\n${output}`);
 }
 
 function loadPublicConfig() {
@@ -767,6 +777,8 @@ compileJavaScript("tools/audit_company_functionality.js");
 compileJavaScript("tools/draft_external_live_packet.js");
 compileJavaScript("tools/generate_external_live_gap_packet.js");
 compileJavaScript("tools/validate_external_live_packet.js");
+compileJavaScript("tools/check_external_live_packet_gate.js");
+checkExternalLivePacketGate();
 checkPublicSurface();
 checkPrivateUrlAllowlists();
 checkOutcomeEvidenceContract();
