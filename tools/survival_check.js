@@ -77,6 +77,7 @@ function checkStaticSurvivalSurface() {
   assert(adaptiveProtocol.includes("Damage is information"), "ADAPTIVE_OPERATOR_PROTOCOL.md must keep the adaptive damage rule.", "adaptive damage rule", "ADAPTIVE_OPERATOR_PROTOCOL.md");
   assert(adaptiveProtocol.includes("Do not set `liveMode: true`"), "ADAPTIVE_OPERATOR_PROTOCOL.md must keep the liveMode stop rule.", "adaptive liveMode stop rule", "ADAPTIVE_OPERATOR_PROTOCOL.md");
   assert(adaptiveProtocol.includes("Damage-to-adaptation receipts"), "ADAPTIVE_OPERATOR_PROTOCOL.md must document adaptive receipts.", "adaptive receipt docs", "ADAPTIVE_OPERATOR_PROTOCOL.md");
+  assert(adaptiveProtocol.includes("no-spend execution packet"), "ADAPTIVE_OPERATOR_PROTOCOL.md must document adaptive route packets.", "adaptive route packet docs", "ADAPTIVE_OPERATOR_PROTOCOL.md");
   assert(operatingSystem.includes("receipt chain"), "OPERATING_SYSTEM.md must describe the receipt chain.", "receipt-chain operating layer", "OPERATING_SYSTEM.md");
   assert(brazilCompliance.includes("Keep `public-config.js` at `liveMode: false`"), "BRAZIL_COMPLIANCE.md must keep the liveMode stop rule.", "Brazil liveMode stop rule", "BRAZIL_COMPLIANCE.md");
   assert(brazilAgents.includes("Human must close"), "BRAZIL_COMPLIANCE_AGENTS.md must keep human closure language.", "Brazil compliance human closure", "BRAZIL_COMPLIANCE_AGENTS.md");
@@ -100,6 +101,8 @@ function checkStaticSurvivalSurface() {
   assert(script.includes("const BRAZIL_COMPLIANCE_AGENTS = ["), "script.js must include Brazil compliance agents.", "Brazil compliance agents", "script.js");
   assert(script.includes("const ADAPTIVE_DAMAGE_ROUTES = ["), "script.js must include adaptive damage routes.", "adaptive damage routes", "script.js");
   assert(script.includes("function recordAdaptiveReceipt"), "script.js must include adaptive receipt recording.", "adaptive receipt recorder", "script.js");
+  assert(script.includes("function routeAdaptiveReceipt"), "script.js must include adaptive receipt routing.", "adaptive receipt router", "script.js");
+  assert(script.includes("adaptiveReceiptId"), "script.js must link routed packets back to adaptive receipts.", "adaptive packet receipt link", "script.js");
   assert(script.includes('"Adaptation Receipt",'), "script.js must include adaptive receipts in the receipt chain.", "adaptive receipt chain", "script.js");
   assert(script.includes("const SETUP_EVIDENCE_SLOTS = ["), "script.js must include setup evidence slots.", "setup evidence slots", "script.js");
 

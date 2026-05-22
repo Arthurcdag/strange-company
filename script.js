@@ -2783,6 +2783,10 @@ function normalizeAdaptiveReceipt(receipt) {
     countermeasure: String(receipt.countermeasure || route.countermeasure).trim().slice(0, 1200),
     nextEvolution: String(receipt.nextEvolution || "").trim().slice(0, 900),
     routeLane: String(receipt.routeLane || route.lane).trim().slice(0, 300),
+    routedAt: typeof receipt.routedAt === "string" ? receipt.routedAt : "",
+    routeTargetType: typeof receipt.routeTargetType === "string" ? receipt.routeTargetType : "",
+    routeTargetId: typeof receipt.routeTargetId === "string" ? receipt.routeTargetId : "",
+    cooldownId: typeof receipt.cooldownId === "string" ? receipt.cooldownId : "",
     status
   };
 }
@@ -5031,7 +5035,8 @@ function draftGrowthTreasuryProposal(button) {
 function buildAdaptiveOperatorModel() {
   const receipts = adaptiveOperator.receipts || [];
   const latestReceipt = receipts[0] || null;
-  const openReceipts = receipts.filter((receipt) => receipt.status !== "closed");
+  const openReceipts = receipts.filter((receipt) => receipt.status === "open");
+  const routedReceipts = receipts.filter((receipt) => receipt.status === "routed" || receipt.routeTargetId);
   const setupModel = buildSetupEvidenceModel();
   const complianceModel = buildBrazilComplianceAgentsModel();
   const revenueStartModel = buildRevenueStartModel();
@@ -5066,6 +5071,7 @@ function buildAdaptiveOperatorModel() {
     receipts,
     latestReceipt,
     openReceipts,
+    routedReceipts,
     currentDamage: Array.from(new Set(currentDamage)),
     state,
     tone,
@@ -5082,6 +5088,8 @@ function adaptiveReceiptPacket(receipt) {
     `Status: ${receipt.status}`,
     `Damage type: ${route.label}`,
     `Routing lane: ${receipt.routeLane || route.lane}`,
+    receipt.routeTargetId ? `Route target: ${receipt.routeTargetType || "execution-packet"} / ${receipt.routeTargetId}` : "Route target: not issued",
+    receipt.cooldownId ? `Cooldown lane: ${receipt.cooldownId}` : "",
     "",
     "[Damage Received]",
     receipt.damage,
@@ -5128,6 +5136,13 @@ function renderAdaptiveOperator() {
     ? model.receipts.slice(0, 8).map((receipt) => {
         const route = adaptiveRouteFor(receipt.damageType);
         const tone = receipt.status === "closed" ? "green" : receipt.status === "routed" ? "amber" : "red";
+        const routeDisabled = receipt.routeTargetId || receipt.status === "closed" ? "disabled" : "";
+        const routedLine = receipt.routeTargetId
+          ? `<p><strong>Routed:</strong> ${escapeHtml(receipt.routeTargetType || "execution-packet")} / ${escapeHtml(receipt.routeTargetId)}</p>`
+          : "";
+        const cooldownLine = receipt.cooldownId
+          ? `<p><strong>Cooldown:</strong> ${escapeHtml(receipt.cooldownId)}</p>`
+          : "";
         return `
           <article class="adaptive-receipt-card">
             <div>
@@ -5135,9 +5150,12 @@ function renderAdaptiveOperator() {
               <h4>${escapeHtml(route.label)}</h4>
               <p>${escapeHtml(receipt.damage)}</p>
               <p><strong>Route:</strong> ${escapeHtml(receipt.routeLane || route.lane)}</p>
+              ${routedLine}
+              ${cooldownLine}
             </div>
             <span class="state ${tone}">${escapeHtml(receipt.status)}</span>
             <div class="adaptive-receipt-actions">
+              <button type="button" data-route-adaptive-receipt="${escapeHtml(receipt.id)}" ${routeDisabled}>Route</button>
               <button type="button" data-copy-adaptive-receipt="${escapeHtml(receipt.id)}">Copy</button>
               <button type="button" data-close-adaptive-receipt="${escapeHtml(receipt.id)}" ${receipt.status === "closed" ? "disabled" : ""}>Close</button>
               <button type="button" data-remove-adaptive-receipt="${escapeHtml(receipt.id)}">Remove</button>
@@ -5217,6 +5235,9 @@ function renderAdaptiveOperator() {
   }
   document.querySelectorAll("[data-copy-adaptive-receipt]").forEach((button) => {
     button.addEventListener("click", () => copyAdaptiveReceipt(button.dataset.copyAdaptiveReceipt, button));
+  });
+  document.querySelectorAll("[data-route-adaptive-receipt]").forEach((button) => {
+    button.addEventListener("click", () => routeAdaptiveReceipt(button.dataset.routeAdaptiveReceipt));
   });
   document.querySelectorAll("[data-close-adaptive-receipt]").forEach((button) => {
     button.addEventListener("click", () => closeAdaptiveReceipt(button.dataset.closeAdaptiveReceipt));
@@ -5308,6 +5329,146 @@ function copyLatestAdaptiveReceipt(button) {
     return;
   }
   copyAdaptiveReceipt(latest.id, button);
+}
+
+function adaptiveReceiptNeedsCooldown(receipt) {
+  return ["growth-experiment", "customer-objection"].includes(receipt.damageType);
+}
+
+function adaptiveRouteDue(receipt) {
+  if (["live-gate", "brazil-compliance", "google-form", "support-incident", "customer-order"].includes(receipt.damageType)) {
+    return "1 day";
+  }
+  if (receipt.damageType === "security-resilience") {
+    return "2 days";
+  }
+  return "3 days";
+}
+
+function adaptiveRoutePacketTitle(receipt) {
+  const route = adaptiveRouteFor(receipt.damageType);
+  if (receipt.damageType === "security-resilience") {
+    return `Harden adaptive weakness: ${route.label}`;
+  }
+  return `Route adaptive receipt: ${route.label}`;
+}
+
+function adaptiveRoutePacketDetail(receipt) {
+  return [
+    `Damage: ${receipt.damage}`,
+    receipt.revealed ? `Revealed: ${receipt.revealed}` : "",
+    `Countermeasure: ${receipt.countermeasure || adaptiveRouteFor(receipt.damageType).countermeasure}`,
+    receipt.nextEvolution ? `Next evolution: ${receipt.nextEvolution}` : ""
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 1800);
+}
+
+function issueAdaptiveExecutionPacket(receipt) {
+  const route = adaptiveRouteFor(receipt.damageType);
+  const packetId = `adaptive-packet-${slugify(receipt.id) || Date.now().toString(36)}`;
+  const existing = executionPackets.find((packet) => packet.id === packetId);
+  if (existing) {
+    return existing;
+  }
+  const packet = {
+    id: packetId,
+    title: adaptiveRoutePacketTitle(receipt),
+    detail: adaptiveRoutePacketDetail(receipt),
+    budget: 0,
+    due: adaptiveRouteDue(receipt),
+    state: "Open",
+    source: `Adaptive operator / ${receipt.id}`,
+    acceptance: [
+      `Execute the recorded countermeasure for ${route.label}.`,
+      "Keep public live intake closed unless external evidence and review dates are real.",
+      receipt.damageType === "security-resilience" ? "Add or update a survival check if the weakness is structural." : ""
+    ].filter(Boolean).join(" "),
+    adaptiveReceiptId: receipt.id,
+    adaptiveDamageType: receipt.damageType,
+    createdAt: new Date().toISOString()
+  };
+  executionPackets.unshift(packet);
+  return packet;
+}
+
+function issueAdaptiveCooldownLane(receipt) {
+  if (!adaptiveReceiptNeedsCooldown(receipt)) {
+    return "";
+  }
+  const cooldownId = `cooldown-adapt-${slugify(receipt.id) || Date.now().toString(36)}`;
+  const existing = cooldownLanes.find((lane) => lane.id === cooldownId);
+  if (existing) {
+    return existing.id;
+  }
+  const route = adaptiveRouteFor(receipt.damageType);
+  cooldownLanes.unshift({
+    id: cooldownId,
+    lane: receipt.damageType === "customer-objection" ? "Customer objection route" : "Experiment or spend route",
+    reason: [
+      receipt.damage,
+      receipt.revealed ? `Revealed: ${receipt.revealed}` : "",
+      `Countermeasure: ${receipt.countermeasure || route.countermeasure}`
+    ].filter(Boolean).join(" "),
+    source: `Adaptive operator / ${receipt.id}`,
+    sourceAdaptationId: receipt.id,
+    expires: "2 cycles",
+    createdAt: new Date().toISOString()
+  });
+  return cooldownId;
+}
+
+function routeAdaptiveReceipt(receiptId) {
+  const receipt = (adaptiveOperator.receipts || []).find((item) => item.id === receiptId);
+  if (!receipt) {
+    return;
+  }
+  const sensitive = findSensitiveData([
+    receipt.damage,
+    receipt.revealed,
+    receipt.countermeasure,
+    receipt.nextEvolution
+  ].join("\n"));
+  if (sensitive.length) {
+    showAdaptiveOperatorError(`Receipt text contains ${sensitive.join(", ")}. Strip and retry.`);
+    return;
+  }
+
+  const packet = issueAdaptiveExecutionPacket(receipt);
+  const cooldownId = issueAdaptiveCooldownLane(receipt) || receipt.cooldownId || "";
+  const routedAt = receipt.routedAt || new Date().toISOString();
+  adaptiveOperator.receipts = (adaptiveOperator.receipts || []).map((item) =>
+    item.id === receipt.id
+      ? {
+          ...item,
+          status: "routed",
+          routedAt,
+          routeTargetType: "execution-packet",
+          routeTargetId: packet.id,
+          cooldownId
+        }
+      : item
+  );
+
+  saveExecutionPackets();
+  if (cooldownId) {
+    saveCooldownLanes();
+  }
+  saveAdaptiveOperator();
+  renderAdaptiveOperator();
+  renderBounties();
+  renderCooldownLanes();
+  renderReceiptChain();
+  renderLogs();
+  renderAdaptiveOperatorOutput([
+    "Adaptive receipt routed",
+    `Receipt id: ${receipt.id}`,
+    `Execution packet: ${packet.id}`,
+    cooldownId ? `Cooldown lane: ${cooldownId}` : "",
+    "",
+    "Boundary: this is a private no-spend action packet. It does not turn on live intake or certify external evidence."
+  ].filter((line) => line !== "").join("\n"), false);
 }
 
 function closeAdaptiveReceipt(receiptId) {
@@ -8018,17 +8179,22 @@ function collectReceiptEvents() {
       currentDamage: adaptiveModel.currentDamage.slice(0, 12),
       latestReceiptId: adaptiveModel.latestReceipt ? adaptiveModel.latestReceipt.id : "",
       openReceipts: adaptiveModel.openReceipts.length,
+      routedReceipts: adaptiveModel.routedReceipts.length,
       receiptCount: adaptiveModel.receipts.length
     }
   );
   adaptiveModel.receipts.forEach((receipt) => {
     const route = adaptiveRouteFor(receipt.damageType);
-    push("Adaptation Receipt", receipt.id, route.label, "Adaptive operator", receipt.status, receipt.closedAt || receipt.createdAt, {
+    push("Adaptation Receipt", receipt.id, route.label, "Adaptive operator", receipt.status, receipt.closedAt || receipt.routedAt || receipt.createdAt, {
       countermeasure: receipt.countermeasure,
       damage: receipt.damage,
+      cooldownId: receipt.cooldownId || "",
       nextEvolution: receipt.nextEvolution,
       revealed: receipt.revealed,
-      routeLane: receipt.routeLane || route.lane
+      routeLane: receipt.routeLane || route.lane,
+      routedAt: receipt.routedAt || "",
+      routeTargetId: receipt.routeTargetId || "",
+      routeTargetType: receipt.routeTargetType || ""
     });
   });
 
@@ -8179,6 +8345,8 @@ function collectReceiptEvents() {
   executionPackets.forEach((packet) => {
     push("Packet", packet.id, packet.title, "Execution market", packet.state, packet.outcomeAt || packet.updatedAt || packet.createdAt, {
       budget: Number(packet.budget || 0),
+      adaptiveDamageType: packet.adaptiveDamageType || "",
+      adaptiveReceiptId: packet.adaptiveReceiptId || "",
       due: packet.due,
       launchGate: Boolean(packet.launchGate),
       outcomeId: packet.outcomeId || "",
@@ -8229,6 +8397,7 @@ function collectReceiptEvents() {
       sourceSignalReference: lane.sourceSignalReference || "",
       sourceSignalSource: lane.sourceSignalSource || "",
       sourceSignalSubject: lane.sourceSignalSubject || "",
+      sourceAdaptationId: lane.sourceAdaptationId || "",
       sourceOutcomeId: lane.sourceOutcomeId || ""
     });
   });

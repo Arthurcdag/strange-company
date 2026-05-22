@@ -74,6 +74,10 @@ function auditPrivateConsole() {
   assertIncludes("script.js", "function adaptiveReceiptPacket", "adaptive operator packet");
   assertIncludes("script.js", "function renderAdaptiveOperator", "adaptive operator renderer");
   assertIncludes("script.js", "function recordAdaptiveReceipt", "adaptive operator receipt action");
+  assertIncludes("script.js", "function routeAdaptiveReceipt", "adaptive operator route action");
+  assertIncludes("script.js", "data-route-adaptive-receipt", "adaptive operator route button");
+  assertIncludes("script.js", "adaptiveReceiptId", "adaptive execution packet receipt link");
+  assertIncludes("script.js", "sourceAdaptationId", "adaptive cooldown receipt link");
   assertIncludes("script.js", "function buildRevenueStartModel", "revenue start state model");
   assertIncludes("script.js", "function snapshotRevenueStartLanes", "start packet lane snapshots");
   assertIncludes("script.js", "function buildGrowthReviewModel", "growth review state model");
@@ -108,6 +112,8 @@ function auditDocs() {
   assertIncludes("OPERATIONS_RUNBOOK.md", "Adaptive Operator Protocol", "adaptive operator runbook section");
   assertIncludes("ADAPTIVE_OPERATOR_PROTOCOL.md", "Damage is information", "adaptive damage rule");
   assertIncludes("ADAPTIVE_OPERATOR_PROTOCOL.md", "Damage-to-adaptation receipts", "adaptive receipt console docs");
+  assertIncludes("ADAPTIVE_OPERATOR_PROTOCOL.md", "no-spend execution packet", "adaptive route packet docs");
+  assertIncludes("OPERATIONS_RUNBOOK.md", "can be routed into a no-spend execution packet", "adaptive route runbook note");
   assertIncludes("README.md", "ONLINE_ASAP.md", "online ASAP README link");
   assertIncludes("README.md", "EXTERNAL_LIVE_CONTROLS.md", "external live controls README link");
   assertIncludes("ONLINE_ASAP.md", "Main Track: Strange Company", "main online ASAP lane");

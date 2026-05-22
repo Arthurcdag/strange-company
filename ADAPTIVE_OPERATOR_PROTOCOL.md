@@ -55,6 +55,8 @@ The private Operations console contains an `Adaptive operator` panel for turning
 
 Adaptive receipts are local command-center evidence. They can be copied into handoffs and are included in the receipt chain, but they do not certify external evidence and they do not turn on public intake.
 
+Each receipt can also be routed from the private Operations console. Routing creates a no-spend execution packet that carries the countermeasure into the execution market, marks the receipt as `routed`, and links the receipt to the packet in the receipt chain. Experiment or customer objection routes also create a two-cycle cooldown lane so weak spend or sales paths are not repeated automatically.
+
 ## Operator Rules
 
 - Do not defend a failed plan. Convert the failure into a better plan.
@@ -89,6 +91,8 @@ When damage reveals new work, route it to the correct evidence lane:
 | Customer order or delivery failure | `ORDER_DESK.md`, `OPERATIONS_RUNBOOK.md`, receipt-chain order timeline |
 | Experiment or spend failure | `AUTONOMOUS_CYCLE.md`, `OUTCOME_REVIEW.md`, `CAPITAL_ROUTER.md` |
 | Security, resilience, or public/private boundary weakness | `RESILIENCE_MODEL.md`, `RESILIENCE_DRILLS.md`, `tools/survival_check.js` |
+
+The console `Route` action is a handoff mechanism, not an approval mechanism. It may create a private execution packet or cooldown lane, but it cannot approve spend, close a legal/tax/privacy review, verify the Google Form, verify the support inbox, accept payment, or set `liveMode: true`.
 
 ## Agent Prompt
 

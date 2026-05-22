@@ -75,7 +75,7 @@ Operational v1.5 layers two private panels onto the Operations console without c
 
 - A **Setup Evidence** panel turns the launch checklist into operator-asserted proof. The Brazil-first slots (`entity`, `tax-regime`, `nfse`, `bank`, `payment`, `support-inbox`, `lgpd-contact`, `google-sheet`, `google-form`, `terms-review`, `privacy-review`) store a status (`missing`, `pending`, `verified`, `blocked`), an `https://` evidence URL, an optional `verifiedAt` timestamp, and an operator note. Notes are scanned for PHI, payment card data, credentials, SSNs, private keys, and API keys before they are saved. See [SETUP_EVIDENCE.md](SETUP_EVIDENCE.md).
 - A **Brazil Compliance Agents** panel turns those rows into AI-prepared, human-closed work queues for entity/CNPJ, tax/NFS-e, payment, support, LGPD/privacy, consumer terms, intake/ledger, and AI handoff review. Each queue copies a packet for the responsible human and names the evidence needed before live mode. See [BRAZIL_COMPLIANCE_AGENTS.md](BRAZIL_COMPLIANCE_AGENTS.md).
-- An **Adaptive Operator Protocol** panel turns roadblocks, failed commands, customer objections, missing evidence, and unsafe boundary signals into damage-to-adaptation receipts. Each receipt is included in the local receipt chain and can be copied into a handoff. See [ADAPTIVE_OPERATOR_PROTOCOL.md](ADAPTIVE_OPERATOR_PROTOCOL.md).
+- An **Adaptive Operator Protocol** panel turns roadblocks, failed commands, customer objections, missing evidence, and unsafe boundary signals into damage-to-adaptation receipts. Each receipt is included in the local receipt chain, can be copied into a handoff, and can be routed into a no-spend execution packet. See [ADAPTIVE_OPERATOR_PROTOCOL.md](ADAPTIVE_OPERATOR_PROTOCOL.md).
 - A **Customer Acquisition** panel surfaces the daily outreach target, a log of operator outreach attempts by source (`referral`, `email`, `form`, `direct`, `partner`), conversion counts for every sales lead stage, and a copyable outreach packet. The lead form on the same view now requires a source category. See [CUSTOMER_ACQUISITION.md](CUSTOMER_ACQUISITION.md).
 - A **Growth Management** panel turns acquisition, pipeline, revenue-start, and readiness receipts into one next operator action. It never sends outreach, approves spend, or overrides legal/payment gates. See [GROWTH_MANAGEMENT.md](GROWTH_MANAGEMENT.md).
 
@@ -84,6 +84,8 @@ Operational v1.5 layers two private panels onto the Operations console without c
 Use the adaptive panel when the current path fails or becomes unsafe. The operator records what happened, what it revealed, the next smallest safe countermeasure, the routing lane, and the next evolution if the countermeasure fails.
 
 Adaptive receipts can create a stronger handoff, a narrower experiment, or a resilience hardening task. They cannot bypass `public-config.js`, professional review, Brazil compliance, LGPD duties, fiscal obligations, support readiness, payment controls, or evidence requirements.
+
+Use `Route` when the receipt has a concrete countermeasure. The route creates a private execution packet, marks the receipt as `routed`, and creates a cooldown lane for weak experiment or customer objection routes.
 
 ### Profit Readiness Gate
 
