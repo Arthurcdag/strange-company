@@ -141,9 +141,15 @@ function auditDocs() {
   assertIncludes("README.md", "EXTERNAL_LIVE_PACKET.template.json", "external live packet template README link");
   assertIncludes("README.md", "tools/validate_external_live_packet.js", "external live packet validator README link");
   assertIncludes("EXTERNAL_LIVE_PACKET.template.json", '"schemaVersion": 1', "external live packet template schema");
+  assertIncludes("EXTERNAL_LIVE_PACKET.template.json", '"brazilComplianceReviewedAt": ""', "external packet Brazil compliance review field");
+  assertIncludes("EXTERNAL_LIVE_PACKET.template.json", '"aiHandoffReviewedAt": ""', "external packet AI handoff review field");
   assertIncludes("tools/validate_external_live_packet.js", "External live packet validation", "external live packet validator");
+  assertIncludes("tools/validate_external_live_packet.js", "public Brazil compliance review date", "external packet Brazil review live requirement");
+  assertIncludes("tools/validate_external_live_packet.js", "public AI handoff review date", "external packet AI handoff live requirement");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "termsReviewedAt", "terms review date instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "privacyReviewedAt", "privacy review date instructions");
+  assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "brazilComplianceReviewedAt", "Brazil compliance review date instructions");
+  assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "aiHandoffReviewedAt", "AI handoff review date instructions");
   assertIncludes("OPERATIONS_RUNBOOK.md", "## Functional Definition", "satellite functional definition");
   assertIncludes("OPERATIONS_RUNBOOK.md", "Receipt Chain Timeline Panel", "order timeline runbook section");
   assertIncludes("OPERATIONS_RUNBOOK.md", "Revenue Start Board", "revenue start runbook section");

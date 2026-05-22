@@ -80,6 +80,13 @@ function requireTrue(packet, dottedPath, label) {
   }
 }
 
+function requireEquals(packet, dottedPath, expected, label) {
+  const value = valueAt(packet, dottedPath);
+  if (value !== expected) {
+    fail(`${label} must be ${JSON.stringify(expected)} at ${dottedPath}.`);
+  }
+}
+
 function assertShape(packet) {
   const requiredObjects = [
     "support",
@@ -171,8 +178,12 @@ function validateOptionalFormats(packet) {
     "legalReview.termsReviewedAt",
     "legalReview.privacyReviewedAt",
     "legalReview.supportReviewedAt",
+    "legalReview.brazilComplianceReviewedAt",
+    "legalReview.aiHandoffReviewedAt",
     "publicConfig.termsReviewedAt",
     "publicConfig.privacyReviewedAt",
+    "publicConfig.brazilComplianceReviewedAt",
+    "publicConfig.aiHandoffReviewedAt",
     "attestation.reviewedAt"
   ]) {
     const value = valueAt(packet, dottedPath);
@@ -185,11 +196,21 @@ function validateOptionalFormats(packet) {
   const publicTerms = valueAt(packet, "publicConfig.termsReviewedAt");
   const privacy = valueAt(packet, "legalReview.privacyReviewedAt");
   const publicPrivacy = valueAt(packet, "publicConfig.privacyReviewedAt");
+  const brazilCompliance = valueAt(packet, "legalReview.brazilComplianceReviewedAt");
+  const publicBrazilCompliance = valueAt(packet, "publicConfig.brazilComplianceReviewedAt");
+  const aiHandoff = valueAt(packet, "legalReview.aiHandoffReviewedAt");
+  const publicAiHandoff = valueAt(packet, "publicConfig.aiHandoffReviewedAt");
   if (!isBlank(terms) && !isBlank(publicTerms) && terms !== publicTerms) {
     fail("legalReview.termsReviewedAt must match publicConfig.termsReviewedAt.");
   }
   if (!isBlank(privacy) && !isBlank(publicPrivacy) && privacy !== publicPrivacy) {
     fail("legalReview.privacyReviewedAt must match publicConfig.privacyReviewedAt.");
+  }
+  if (!isBlank(brazilCompliance) && !isBlank(publicBrazilCompliance) && brazilCompliance !== publicBrazilCompliance) {
+    fail("legalReview.brazilComplianceReviewedAt must match publicConfig.brazilComplianceReviewedAt.");
+  }
+  if (!isBlank(aiHandoff) && !isBlank(publicAiHandoff) && aiHandoff !== publicAiHandoff) {
+    fail("legalReview.aiHandoffReviewedAt must match publicConfig.aiHandoffReviewedAt.");
   }
 }
 
@@ -213,6 +234,8 @@ function validateLive(packet) {
   requirePath(packet, "legalReview.termsReviewedAt", "terms review date");
   requirePath(packet, "legalReview.privacyReviewedAt", "privacy review date");
   requirePath(packet, "legalReview.supportReviewedAt", "support review date");
+  requirePath(packet, "legalReview.brazilComplianceReviewedAt", "Brazil compliance review date");
+  requirePath(packet, "legalReview.aiHandoffReviewedAt", "AI handoff review date");
   requirePath(packet, "legalReview.reviewer", "legal/support reviewer");
 
   requirePath(packet, "stripe.dashboardUrl", "Stripe dashboard URL");
@@ -233,12 +256,16 @@ function validateLive(packet) {
   requireTrue(packet, "bank.verified", "bank route verification");
 
   requirePath(packet, "publicConfig.operatorName", "public operator name");
+  requireEquals(packet, "publicConfig.jurisdiction", "BR", "public jurisdiction");
+  requireTrue(packet, "publicConfig.aiGeneratedLegalDocsRequireHumanReview", "public AI legal review flag");
   requirePath(packet, "publicConfig.supportEmail", "public support email");
   requirePath(packet, "publicConfig.googleFormUrl", "public Google Form URL");
   requireTrue(packet, "publicConfig.supportInboxVerified", "public support verified flag");
   requireTrue(packet, "publicConfig.googleFormVerified", "public Google Form verified flag");
   requirePath(packet, "publicConfig.termsReviewedAt", "public terms review date");
   requirePath(packet, "publicConfig.privacyReviewedAt", "public privacy review date");
+  requirePath(packet, "publicConfig.brazilComplianceReviewedAt", "public Brazil compliance review date");
+  requirePath(packet, "publicConfig.aiHandoffReviewedAt", "public AI handoff review date");
   requireTrue(packet, "publicConfig.liveMode", "public live mode");
 
   requirePath(packet, "attestation.operator", "attesting operator");

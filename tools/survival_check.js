@@ -101,6 +101,8 @@ function checkStaticSurvivalSurface() {
   assert(script.includes("function liveEvidencePacket"), "script.js must include live evidence packet generation.", "live evidence packet", "script.js");
   assert(read("tools/draft_external_live_packet.js").includes("draft-from-public-config"), "external live packet draft tool must keep local evidence in draft mode.", "external live packet draft tool", "tools/draft_external_live_packet.js");
   assert(read("tools/generate_external_live_gap_packet.js").includes("Strange Company external live evidence gap packet"), "live evidence gap packet tool must generate a handoff packet.", "live evidence gap packet tool", "tools/generate_external_live_gap_packet.js");
+  assert(read("tools/validate_external_live_packet.js").includes("public Brazil compliance review date"), "external live packet validator must require Brazil compliance review date.", "external packet Brazil review gate", "tools/validate_external_live_packet.js");
+  assert(read("tools/validate_external_live_packet.js").includes("public AI handoff review date"), "external live packet validator must require AI handoff review date.", "external packet AI review gate", "tools/validate_external_live_packet.js");
   assert(script.includes("function runResilienceDrill"), "script.js must include resilience drill execution.", "resilience drill runner", "script.js");
   assert(script.includes("function issueDrillHardeningPacket"), "script.js must include drill hardening packet issuance.", "hardening packet issuer", "script.js");
   assert(script.includes("const BRAZIL_COMPLIANCE_AGENTS = ["), "script.js must include Brazil compliance agents.", "Brazil compliance agents", "script.js");

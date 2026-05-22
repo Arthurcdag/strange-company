@@ -16,6 +16,8 @@ Collect these values before editing `public-config.js`:
 | Google Form test row reached Sheet | `googleFormVerified` | yes | private Operations setup evidence |
 | Terms reviewed date | `termsReviewedAt` | yes | commit plus private review note |
 | Privacy reviewed date | `privacyReviewedAt` | yes | commit plus private review note |
+| Brazil compliance reviewed date | `brazilComplianceReviewedAt` | yes | accountant/legal/operator review note |
+| AI handoff reviewed date | `aiHandoffReviewedAt` | yes | human review note for AI-prepared legal/compliance material |
 | Stripe dashboard URL | none | no | private Operations integration config |
 | Stripe test hosted invoice URL | none | no | private Operations setup evidence |
 | Business bank verified | none | no | private Operations setup evidence only |

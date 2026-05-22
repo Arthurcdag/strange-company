@@ -30,6 +30,8 @@ function loadTemplate() {
 function publicConfigDraft(config) {
   return {
     operatorName: config.operatorName || "Strange Works Studio",
+    jurisdiction: config.jurisdiction || "BR",
+    aiGeneratedLegalDocsRequireHumanReview: config.aiGeneratedLegalDocsRequireHumanReview === true,
     supportEmail: config.supportEmail || "",
     googleFormUrl: config.googleFormUrl || "",
     supportInboxVerified: config.supportInboxVerified === true,
@@ -62,7 +64,9 @@ function buildDraft(template, config) {
     legalReview: {
       ...template.legalReview,
       termsReviewedAt: publicConfig.termsReviewedAt,
-      privacyReviewedAt: publicConfig.privacyReviewedAt
+      privacyReviewedAt: publicConfig.privacyReviewedAt,
+      brazilComplianceReviewedAt: publicConfig.brazilComplianceReviewedAt,
+      aiHandoffReviewedAt: publicConfig.aiHandoffReviewedAt
     },
     publicConfig,
     attestation: {
@@ -74,7 +78,7 @@ function buildDraft(template, config) {
     draftWarnings: [
       "This draft only copies public-safe values from public-config.js.",
       "Blank private fields must be completed from real external evidence before --require-live can pass.",
-      "Do not set liveMode true until support, Google Form, legal, privacy, Brazil compliance, AI handoff, Stripe, and bank evidence are real."
+      "Do not set liveMode true until support, Google Form, terms/privacy, Brazil compliance, AI handoff, Stripe, and bank evidence are real."
     ]
   };
 }
