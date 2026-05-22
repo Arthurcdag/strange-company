@@ -123,11 +123,13 @@ function auditDocs() {
   assertIncludes("OPERATIONS_RUNBOOK.md", "can be routed into a no-spend execution packet", "adaptive route runbook note");
   assertIncludes("README.md", "ONLINE_ASAP.md", "online ASAP README link");
   assertIncludes("README.md", "EXTERNAL_LIVE_CONTROLS.md", "external live controls README link");
+  assertIncludes("README.md", "HUMAN_REVIEW_PACKET.md", "human review packet README link");
   assertIncludes("ONLINE_ASAP.md", "Main Track: Strange Company", "main online ASAP lane");
   assertIncludes("ONLINE_ASAP.md", "Satellite Track: Strange Works Studio", "satellite online ASAP lane");
   assertIncludes("ONLINE_ASAP.md", "Set `liveMode: true` last", "live mode last instruction");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Google Form Intake", "Google Form setup instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Support Inbox", "support inbox setup instructions");
+  assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "HUMAN_REVIEW_PACKET.md", "human review packet external controls link");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Launch Gate Evidence Panel", "live evidence panel instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Stripe Route", "Stripe route setup instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "Bank Route", "bank route setup instructions");
@@ -149,6 +151,10 @@ function auditDocs() {
   assertIncludes("tools/validate_external_live_packet.js", "public Brazil compliance review date", "external packet Brazil review live requirement");
   assertIncludes("tools/validate_external_live_packet.js", "public AI handoff review date", "external packet AI handoff live requirement");
   assertIncludes("tools/check_external_live_packet_gate.js", "External live packet gate regression passed", "external live packet gate regression tool");
+  assertIncludes("HUMAN_REVIEW_PACKET.md", "Manual Close Sheet", "human review manual close sheet");
+  assertIncludes("HUMAN_REVIEW_PACKET.md", "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live", "human review validation command");
+  assertIncludes("HUMAN_REVIEW_PACKET.md", "Do not put Sheet URLs, Stripe dashboard URLs, bank metadata, tax IDs, private reviewer notes, or credentials in `public-config.js`.", "human review public config boundary");
+  assertIncludes("AI_LEGAL_HANDOFF.md", "HUMAN_REVIEW_PACKET.md", "AI handoff human review packet link");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "termsReviewedAt", "terms review date instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "privacyReviewedAt", "privacy review date instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "brazilComplianceReviewedAt", "Brazil compliance review date instructions");

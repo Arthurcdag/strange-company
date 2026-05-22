@@ -2,6 +2,8 @@
 
 This file is the handoff between AI-prepared work and the human/legal/accounting work that cannot be delegated to AI.
 
+Use `HUMAN_REVIEW_PACKET.md` as the live-intake close sheet for collecting the actual human review dates, Brazil compliance review, AI handoff review, Google Form evidence, Stripe route, bank route, and final attestation.
+
 ## What AI Prepared
 
 - Brazil-first customer-facing Portuguese `TERMOS.md` draft.

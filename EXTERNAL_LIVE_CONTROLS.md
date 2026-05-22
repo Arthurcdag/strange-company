@@ -4,6 +4,8 @@ This is the developer/operator handoff for creating the outside routes that must
 
 The developer can prepare the repo and verify URLs. The operator or account owner must create and approve the support inbox, Google Form, Stripe account, bank route, terms review, and privacy review. Do not store private keys, bank numbers, tax documents, customer secrets, or payment credentials in this repo.
 
+Use `HUMAN_REVIEW_PACKET.md` as the manual close sheet before editing `public-config.js`.
+
 ## Output Values
 
 Collect these values before editing `public-config.js`:
