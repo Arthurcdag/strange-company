@@ -61,11 +61,14 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [OPERATING_SYSTEM.md](OPERATING_SYSTEM.md): how the company makes decisions and executes work.
 - [RESILIENCE_MODEL.md](RESILIENCE_MODEL.md): how the company survives attacks and shocks.
 - [RESILIENCE_DRILLS.md](RESILIENCE_DRILLS.md): how attack drills become receipts and hardening packets.
+- [THREAT_PATHOLOGY.md](THREAT_PATHOLOGY.md): defensive taxonomy for computer viruses, bacteria, eukaryotic agent systems, prions, and mirrored proteins.
 - [ADAPTIVE_OPERATOR_PROTOCOL.md](ADAPTIVE_OPERATOR_PROTOCOL.md): how operators and AI agents convert roadblocks, failed commands, criticism, and missing evidence into safer next actions.
 - [LAUNCH_PLAN.md](LAUNCH_PLAN.md): practical path to version 0.
 - [ONLINE_GATE.md](ONLINE_GATE.md): when the company may move from local prototype to private sandbox, public beta, or live operation.
 - [LIVE_HANDOFF_CHECKLIST.md](LIVE_HANDOFF_CHECKLIST.md): developer/operator checklist for turning the deployed static prototype into verified live intake.
 - [ONLINE_ASAP.md](ONLINE_ASAP.md): shortest safe path for keeping the main prototype online and switching the satellite to live intake once outside controls are verified.
+- [FIRST_REVENUE_CLOSEOUT.md](FIRST_REVENUE_CLOSEOUT.md): current closeout packet for moving from public prototype to first safe paid intake.
+- [REVIEW_READY_PACKET.md](REVIEW_READY_PACKET.md): AI-prepared review brief for the remaining human/legal/compliance sign-off fields.
 - [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md): developer/operator instructions for creating the support inbox, Google Form, Sheet ledger, review dates, Stripe invoice route, and bank evidence.
 - [HUMAN_REVIEW_PACKET.md](HUMAN_REVIEW_PACKET.md): AI-prepared packet for the manual human/legal/accounting/payment evidence needed before live intake.
 - [CONKA8_LAW_INSTRUCTIONS.md](CONKA8_LAW_INSTRUCTIONS.md): law-sensitive operating instructions for conka8, including AI/human boundaries and launch stop rules.

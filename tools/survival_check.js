@@ -55,6 +55,7 @@ function checkStaticSurvivalSurface() {
   const charter = read("CHARTER.md");
   const resilienceModel = read("RESILIENCE_MODEL.md");
   const resilienceDrills = read("RESILIENCE_DRILLS.md");
+  const threatPathology = read("THREAT_PATHOLOGY.md");
   const adaptiveProtocol = read("ADAPTIVE_OPERATOR_PROTOCOL.md");
   const operatingSystem = read("OPERATING_SYSTEM.md");
   const brazilCompliance = read("BRAZIL_COMPLIANCE.md");
@@ -76,6 +77,9 @@ function checkStaticSurvivalSurface() {
   assert(resilienceModel.includes("## Threat Model"), "RESILIENCE_MODEL.md must define the threat model.", "threat model", "RESILIENCE_MODEL.md");
   assert(resilienceModel.includes("Every incident must produce at least one permanent improvement"), "RESILIENCE_MODEL.md must keep the anti-fragility rule.", "anti-fragility rule", "RESILIENCE_MODEL.md");
   assert(resilienceDrills.includes("Every serious weakness must become a hardening packet"), "RESILIENCE_DRILLS.md must keep the hardening packet rule.", "hardening packet rule", "RESILIENCE_DRILLS.md");
+  assert(threatPathology.includes("Computer Pathology Model"), "THREAT_PATHOLOGY.md must define the computer pathology model.", "computer pathology model", "THREAT_PATHOLOGY.md");
+  assert(threatPathology.includes("Every incident must be classified by pathology type before the system adapts"), "THREAT_PATHOLOGY.md must keep the pathology classification rule.", "pathology classification rule", "THREAT_PATHOLOGY.md");
+  assert(threatPathology.includes("Do not create, test, deploy, or improve malware"), "THREAT_PATHOLOGY.md must keep the malware stop rule.", "pathology malware stop rule", "THREAT_PATHOLOGY.md");
   assert(adaptiveProtocol.includes("Damage is information"), "ADAPTIVE_OPERATOR_PROTOCOL.md must keep the adaptive damage rule.", "adaptive damage rule", "ADAPTIVE_OPERATOR_PROTOCOL.md");
   assert(adaptiveProtocol.includes("Do not set `liveMode: true`"), "ADAPTIVE_OPERATOR_PROTOCOL.md must keep the liveMode stop rule.", "adaptive liveMode stop rule", "ADAPTIVE_OPERATOR_PROTOCOL.md");
   assert(adaptiveProtocol.includes("Damage-to-adaptation receipts"), "ADAPTIVE_OPERATOR_PROTOCOL.md must document adaptive receipts.", "adaptive receipt docs", "ADAPTIVE_OPERATOR_PROTOCOL.md");

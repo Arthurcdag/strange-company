@@ -1,12 +1,12 @@
 # Google Form Intake
 
-Status date: 2026-05-21
+Status date: 2026-05-24
 
-The Google Sheet control workbook and operational ledger have been created in Drive. The live Google Form is still pending because the available Google connector can create and edit Docs, Sheets, and Slides, but it cannot create or configure Google Forms.
+The Google Sheet control workbook, operational ledger, and public Google Form have been created. A safe test response landed in the linked `Responses` tab on 2026-05-24.
 
-The repo includes `tools/google_apps_script_create_intake_form.gs`, an Apps Script builder that creates the Form, links it to the existing Sheet, and writes the published/edit URLs back into the Sheet for private evidence.
+The repo includes `tools/google_apps_script_create_intake_form.gs`, an Apps Script builder that creates the Form, links it to the existing Sheet, and writes the published/edit URLs back into the Sheet for private evidence. Keep it as the rebuild path if the Form must be recreated.
 
-Do not commit the private Sheet URL or Form edit URL to the public repo. Store those URLs in the private operator record and in the local Setup Evidence panel.
+Do not commit the private Sheet URL or Form edit URL to the public repo. Store those URLs in the private operator record and in the local Setup Evidence panel. The public responder URL is allowed in `public-config.js`.
 
 ## Created Sheet Tabs
 
@@ -28,7 +28,7 @@ The operational ledger tabs use the documented headers from `GOOGLE_SHEET_LEDGER
 
 ## Apps Script Build
 
-Use this path before building the form manually:
+Completed on 2026-05-24. Use this path only if the Form must be rebuilt:
 
 1. Open `https://script.google.com`.
 2. Create a new Apps Script project in the same Google account that owns the Sheet.
@@ -84,7 +84,22 @@ Use the `Form Spec` tab as the source of truth for questions. At minimum, the fo
 
 ## Verification Gate
 
-Before changing `public-config.js`:
+Current public responder URL:
+
+```text
+https://docs.google.com/forms/d/e/1FAIpQLSdziVPmI5O76mU4SMWhnML80jN_VsfXxSKtFe3hF1RWkF7mfQ/viewform
+```
+
+Verification evidence:
+
+- The Form is linked to the existing intake ledger Sheet.
+- The `Responses` tab contains the Form headers.
+- A safe test response landed in `Responses` with timestamp `24/05/2026 20:36:52`.
+- The test response had `Human confirmation = Test`.
+
+Historical gate rule:
+
+Before setting `googleFormVerified: true`:
 
 1. Submit one safe test response through the public responder URL.
 2. Confirm the response lands in the `Responses` tab.
@@ -92,14 +107,14 @@ Before changing `public-config.js`:
 4. Copy the public responder URL, not the edit URL.
 5. Record the Sheet/Form evidence in private Setup Evidence.
 
-Only after those steps:
+Those steps are complete as of 2026-05-24, so `public-config.js` may keep:
 
 ```js
 googleFormUrl: "https://docs.google.com/forms/..."
 googleFormVerified: true
 ```
 
-Keep `liveMode: false` until support, Form, legal review, Brazil compliance review, AI handoff review, payment, fiscal/NFS-e, and entity/bank routes are all real.
+Keep `liveMode: false` until legal review, Brazil compliance review, AI handoff review, payment, fiscal/NFS-e, and entity/bank routes are all real.
 
 ## AI Boundary
 

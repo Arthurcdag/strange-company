@@ -25,6 +25,7 @@ Threat scenario
 - Vendor lock-in: a critical provider traps data, pricing, or access.
 - Claim laundering: a weak growth claim is disguised as a safety claim.
 - Data loss: audit records become unavailable during proof export.
+- Pathology classification: a suspected virus, bacteria, eukaryotic-cell, prion, or mirrored-protein incident must be classified before the operator adapts.
 
 ## Packet Boundary
 

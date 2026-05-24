@@ -24,11 +24,14 @@ node tools/generate_external_live_gap_packet.js
 At the time this packet was created, the repo already had:
 
 - support inbox evidence recorded,
+- Google Form public URL created,
+- Google Form linked to the private Sheet,
+- safe Google Form test response recorded,
 - Brazil-first public config posture,
 - AI-generated legal/compliance material forced through human review,
 - live mode still disabled.
 
-The remaining live blockers are outside-repo evidence: Google Form creation and test response, human terms review, human privacy review, Brazil compliance review, AI handoff review, Stripe route, bank route, and final attestation.
+The remaining live blockers are outside-repo evidence: human terms review, human privacy review, Brazil compliance review, AI handoff review, Stripe route, bank route, and final attestation.
 
 ## AI Can Prepare
 
@@ -115,8 +118,8 @@ satellite_is_revenue_operator:
 
 | Gate | Human owner | Evidence to close | Public config field |
 | --- | --- | --- | --- |
-| Google Form URL | account owner/operator | Public Form URL starts with `https://docs.google.com/forms/` and is linked to the private Sheet | `googleFormUrl` |
-| Google Form test row | operator | Safe test response reaches the private Sheet | `googleFormVerified` |
+| Google Form URL | account owner/operator | Closed 2026-05-24: public Form URL starts with `https://docs.google.com/forms/` and is linked to the private Sheet | `googleFormUrl` |
+| Google Form test row | operator | Closed 2026-05-24: safe test response reached the private Sheet | `googleFormVerified` |
 | Terms review | operator/lawyer | `TERMOS.md`, `TERMS.md`, offer, refund/cancellation, support, and invoice flow reviewed | `termsReviewedAt` |
 | Privacy review | operator/lawyer | `AVISO_DE_PRIVACIDADE.md`, `PRIVACY.md`, LGPD contact, retention, processors, and rights path reviewed | `privacyReviewedAt` |
 | Brazil compliance review | operator/accountant/lawyer | CNPJ/entity route, NFS-e or fiscal receipt route, payment support, tax/accounting note, LGPD route | `brazilComplianceReviewedAt` |
@@ -175,8 +178,6 @@ If any command fails, keep `liveMode: false`.
 
 Stop and keep live intake closed if:
 
-- Google Form is not created or not linked to the Sheet,
-- no safe test response landed in the Sheet,
 - terms or privacy changed after review and were not re-reviewed,
 - CNPJ/entity, NFS-e, fiscal receipt, payment, or LGPD route is uncertain,
 - Stripe or bank evidence is missing,

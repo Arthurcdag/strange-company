@@ -158,7 +158,7 @@ Questions:
 | --- | --- | --- | --- |
 | Customer or company name | Short answer | yes | no individual patient/client records |
 | Contact email | Short answer | yes | enable email validation when available |
-| Requested service | Dropdown | yes | `Compliance proof sprint - 750 USD/mo`; `Compliance template pack - 79 USD/mo` |
+| Requested service | Dropdown | yes | `Compliance proof sprint - R$750/mo`; `Compliance template pack - R$79/mo` |
 | Requested monthly amount | Short answer | yes | default public amounts only unless operator approved |
 | What do you need? | Paragraph | yes | instruct customer to summarize without sensitive data |
 | Safety confirmation | Checkboxes | yes | require every safety checkbox below |
