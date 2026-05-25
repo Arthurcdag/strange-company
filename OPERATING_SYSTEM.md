@@ -14,9 +14,10 @@ The audit and defense layer includes a receipt chain: material launch, gate, tre
 
 ## Legal Wrapper
 
-Practical candidates:
+Practical candidates depend on jurisdiction:
 
-- purpose trust owning an LLC,
+- Brazilian operating entity or approved Brazilian structure for the first local revenue path,
+- purpose trust owning an LLC, if a later US structure is reviewed,
 - foundation-owned company,
 - public benefit corporation with locked reinvestment policy,
 - nonprofit foundation plus taxable subsidiary,
@@ -25,9 +26,9 @@ Practical candidates:
 
 The first version should not pretend law can be automated away. It should use a conventional legal entity with unusual internal rules.
 
-Recommended v0:
+Brazil-first v0:
 
-**A manager-managed LLC governed by a purpose charter, with a small guardian board and strict treasury policy.**
+**A conventional Brazilian operator with CNPJ/tax/NFS-e support, governed internally by the purpose charter, with strict treasury policy and human review for legal, tax, privacy, refund, and incident decisions.**
 
 This is not the final form, but it is simple enough to test.
 
@@ -172,7 +173,7 @@ The company should prefer small, testable work packets over broad roles.
 
 Strange Company v0 should launch many small tools, not one grand platform.
 
-The first functional step is a controlled revenue pilot: a narrow productized service that can be sold, delivered manually, measured, and then converted into reusable packets or software. It should not accept payment until the legal, payment, accounting, and customer terms gates are clear.
+The first functional step is a controlled revenue pilot: a narrow productized service that can be sold, delivered manually, measured, and then converted into reusable packets or software. It should not accept payment until the legal, payment, accounting, Brazilian fiscal, LGPD, and customer terms gates are clear.
 
 Selection criteria:
 
@@ -208,6 +209,20 @@ Every product runs through the same loop:
 6. Reinvest learnings and revenue.
 
 Kill criteria matter. Strange Company should not emotionally attach to products.
+
+## Adaptive Operator Protocol
+
+The operating system treats roadblocks as evidence, not embarrassment. A failed command, rejected plan, customer objection, missing receipt, legal blocker, fiscal blocker, privacy blocker, or unsafe public/private leak is damage that must change the next action.
+
+Operators and AI agents follow [ADAPTIVE_OPERATOR_PROTOCOL.md](ADAPTIVE_OPERATOR_PROTOCOL.md) when damage occurs:
+
+1. identify what failed or changed,
+2. explain what the damage revealed,
+3. adapt the strategy,
+4. execute the next smallest safe countermeasure,
+5. and define the next evolution if the countermeasure fails.
+
+This loop can narrow scope, change tactics, create a handoff, or stop an unsafe launch. It cannot bypass the live gate, professional review, Brazil compliance, LGPD duties, fiscal obligations, customer terms, support readiness, or receipt requirements.
 
 ## Metrics
 

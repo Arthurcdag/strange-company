@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { spawnSync } = require("child_process");
 const vm = require("vm");
 
 const root = path.resolve(__dirname, "..");
@@ -25,6 +26,15 @@ function compileJavaScript(relativePath) {
   } catch (error) {
     fail(`${relativePath} does not parse: ${error.message}`);
   }
+}
+
+function checkExternalLivePacketGate() {
+  const result = spawnSync(process.execPath, ["tools/check_external_live_packet_gate.js"], {
+    cwd: root,
+    encoding: "utf8"
+  });
+  const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
+  assert(result.status === 0, `external live packet gate regression failed:\n${output}`);
 }
 
 function loadPublicConfig() {
@@ -121,7 +131,10 @@ function checkPublicSurface() {
     "social security number",
     "password or secret",
     "private key material",
-    "renderBlocked"
+    "renderBlocked",
+    "Public intake is closed",
+    "if (!readiness.liveReady)",
+    "readiness.liveReady ? `<a href=\"${mailtoUrl(order)}\">Open email draft</a>` : \"\""
   ];
   for (const term of requiredGuardTerms) {
     assert(publicJs.includes(term), `public.js must keep the ${term} guard.`);
@@ -474,6 +487,11 @@ function checkOperationalV15Contract() {
     ["setup evidence clear handler", "function clearSetupEvidence"],
     ["setup evidence url sanitizer", 'safeHttpsUrl(raw)'],
     ["setup evidence note sensitive scan", "findSensitiveData(note)"],
+    ["Brazil compliance agent list", "const BRAZIL_COMPLIANCE_AGENTS = ["],
+    ["Brazil compliance agent model", "function buildBrazilComplianceAgentsModel"],
+    ["Brazil compliance agent packet", "function brazilComplianceAgentPacket"],
+    ["Brazil compliance agent renderer", "function renderBrazilComplianceAgents"],
+    ["Brazil compliance agent copy handler", "async function copyBrazilComplianceAgentPacket"],
     ["customer acquisition loader", "function loadCustomerAcquisition"],
     ["customer acquisition saver", "function saveCustomerAcquisition"],
     ["customer acquisition model", "function buildCustomerAcquisitionModel"],
@@ -500,6 +518,7 @@ function checkOperationalV15Contract() {
   const indexExpectations = [
     ["setup evidence panel container", 'id="setupEvidencePanel"'],
     ["setup evidence reset button", 'id="resetSetupEvidence"'],
+    ["Brazil compliance agents panel container", 'id="brazilComplianceAgentsPanel"'],
     ["customer acquisition panel container", 'id="customerAcquisitionPanel"'],
     ["customer acquisition reset button", 'id="resetCustomerAcquisition"'],
     ["growth review panel container", 'id="growthReviewPanel"'],
@@ -512,6 +531,7 @@ function checkOperationalV15Contract() {
 
   assert(runbook.includes("Operational v1.5"), "OPERATIONS_RUNBOOK.md must document Operational v1.5.");
   assert(runbook.includes("Setup Evidence"), "OPERATIONS_RUNBOOK.md must reference the Setup Evidence panel.");
+  assert(runbook.includes("Brazil Compliance Agents"), "OPERATIONS_RUNBOOK.md must reference the Brazil Compliance Agents panel.");
   assert(runbook.includes("Customer Acquisition"), "OPERATIONS_RUNBOOK.md must reference the Customer Acquisition panel.");
   assert(runbook.includes("Growth Management"), "OPERATIONS_RUNBOOK.md must reference the Growth Management panel.");
 
@@ -527,6 +547,11 @@ function checkOperationalV15Contract() {
   assert(growthDoc.includes("# Growth Management"), "GROWTH_MANAGEMENT.md must exist and start with a top-level heading.");
   assert(growthDoc.includes("Growth States"), "GROWTH_MANAGEMENT.md must document growth states.");
 
+  const complianceAgentsDoc = read("BRAZIL_COMPLIANCE_AGENTS.md");
+  assert(complianceAgentsDoc.includes("# Brazil Compliance Agents"), "BRAZIL_COMPLIANCE_AGENTS.md must exist and start with a top-level heading.");
+  assert(complianceAgentsDoc.includes("AI prepares"), "BRAZIL_COMPLIANCE_AGENTS.md must document what AI can prepare.");
+  assert(complianceAgentsDoc.includes("Human must close"), "BRAZIL_COMPLIANCE_AGENTS.md must document human closure.");
+
   for (const [file, contents] of [
     ["public.html", publicHtml],
     ["public.js", publicJs],
@@ -535,11 +560,13 @@ function checkOperationalV15Contract() {
     assert(!/strange-company-setup-evidence/.test(contents), `${file} exposes setup evidence storage key.`);
     assert(!/strange-company-customer-acquisition/.test(contents), `${file} exposes customer acquisition storage key.`);
     assert(!/setupEvidencePanel/.test(contents), `${file} exposes setup evidence panel id.`);
+    assert(!/brazilComplianceAgentsPanel/.test(contents), `${file} exposes Brazil compliance agents panel id.`);
     assert(!/customerAcquisitionPanel/.test(contents), `${file} exposes customer acquisition panel id.`);
     assert(!/growthReviewPanel/.test(contents), `${file} exposes growth review panel id.`);
     assert(!/copyGrowthReview/.test(contents), `${file} exposes growth review copy action.`);
     assert(!/outreachLogForm/.test(contents), `${file} exposes outreach log form id.`);
     assert(!/SETUP_EVIDENCE_SLOTS/.test(contents), `${file} exposes setup evidence slot internals.`);
+    assert(!/BRAZIL_COMPLIANCE_AGENTS/.test(contents), `${file} exposes Brazil compliance agent internals.`);
     assert(!/ACQUISITION_LEAD_SOURCES/.test(contents), `${file} exposes acquisition lead source internals.`);
   }
 }
@@ -611,12 +638,93 @@ function checkRevenueStartContract() {
   }
 }
 
+function checkBrazilComplianceContract() {
+  const readme = read("README.md");
+  const terms = read("TERMS.md");
+  const privacy = read("PRIVACY.md");
+  const termos = read("TERMOS.md");
+  const avisoPrivacidade = read("AVISO_DE_PRIVACIDADE.md");
+  const setupEvidence = read("SETUP_EVIDENCE.md");
+  const livePilot = read("RUN_LIVE_PILOT.md");
+  const startPacket = read("OPERATIONS_START_PACKET.md");
+  const brazilCompliance = read("BRAZIL_COMPLIANCE.md");
+  const brazilAgents = read("BRAZIL_COMPLIANCE_AGENTS.md");
+  const aiHandoff = read("AI_LEGAL_HANDOFF.md");
+  const googleFormIntake = read("GOOGLE_FORM_INTAKE.md");
+  const supportEvidence = read("SUPPORT_INBOX_EVIDENCE.md");
+  const indexHtml = read("index.html");
+  const publicHtml = read("public.html");
+  const publicJs = read("public.js");
+  const script = read("script.js");
+  const styles = read("styles.css");
+
+  const requiredDocs = [
+    ["README Portuguese terms link", readme, "TERMOS.md"],
+    ["README Portuguese privacy link", readme, "AVISO_DE_PRIVACIDADE.md"],
+    ["README Brazil compliance link", readme, "BRAZIL_COMPLIANCE.md"],
+    ["README Brazil compliance agents link", readme, "BRAZIL_COMPLIANCE_AGENTS.md"],
+    ["README support inbox evidence link", readme, "SUPPORT_INBOX_EVIDENCE.md"],
+    ["README AI handoff link", readme, "AI_LEGAL_HANDOFF.md"],
+    ["README Google Form intake link", readme, "GOOGLE_FORM_INTAKE.md"],
+    ["README Google Form Apps Script link", readme, "tools/google_apps_script_create_intake_form.gs"],
+    ["Portuguese terms heading", termos, "# Termos de Uso e Contratacao"],
+    ["Portuguese terms manual request", termos, "Pedido Manual"],
+    ["Portuguese terms consumer handling", termos, "Cancelamento, Reembolso e Direito de Arrependimento"],
+    ["Portuguese terms fiscal route", termos, "NFS-e"],
+    ["Portuguese privacy heading", avisoPrivacidade, "# Aviso de Privacidade"],
+    ["Portuguese privacy controller", avisoPrivacidade, "Controlador"],
+    ["Portuguese privacy rights", avisoPrivacidade, "Direitos dos Titulares"],
+    ["Portuguese privacy AI boundary", avisoPrivacidade, "A IA nao deve"],
+    ["public page Portuguese terms link", publicHtml, 'href="TERMOS.md"'],
+    ["public page Portuguese privacy link", publicHtml, 'href="AVISO_DE_PRIVACIDADE.md"'],
+    ["terms Brazil operator gate", terms, "Brazilian operating entity"],
+    ["terms NFS-e gate", terms, "NFS-e"],
+    ["terms AI boundary", terms, "AI-created material is draft support"],
+    ["privacy LGPD notice", privacy, "LGPD"],
+    ["privacy data-subject rights", privacy, "Data-Subject Rights"],
+    ["privacy AI boundary", privacy, "AI must not"],
+    ["setup evidence Brazil operator", setupEvidence, "Brazilian operating entity"],
+    ["setup evidence NFS-e", setupEvidence, "NFS-e"],
+    ["setup evidence LGPD contact", setupEvidence, "LGPD contact"],
+    ["live pilot Brazil posture", livePilot, "manual paid pilot in Brazil"],
+    ["operations start Brazil gate", startPacket, "Brazilian entity/CNPJ"],
+    ["Brazil gate matrix", brazilCompliance, "Gate Matrix"],
+    ["Brazil AI boundary", brazilCompliance, "AI may not"],
+    ["Brazil compliance agents heading", brazilAgents, "# Brazil Compliance Agents"],
+    ["Brazil compliance agents AI lane", brazilAgents, "AI prepares"],
+    ["Brazil compliance agents human lane", brazilAgents, "Human must close"],
+    ["AI human review queue", aiHandoff, "Human Review Queue"],
+    ["Google Form private URL boundary", googleFormIntake, "Do not commit the private Sheet URL"],
+    ["Google Form verification stop rule", googleFormIntake, "Do not set googleFormVerified true"],
+    ["Google Form Apps Script builder", read("tools/google_apps_script_create_intake_form.gs"), "FormApp.create"],
+    ["Google Form Apps Script Sheet destination", read("tools/google_apps_script_create_intake_form.gs"), "setDestination(FormApp.DestinationType.SPREADSHEET"],
+    ["support inbox evidence heading", supportEvidence, "# Support Inbox Evidence"],
+    ["support inbox Gmail label", supportEvidence, "Strange Works Studio/Support"],
+    ["support inbox Gmail message id", supportEvidence, "19e4c73fcdbf42a2"],
+    ["private Brazil compliance agents panel", indexHtml, 'id="brazilComplianceAgentsPanel"'],
+    ["public request packet Brazil jurisdiction", publicJs, "Jurisdiction: Brazil"],
+    ["public request packet AI human review", publicJs, "AI-generated legal, tax, privacy, and compliance copy requires human review"],
+    ["script Brazil compliance agent list", script, "const BRAZIL_COMPLIANCE_AGENTS = ["],
+    ["script Brazil compliance agent renderer", script, "function renderBrazilComplianceAgents"],
+    ["script Brazil setup slot", script, "Brazilian operator/CNPJ"],
+    ["script NFS-e setup slot", script, "NFS-e or fiscal receipt route"],
+    ["script LGPD setup slot", script, "LGPD contact path"],
+    ["styles Brazil compliance agent card", styles, ".compliance-agent-card"]
+  ];
+
+  for (const [label, contents, snippet] of requiredDocs) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
 function checkConfig() {
   const config = loadPublicConfig();
   const formUrl = String(config.googleFormUrl || "").trim();
   const supportEmail = String(config.supportEmail || "").trim();
   const termsReviewedAt = String(config.termsReviewedAt || "").trim();
   const privacyReviewedAt = String(config.privacyReviewedAt || "").trim();
+  const brazilComplianceReviewedAt = String(config.brazilComplianceReviewedAt || "").trim();
+  const aiHandoffReviewedAt = String(config.aiHandoffReviewedAt || "").trim();
   const services = Array.isArray(config.services) ? config.services : [];
 
   assert(Boolean(config.operatorName), "public-config.js needs operatorName.");
@@ -625,8 +733,15 @@ function checkConfig() {
   assert(typeof config.supportInboxVerified === "boolean", "supportInboxVerified must be boolean.");
   assert(typeof config.googleFormVerified === "boolean", "googleFormVerified must be boolean.");
   assert(typeof config.liveMode === "boolean", "liveMode must be boolean.");
+  assert(config.jurisdiction === "BR", "public-config.js jurisdiction must be BR for the Brazil-first launch gate.");
+  assert(
+    config.aiGeneratedLegalDocsRequireHumanReview === true,
+    "public-config.js must keep aiGeneratedLegalDocsRequireHumanReview true."
+  );
   assert(isIsoDate(termsReviewedAt), "termsReviewedAt must be blank or YYYY-MM-DD.");
   assert(isIsoDate(privacyReviewedAt), "privacyReviewedAt must be blank or YYYY-MM-DD.");
+  assert(isIsoDate(brazilComplianceReviewedAt), "brazilComplianceReviewedAt must be blank or YYYY-MM-DD.");
+  assert(isIsoDate(aiHandoffReviewedAt), "aiHandoffReviewedAt must be blank or YYYY-MM-DD.");
   assert(services.length > 0, "services must contain at least one public offer.");
 
   for (const [index, service] of services.entries()) {
@@ -639,12 +754,19 @@ function checkConfig() {
     assert(Boolean(formUrl), "googleFormVerified requires googleFormUrl.");
   }
 
+  if (config.supportInboxVerified) {
+    const supportEvidence = read("SUPPORT_INBOX_EVIDENCE.md");
+    assert(supportEvidence.includes(supportEmail), "supportInboxVerified requires SUPPORT_INBOX_EVIDENCE.md to reference supportEmail.");
+  }
+
   if (config.liveMode) {
     assert(config.supportInboxVerified, "liveMode requires supportInboxVerified.");
     assert(config.googleFormVerified, "liveMode requires googleFormVerified.");
     assert(Boolean(formUrl), "liveMode requires googleFormUrl.");
     assert(Boolean(termsReviewedAt), "liveMode requires termsReviewedAt.");
     assert(Boolean(privacyReviewedAt), "liveMode requires privacyReviewedAt.");
+    assert(Boolean(brazilComplianceReviewedAt), "liveMode requires brazilComplianceReviewedAt.");
+    assert(Boolean(aiHandoffReviewedAt), "liveMode requires aiHandoffReviewedAt.");
   }
 }
 
@@ -652,7 +774,11 @@ compileJavaScript("public-config.js");
 compileJavaScript("public.js");
 compileJavaScript("script.js");
 compileJavaScript("tools/audit_company_functionality.js");
+compileJavaScript("tools/draft_external_live_packet.js");
+compileJavaScript("tools/generate_external_live_gap_packet.js");
 compileJavaScript("tools/validate_external_live_packet.js");
+compileJavaScript("tools/check_external_live_packet_gate.js");
+checkExternalLivePacketGate();
 checkPublicSurface();
 checkPrivateUrlAllowlists();
 checkOutcomeEvidenceContract();
@@ -663,6 +789,7 @@ checkDailyPilotRunContract();
 checkPaidPilotProfitReadinessContract();
 checkOperationalV15Contract();
 checkRevenueStartContract();
+checkBrazilComplianceContract();
 checkConfig();
 
 if (failures.length) {

@@ -256,21 +256,21 @@ function defaultRevenuePilot() {
       {
         id: "payments",
         title: "Payment route ready",
-        detail: "Bank account, processor, receipt format, and refund path are defined.",
+        detail: "Brazil bank/payment route, fiscal receipt/NFS-e process, reconciliation, and refund path are defined.",
         done: false,
         critical: true
       },
       {
         id: "accounting",
         title: "Accounting lane ready",
-        detail: "Bookkeeping, tax category, and monthly reconciliation owner are defined.",
+        detail: "Bookkeeping, tax regime, CNAE/NFS-e owner, and monthly reconciliation owner are defined.",
         done: false,
         critical: true
       },
       {
         id: "terms",
         title: "Terms and privacy copy ready",
-        detail: "Scope, data handling, support, cancellation, and limits are visible.",
+        detail: "Brazil scope, data handling, LGPD path, support, cancellation, and limits are visible.",
         done: false,
         critical: true
       },
@@ -415,7 +415,7 @@ function defaultSatelliteCompany() {
 function defaultOperations() {
   return {
     operatorName: "Strange Works Studio",
-    supportEmail: "ops@strangeworks.studio",
+    supportEmail: "tuiidagnese+strangeworks@gmail.com",
     paymentMode: "Manual invoice only",
     invoicePrefix: "SWS",
     nextInvoiceNumber: 1001,
@@ -429,30 +429,30 @@ function defaultOperations() {
     },
     launchChecklist: [
       {
-        id: "llc-formed",
-        title: "US LLC formed",
-        detail: "Articles of organization are filed in the chosen state. SBA: sba.gov/business-guide/launch-your-business/register-your-business.",
+        id: "brazil-operator-confirmed",
+        title: "Brazilian operator confirmed",
+        detail: "CNPJ or approved Brazilian operating structure is recorded with a responsible human operator.",
         done: false,
         completedAt: ""
       },
       {
-        id: "ein-issued",
-        title: "EIN issued",
-        detail: "Federal Employer Identification Number obtained from the IRS after entity formation.",
+        id: "tax-route-reviewed",
+        title: "Tax and NFS-e route reviewed",
+        detail: "Accountant confirms tax regime, CNAE, municipal setup needs, and NFS-e or reviewed receipt path.",
         done: false,
         completedAt: ""
       },
       {
         id: "bank-open",
-        title: "Business bank account open",
-        detail: "Operating account opened in the LLC name. Used for receiving Stripe payouts and paying expenses.",
+        title: "Business bank/payment account open",
+        detail: "Operating account opened in the Brazilian operator's name and ready for payment-provider payouts.",
         done: false,
         completedAt: ""
       },
       {
-        id: "stripe-active",
-        title: "Stripe account active",
-        detail: "Stripe account verified for the LLC, payouts wired to the business bank, invoicing enabled.",
+        id: "payment-route-active",
+        title: "Manual payment route active",
+        detail: "Payment provider or manual invoice route is verified for the operator, with payouts, refunds, and reconciliation understood.",
         done: false,
         completedAt: ""
       },
@@ -480,14 +480,14 @@ function defaultOperations() {
       {
         id: "privacy-reviewed",
         title: "Privacy notice reviewed",
-        detail: "Privacy notice reviewed before taking the first payment.",
+        detail: "LGPD privacy notice, legal bases, rights request path, and processor list reviewed before taking the first payment.",
         done: false,
         completedAt: ""
       },
       {
         id: "first-invoice-sent",
-        title: "First customer invoice sent",
-        detail: "At least one real Stripe Hosted Invoice has been sent to a real customer.",
+        title: "First safe test order completed",
+        detail: "At least one safe test request has completed payment/fiscal evidence, delivery, and receipt-chain closeout.",
         done: false,
         completedAt: ""
       }
@@ -496,21 +496,21 @@ function defaultOperations() {
       {
         id: "entity",
         title: "Entity and tax identity ready",
-        detail: "Legal name, tax identity, signer authority, and customer contract path are confirmed.",
+        detail: "Brazilian legal name, CNPJ or approved route, signer authority, and customer contract path are confirmed.",
         done: false,
         critical: true
       },
       {
         id: "payment",
         title: "Payment route ready",
-        detail: "Bank, processor or manual invoice route, refund path, and failed-payment handling are ready.",
+        detail: "Bank, payment provider or manual invoice route, NFS-e/receipt path, refund path, and failed-payment handling are ready.",
         done: false,
         critical: true
       },
       {
         id: "accounting",
         title: "Bookkeeping lane ready",
-        detail: "Invoice numbers, revenue categories, tax review, and monthly reconciliation are defined.",
+        detail: "Invoice numbers, fiscal receipt/NFS-e evidence, tax review, and monthly reconciliation are defined.",
         done: false,
         critical: true
       },
@@ -531,14 +531,14 @@ function defaultOperations() {
       {
         id: "privacy",
         title: "Privacy notice published",
-        detail: "Data handling, local storage, retention, and contact route are visible.",
+        detail: "Data handling, local storage, retention, LGPD rights, AI boundary, and contact route are visible.",
         done: true,
         critical: true
       },
       {
         id: "no-regulated-data",
         title: "No regulated data in v0",
-        detail: "The first service accepts summaries and document lists, not protected health, payment, or credential data.",
+        detail: "The first service accepts summaries and document lists, not protected health, payment, credential, sensitive personal, or regulated source data.",
         done: true,
         critical: false
       }
@@ -643,9 +643,9 @@ const logs = [
   ["C", "Consider purpose trust wrapper after v0 revenue proof.", "Guardians", "Deferred", "red"]
 ];
 
-const money = new Intl.NumberFormat("en-US", {
+const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
-  currency: "USD",
+  currency: "BRL",
   maximumFractionDigits: 0
 });
 
@@ -669,19 +669,96 @@ const DAILY_PILOT_RUN_KEY = "strange-company-daily-pilot-run";
 const EXTERNAL_SIGNALS_KEY = "strange-company-external-signals";
 const SETUP_EVIDENCE_KEY = "strange-company-setup-evidence";
 const CUSTOMER_ACQUISITION_KEY = "strange-company-customer-acquisition";
+const ADAPTIVE_OPERATOR_KEY = "strange-company-adaptive-operator";
 const INCIDENT_SEVERITIES = ["info", "low", "medium", "high"];
 const INCIDENT_STATUSES = ["open", "mitigating", "resolved", "closed"];
 const SETUP_EVIDENCE_STATUSES = ["missing", "pending", "verified", "blocked"];
 const SETUP_EVIDENCE_SLOTS = [
-  { id: "llc", label: "US LLC formation", detail: "Articles of organization filed; entity is in good standing." },
-  { id: "ein", label: "EIN", detail: "Federal Employer Identification Number issued by the IRS for the LLC." },
-  { id: "bank", label: "Business bank account", detail: "Operating account opened in the LLC name with payouts wired in." },
-  { id: "stripe", label: "Stripe account active", detail: "Stripe account verified for the LLC with payouts and invoicing enabled." },
+  { id: "entity", label: "Brazilian operator/CNPJ", detail: "Brazilian entity, CNPJ, or approved operating structure confirmed with responsible human owner." },
+  { id: "tax-regime", label: "Tax regime and CNAE", detail: "Accountant-reviewed tax regime, CNAE, municipal registration needs, and bookkeeping owner." },
+  { id: "nfse", label: "NFS-e or fiscal receipt route", detail: "NFS-e portal or legally reviewed fiscal receipt route tested before paid operation." },
+  { id: "bank", label: "Business bank/payment account", detail: "Operating bank or payment account opened in the Brazilian operator's name with payouts wired in." },
+  { id: "payment", label: "Payment route active", detail: "Payment provider or manual invoice route verified with payout, refund, and reconciliation process." },
   { id: "support-inbox", label: "Support inbox monitored", detail: "Real monitored inbox is reachable and read every business day." },
+  { id: "lgpd-contact", label: "LGPD contact path", detail: "Privacy and data-subject requests route to a responsible human operator." },
   { id: "google-sheet", label: "Google Sheet ledger", detail: "Live Sheet with Requests, Invoices, Customers, Delivery, Incidents, Leads tabs." },
   { id: "google-form", label: "Google Form intake", detail: "Public intake form points at the verified sheet and obeys boundaries." },
   { id: "terms-review", label: "Terms reviewed", detail: "Customer-facing terms reviewed before sending the first paid invoice." },
-  { id: "privacy-review", label: "Privacy notice reviewed", detail: "Privacy notice reviewed before collecting any customer detail." }
+  { id: "privacy-review", label: "LGPD privacy notice reviewed", detail: "Privacy notice reviewed for legal bases, rights request path, retention, processors, and AI boundary before collecting customer detail." }
+];
+const BRAZIL_COMPLIANCE_AGENTS = [
+  {
+    id: "entity-cnpj",
+    title: "Entity/CNPJ agent",
+    setupIds: ["entity"],
+    aiCan: "Prepare the entity route comparison, data-free founder checklist, and evidence packet template.",
+    humanMust: "Founder, accountant, or lawyer confirms the operating structure, CNPJ route, municipal needs, and responsible legal owner.",
+    evidence: "CNPJ/entity artifact or reviewed operating-structure note stored outside the repo, then referenced in Setup Evidence.",
+    stopRule: "Do not ask for payment or issue fiscal documents while the operating entity route is unresolved."
+  },
+  {
+    id: "tax-nfse",
+    title: "Tax/NFS-e agent",
+    setupIds: ["tax-regime", "nfse"],
+    aiCan: "Prepare CNAE questions, NFS-e test script, bookkeeping handoff, and the invoice evidence checklist.",
+    humanMust: "Accountant or responsible operator validates CNAE, tax regime, municipal registration, NFS-e access, and fiscal receipt route.",
+    evidence: "Accountant-reviewed tax note plus successful NFS-e or legally reviewed fiscal receipt test.",
+    stopRule: "Do not mark an invoice sent until fiscal issuance and tax owner are verified."
+  },
+  {
+    id: "payment-reconciliation",
+    title: "Payment/reconciliation agent",
+    setupIds: ["bank", "payment"],
+    aiCan: "Prepare payout, refund, chargeback, and ledger reconciliation procedures without touching credentials.",
+    humanMust: "Operator opens and verifies the bank/payment route, runs a payout path, and confirms refund handling.",
+    evidence: "Bank/payment account proof, provider route, payout owner, and reconciliation note.",
+    stopRule: "Do not collect money through an unverified account or a route without refund and reconciliation ownership."
+  },
+  {
+    id: "support-incidents",
+    title: "Support/incident agent",
+    setupIds: ["support-inbox"],
+    aiCan: "Draft response macros, incident triage categories, and daily inbox review checklist.",
+    humanMust: "Operator verifies a monitored support inbox and confirms who reads it every business day.",
+    evidence: "Reachable support inbox, monitoring schedule, escalation owner, and incident logging route.",
+    stopRule: "Do not open intake when no human can receive support, refund, privacy, or complaint messages."
+  },
+  {
+    id: "lgpd-privacy",
+    title: "LGPD/privacy agent",
+    setupIds: ["lgpd-contact", "privacy-review"],
+    aiCan: "Prepare a privacy review diff, data inventory, processor list, retention questions, and rights-request packet.",
+    humanMust: "Privacy owner or lawyer reviews LGPD basis, data-subject rights path, retention, processors, security, and AI boundary.",
+    evidence: "Reviewed privacy notice, LGPD contact route, and human owner for data-subject requests.",
+    stopRule: "Do not collect customer detail before the rights path and privacy notice are human-reviewed."
+  },
+  {
+    id: "consumer-terms",
+    title: "Consumer/terms agent",
+    setupIds: ["terms-review"],
+    aiCan: "Prepare terms redlines for scope, cancellation, refund, delivery, consumer information, and support promises.",
+    humanMust: "Lawyer or responsible operator confirms the offer terms, customer disclosures, refund path, and service limitation language.",
+    evidence: "Human-reviewed terms date and customer-facing support/refund route.",
+    stopRule: "Do not send the first paid offer with AI-only terms or unclear cancellation/refund language."
+  },
+  {
+    id: "intake-ledger",
+    title: "Intake/ledger agent",
+    setupIds: ["google-sheet", "google-form"],
+    aiCan: "Prepare form-field boundaries, Sheet tab checks, TSV import test rows, and no-sensitive-data warnings.",
+    humanMust: "Operator verifies the live Google Form writes to the correct Sheet and excludes regulated or sensitive data.",
+    evidence: "Live Sheet, live Form URL, test submission, and owner note for ledger maintenance.",
+    stopRule: "Do not rely on public intake until the form route and ledger tabs are verified."
+  },
+  {
+    id: "ai-human-review",
+    title: "AI human-review agent",
+    setupIds: ["terms-review", "privacy-review", "lgpd-contact"],
+    aiCan: "Prepare a no-submit handoff with every AI-drafted legal, tax, privacy, and compliance artifact that needs human approval.",
+    humanMust: "Lawyer, accountant, founder, or operator signs off the relevant artifact and records dates in public-config.js before live mode.",
+    evidence: "AI_LEGAL_HANDOFF.md reviewed, terms/privacy review dates set, Brazil compliance review date set, and AI handoff review date set.",
+    stopRule: "Do not treat AI output as legal, accounting, privacy, or tax approval."
+  }
 ];
 const ACQUISITION_LEAD_SOURCES = ["referral", "email", "form", "direct", "partner"];
 const REVENUE_START_LANES = [
@@ -726,7 +803,7 @@ const REVENUE_START_LANES = [
       {
         id: "setup-evidence",
         title: "External setup evidence checked",
-        detail: "LLC, EIN, bank, Stripe, support, Sheet, Form, terms, and privacy evidence are reviewed outside the repo.",
+        detail: "Brazilian entity/CNPJ, tax regime, NFS-e, bank/payment, support, LGPD, Sheet, Form, terms, and privacy evidence are reviewed outside the repo.",
         required: true
       },
       {
@@ -738,7 +815,7 @@ const REVENUE_START_LANES = [
       {
         id: "manual-invoice-route",
         title: "Manual invoice route ready",
-        detail: "Stripe Hosted Invoice and Sheet ledger paths are configured before the first invoice is sent.",
+        detail: "Manual payment request, Sheet ledger, and NFS-e/receipt paths are configured before the first invoice is sent.",
         required: true
       },
       {
@@ -758,21 +835,78 @@ const REVENUE_START_LANES = [
 ];
 const DAILY_RUN_CHECKS = [
   { id: "review-requests", title: "Review new requests", detail: "Sheet Requests tab, support inbox, and Order Desk submissions." },
-  { id: "qualify-customer", title: "Qualify customer", detail: "Real US business, allowed service, no regulated data in the request." },
-  { id: "stripe-invoice", title: "Create Stripe invoice", detail: "Manually create the Hosted Invoice and copy the URL." },
-  { id: "ledger-update", title: "Update ledger", detail: "Stripe URL pasted into the order; ledger row up to date." },
+  { id: "qualify-customer", title: "Qualify customer", detail: "Real external buyer, allowed service, consumer-law status checked, no regulated data in the request." },
+  { id: "manual-payment", title: "Create manual payment request", detail: "Manually create the reviewed hosted payment/invoice route and copy the URL." },
+  { id: "ledger-update", title: "Update ledger", detail: "Payment URL and fiscal/NFS-e status pasted into the order or ledger row." },
   { id: "track-payment", title: "Track payment", detail: "Move the order to Paid only after settlement." },
   { id: "deliver", title: "Deliver", detail: "Send the scoped proof packet; record artifact URL and acceptance note." },
   { id: "log-incidents", title: "Log incidents", detail: "Anything off-script becomes an incident row in the Sheet and the chain." },
   { id: "seal-chain", title: "Seal receipt chain", detail: "Decisions view: capture the day's root before closing the run." }
 ];
 const DAILY_RUN_STOP_RULES = [
-  { id: "stripe-hold", title: "Stripe account on hold", detail: "Stripe has flagged, restricted, or held the account or payouts." },
-  { id: "bank-restricted", title: "Business bank restricted", detail: "The LLC bank account is frozen, restricted, or under review." },
-  { id: "regulated-data", title: "Regulated data submitted", detail: "An intake included regulated source documents the operator did not solicit." },
-  { id: "sheet-outage", title: "Sheet ledger outage", detail: "The Google Sheet ledger is inaccessible or out of sync with Stripe." },
+  { id: "payment-hold", title: "Payment route on hold", detail: "Payment provider, bank, or payout route has flagged, restricted, or held the account or payouts." },
+  { id: "bank-restricted", title: "Business bank/payment account restricted", detail: "The Brazilian operator's bank or payment account is frozen, restricted, or under review." },
+  { id: "regulated-data", title: "Regulated or sensitive data submitted", detail: "An intake included regulated source documents, secrets, or sensitive personal data the operator did not solicit." },
+  { id: "fiscal-route-blocked", title: "Fiscal receipt route blocked", detail: "NFS-e, receipt, tax, or accounting route is blocked or unreconciled." },
+  { id: "sheet-outage", title: "Sheet ledger outage", detail: "The Google Sheet ledger is inaccessible or out of sync with payment/fiscal evidence." },
   { id: "support-outage", title: "Support inbox outage", detail: "The support inbox is unmonitored or unreachable for the day." },
   { id: "terms-change", title: "Terms or privacy change required", detail: "Terms or privacy require an unscheduled change before sending more invoices." }
+];
+const ADAPTIVE_DAMAGE_ROUTES = [
+  {
+    id: "live-gate",
+    label: "Live gate blocker",
+    lane: "public-config.js / OPERATOR_FAST_START.md / LIVE_HANDOFF_CHECKLIST.md / OPERATIONS_START_PACKET.md",
+    countermeasure: "Keep liveMode false, record the missing external evidence, and rerun the live audit only after the artifact is real."
+  },
+  {
+    id: "brazil-compliance",
+    label: "Brazil compliance blocker",
+    lane: "BRAZIL_COMPLIANCE.md / BRAZIL_COMPLIANCE_AGENTS.md / AI_LEGAL_HANDOFF.md",
+    countermeasure: "Prepare the smallest legal, tax, LGPD, fiscal, or AI handoff packet and leave final closure to the responsible human."
+  },
+  {
+    id: "google-form",
+    label: "Google Form or ledger blocker",
+    lane: "GOOGLE_FORM_INTAKE.md / tools/google_apps_script_create_intake_form.gs / GOOGLE_SHEET_LEDGER.md",
+    countermeasure: "Narrow the intake route to a manual Form or Sheet verification step, then require one safe test response before marking the route verified."
+  },
+  {
+    id: "support-incident",
+    label: "Support or incident failure",
+    lane: "SUPPORT.md / SUPPORT_INBOX_EVIDENCE.md / OPERATIONS_RUNBOOK.md",
+    countermeasure: "Pause affected work, record the incident response, and verify the monitored inbox or escalation owner before reopening the lane."
+  },
+  {
+    id: "customer-order",
+    label: "Customer order or delivery failure",
+    lane: "ORDER_DESK.md / OPERATIONS_RUNBOOK.md / receipt-chain order timeline",
+    countermeasure: "Keep the order in its current safe state, add missing payment, fiscal, delivery, or acceptance evidence, and avoid advancing the status early."
+  },
+  {
+    id: "growth-experiment",
+    label: "Experiment or spend weakness",
+    lane: "AUTONOMOUS_CYCLE.md / OUTCOME_REVIEW.md / CAPITAL_ROUTER.md",
+    countermeasure: "Route the weak outcome to revise or kill, narrow the next experiment, and require a Research Gate receipt before new spend."
+  },
+  {
+    id: "security-resilience",
+    label: "Security or resilience weakness",
+    lane: "RESILIENCE_MODEL.md / RESILIENCE_DRILLS.md / tools/survival_check.js",
+    countermeasure: "Issue a hardening packet, add a survival check if the weakness is structural, and keep private state off the public surface."
+  },
+  {
+    id: "failed-command",
+    label: "Failed command or workflow",
+    lane: "ADAPTIVE_OPERATOR_PROTOCOL.md / OPERATING_SYSTEM.md",
+    countermeasure: "Capture the exact failure, change one condition, retry only when the cause is addressed, and leave a reproducible command for the next operator."
+  },
+  {
+    id: "customer-objection",
+    label: "Customer objection or rejection",
+    lane: "CUSTOMER_ACQUISITION.md / GROWTH_MANAGEMENT.md / ORDER_DESK.md",
+    countermeasure: "Turn the objection into a qualification note, narrow the offer or refund path, and do not scale the channel until the concern is resolved."
+  }
 ];
 
 let activeScenario = "base";
@@ -797,6 +931,7 @@ let dailyPilotRun = loadDailyPilotRun();
 let externalSignals = loadExternalSignals();
 let setupEvidence = loadSetupEvidence();
 let customerAcquisition = loadCustomerAcquisition();
+let adaptiveOperator = loadAdaptiveOperator();
 
 function activateView(target) {
   document.querySelectorAll(".view").forEach((view) => {
@@ -1038,6 +1173,239 @@ function renderLaunchGate() {
       `
     )
     .join("");
+
+  renderLiveEvidencePanel();
+}
+
+function publicOrderConfig() {
+  return window.PUBLIC_ORDER_CONFIG && typeof window.PUBLIC_ORDER_CONFIG === "object"
+    ? window.PUBLIC_ORDER_CONFIG
+    : {};
+}
+
+function isIsoDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim());
+}
+
+function googleFormUrlReady(value) {
+  const url = safeHttpsUrl(value);
+  return Boolean(url && url.startsWith("https://docs.google.com/forms/"));
+}
+
+function coreLiveEvidenceRows(config) {
+  return [
+    {
+      id: "support-inbox",
+      title: "Support inbox verified",
+      field: "supportEmail + supportInboxVerified",
+      passed: Boolean(String(config.supportEmail || "").trim() && config.supportInboxVerified === true),
+      evidence: "SUPPORT_INBOX_EVIDENCE.md plus the support section of EXTERNAL_LIVE_PACKET.local.json.",
+      fix: "Record monitored inbox owner, cadence, test received timestamp, and reply timestamp."
+    },
+    {
+      id: "google-form-url",
+      title: "Google Form URL public and safe",
+      field: "googleFormUrl",
+      passed: googleFormUrlReady(config.googleFormUrl),
+      evidence: "GOOGLE_FORM_INTAKE.md and the Google section of EXTERNAL_LIVE_PACKET.local.json.",
+      fix: "Create the Form, link it to the private Sheet, then paste only the public Form URL."
+    },
+    {
+      id: "google-form-verified",
+      title: "Google Form test response verified",
+      field: "googleFormVerified",
+      passed: config.googleFormVerified === true,
+      evidence: "Safe test response timestamp in the private Sheet ledger and external live packet.",
+      fix: "Submit one safe test response and confirm it lands in the Responses ledger."
+    },
+    {
+      id: "terms-review",
+      title: "Terms reviewed by human",
+      field: "termsReviewedAt",
+      passed: isIsoDate(config.termsReviewedAt),
+      evidence: "TERMS.md / TERMOS.md review note and external live packet legalReview section.",
+      fix: "Record the actual human review date as YYYY-MM-DD."
+    },
+    {
+      id: "privacy-review",
+      title: "Privacy reviewed by human",
+      field: "privacyReviewedAt",
+      passed: isIsoDate(config.privacyReviewedAt),
+      evidence: "PRIVACY.md / AVISO_DE_PRIVACIDADE.md review note and external live packet legalReview section.",
+      fix: "Record the actual privacy review date as YYYY-MM-DD."
+    },
+    {
+      id: "brazil-compliance-review",
+      title: "Brazil compliance review closed",
+      field: "brazilComplianceReviewedAt",
+      passed: isIsoDate(config.brazilComplianceReviewedAt),
+      evidence: "BRAZIL_COMPLIANCE.md, BRAZIL_COMPLIANCE_AGENTS.md, and human accounting/legal review notes.",
+      fix: "Close CNPJ/fiscal/LGPD/payment support review with a responsible human."
+    },
+    {
+      id: "ai-handoff-review",
+      title: "AI legal handoff reviewed",
+      field: "aiHandoffReviewedAt",
+      passed: isIsoDate(config.aiHandoffReviewedAt),
+      evidence: "AI_LEGAL_HANDOFF.md and the responsible human review record.",
+      fix: "Confirm which AI-prepared text remains draft-only and which human-owned changes are accepted."
+    },
+    {
+      id: "brazil-config",
+      title: "Public config remains Brazil-first",
+      field: "jurisdiction + aiGeneratedLegalDocsRequireHumanReview",
+      passed: config.jurisdiction === "BR" && config.aiGeneratedLegalDocsRequireHumanReview === true,
+      evidence: "public-config.js jurisdiction and AI review flags.",
+      fix: "Keep jurisdiction BR and require human review for AI-generated legal docs."
+    }
+  ];
+}
+
+function buildLiveEvidenceModel() {
+  const config = publicOrderConfig();
+  const coreRows = coreLiveEvidenceRows(config);
+  const evidenceBlockers = coreRows.filter((row) => !row.passed);
+  const liveModeSafe = config.liveMode !== true || evidenceBlockers.length === 0;
+  const rows = [
+    ...coreRows,
+    {
+      id: "live-mode-last",
+      title: "Live mode stays last",
+      field: "liveMode",
+      passed: liveModeSafe,
+      evidence: "public-config.js must stay false until all external evidence rows are real.",
+      fix: "Set liveMode true only after --require-live passes with real external evidence.",
+      stateLabel: config.liveMode === true ? "On" : "Off"
+    }
+  ];
+  const blockers = rows.filter((row) => !row.passed);
+  const readyToTurnOn = evidenceBlockers.length === 0 && liveModeSafe;
+  return {
+    config,
+    rows,
+    blockers,
+    evidenceBlockers,
+    readyToTurnOn,
+    liveMode: config.liveMode === true,
+    state: readyToTurnOn ? "External evidence ready" : "External evidence blocked",
+    tone: blockers.length ? "red" : "green",
+    nextAction: evidenceBlockers.length
+      ? evidenceBlockers[0].fix
+      : config.liveMode === true
+        ? "Keep monitoring support, intake, reviews, payments, incidents, and receipt-chain seals."
+        : "Run the external live packet validator and --require-live before flipping liveMode."
+  };
+}
+
+function liveEvidencePacket() {
+  const model = buildLiveEvidenceModel();
+  const config = model.config;
+  const missing = model.evidenceBlockers.length
+    ? model.evidenceBlockers.map((row) => `- ${row.title} (${row.field}): ${row.fix}`).join("\n")
+    : "- No missing external evidence rows detected in the public config.";
+  const rows = model.rows
+    .map((row) => `- ${row.title}: ${row.passed ? "pass" : "block"} / ${row.field}`)
+    .join("\n");
+  return [
+    "Strange Company external live evidence packet",
+    `Generated: ${new Date().toISOString()}`,
+    `Operator: ${config.operatorName || "not configured"}`,
+    `Jurisdiction: ${config.jurisdiction || "not configured"}`,
+    `Live mode: ${config.liveMode === true ? "true" : "false"}`,
+    "",
+    "[Public Config Snapshot]",
+    `supportEmail: ${config.supportEmail || ""}`,
+    `supportInboxVerified: ${config.supportInboxVerified === true}`,
+    `googleFormUrl: ${config.googleFormUrl || ""}`,
+    `googleFormVerified: ${config.googleFormVerified === true}`,
+    `termsReviewedAt: ${config.termsReviewedAt || ""}`,
+    `privacyReviewedAt: ${config.privacyReviewedAt || ""}`,
+    `brazilComplianceReviewedAt: ${config.brazilComplianceReviewedAt || ""}`,
+    `aiHandoffReviewedAt: ${config.aiHandoffReviewedAt || ""}`,
+    "",
+    "[Gate Rows]",
+    rows,
+    "",
+    "[Missing Evidence]",
+    missing,
+    "",
+    "[Validation Commands]",
+    "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live",
+    "node tools/audit_company_functionality.js --require-live",
+    "",
+    "[Stop Rules]",
+    "Do not set liveMode true until support, Google Form, terms, privacy, Brazil compliance, and AI handoff evidence are real.",
+    "Do not commit EXTERNAL_LIVE_PACKET.local.json, Sheet URLs, Stripe dashboard URLs, bank metadata, private keys, or customer secrets.",
+    "Do not treat this packet as legal, tax, privacy, fiscal, payment, or support approval."
+  ].join("\n");
+}
+
+function renderLiveEvidenceOutput(text, copied) {
+  const output = document.querySelector("#liveEvidenceOutput");
+  if (!output || !text) {
+    return;
+  }
+  output.classList.add("active");
+  output.innerHTML = `
+    <article>
+      <span class="metric-label">${copied ? "Live evidence packet copied" : "Live evidence packet generated"}</span>
+      <pre>${escapeHtml(text)}</pre>
+    </article>
+  `;
+}
+
+function renderLiveEvidencePanel() {
+  const panel = document.querySelector("#liveEvidencePanel");
+  if (!panel) {
+    return;
+  }
+  const model = buildLiveEvidenceModel();
+  const rows = model.rows
+    .map((row) => `
+      <article class="launch-evidence-row">
+        <div>
+          <span class="metric-label">${escapeHtml(row.field)}</span>
+          <h4>${escapeHtml(row.title)}</h4>
+          <p>${escapeHtml(row.evidence)}</p>
+        </div>
+        <span class="state ${row.passed ? "green" : "red"}">${escapeHtml(row.passed ? row.stateLabel || "Ready" : "Block")}</span>
+        <strong>${escapeHtml(row.passed ? "Evidence held" : row.fix)}</strong>
+      </article>
+    `)
+    .join("");
+  panel.innerHTML = `
+    <article class="launch-evidence-summary ${escapeHtml(model.tone)}">
+      <div>
+        <span class="metric-label">External live evidence</span>
+        <h3>${escapeHtml(model.state)}</h3>
+        <p>${escapeHtml(model.nextAction)} This panel reads the public config into the private command center; it does not verify outside accounts by itself.</p>
+      </div>
+      <div class="launch-evidence-counts">
+        <span><strong>${model.evidenceBlockers.length}</strong><small>Evidence gaps</small></span>
+        <span><strong>${model.liveMode ? "On" : "Off"}</strong><small>liveMode</small></span>
+      </div>
+    </article>
+    ${rows}
+  `;
+}
+
+async function copyLiveEvidencePacket(button) {
+  const packet = liveEvidencePacket();
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(packet);
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  renderLiveEvidenceOutput(packet, copied);
+  if (button) {
+    const previous = button.getAttribute("title") || "Copy live evidence packet";
+    button.setAttribute("title", copied ? "Copied" : "Copy failed");
+    setTimeout(() => {
+      button.setAttribute("title", previous);
+    }, 1500);
+  }
 }
 
 function buildLaunchDecision() {
@@ -2618,6 +2986,69 @@ function saveCustomerAcquisition() {
   }
 }
 
+function defaultAdaptiveOperator() {
+  return {
+    receipts: []
+  };
+}
+
+function adaptiveRouteFor(damageType) {
+  return ADAPTIVE_DAMAGE_ROUTES.find((route) => route.id === damageType) || ADAPTIVE_DAMAGE_ROUTES[0];
+}
+
+function normalizeAdaptiveReceipt(receipt) {
+  if (!receipt || typeof receipt !== "object") {
+    return null;
+  }
+  const route = adaptiveRouteFor(receipt.damageType);
+  const damage = String(receipt.damage || receipt.description || "").trim().slice(0, 1200);
+  if (!damage) {
+    return null;
+  }
+  const status = ["open", "routed", "closed"].includes(receipt.status) ? receipt.status : "open";
+  return {
+    id: typeof receipt.id === "string" && receipt.id ? receipt.id : `adapt-${Date.now().toString(36)}`,
+    createdAt: typeof receipt.createdAt === "string" ? receipt.createdAt : new Date().toISOString(),
+    closedAt: typeof receipt.closedAt === "string" ? receipt.closedAt : "",
+    damageType: route.id,
+    damage,
+    revealed: String(receipt.revealed || "").trim().slice(0, 1200),
+    countermeasure: String(receipt.countermeasure || route.countermeasure).trim().slice(0, 1200),
+    nextEvolution: String(receipt.nextEvolution || "").trim().slice(0, 900),
+    routeLane: String(receipt.routeLane || route.lane).trim().slice(0, 300),
+    routedAt: typeof receipt.routedAt === "string" ? receipt.routedAt : "",
+    routeTargetType: typeof receipt.routeTargetType === "string" ? receipt.routeTargetType : "",
+    routeTargetId: typeof receipt.routeTargetId === "string" ? receipt.routeTargetId : "",
+    cooldownId: typeof receipt.cooldownId === "string" ? receipt.cooldownId : "",
+    status
+  };
+}
+
+function loadAdaptiveOperator() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(ADAPTIVE_OPERATOR_KEY) || "null");
+    if (stored && typeof stored === "object") {
+      const receipts = Array.isArray(stored.receipts)
+        ? stored.receipts.map((receipt) => normalizeAdaptiveReceipt(receipt)).filter(Boolean).slice(0, 50)
+        : [];
+      return { receipts };
+    }
+  } catch {
+    // Fall through to an empty adaptive operator log.
+  }
+  return defaultAdaptiveOperator();
+}
+
+function saveAdaptiveOperator() {
+  try {
+    localStorage.setItem(ADAPTIVE_OPERATOR_KEY, JSON.stringify({
+      receipts: (adaptiveOperator.receipts || []).slice(0, 50)
+    }));
+  } catch {
+    // Local storage can be unavailable in hardened browser contexts.
+  }
+}
+
 function loadSalesLeads() {
   try {
     const stored = JSON.parse(localStorage.getItem(SALES_LEADS_KEY) || "null");
@@ -3538,7 +3969,7 @@ function renderSatelliteCompany() {
           <span><strong>${model.customersNeededFor3k}</strong><small>Proof-sprint customers to $3K</small></span>
           <span><strong>${model.customersNeededFor5k}</strong><small>Proof-sprint customers to $5K</small></span>
         </div>
-        <p>Related-party work is never market proof. Keep the first profit evidence tied to normal invoices, external buyers, and the manual Stripe plus Sheet ledger route.</p>
+        <p>Related-party work is never market proof. Keep the first profit evidence tied to normal invoices, external buyers, the reviewed payment route, fiscal evidence, and the Sheet ledger.</p>
       </article>
     `;
   }
@@ -3772,7 +4203,7 @@ function leadQualificationPacket(lead) {
 function leadInvoicePacket(lead) {
   const service = leadService(lead);
   return [
-    `Stripe invoice creation packet for ${lead.customer}`,
+    `Manual payment and fiscal packet for ${lead.customer}`,
     `Lead id: ${lead.id}`,
     `Contact: ${lead.contact || "Not recorded"}`,
     `Service: ${service?.title || lead.serviceId}`,
@@ -3780,11 +4211,12 @@ function leadInvoicePacket(lead) {
     `Qualification note: ${lead.qualificationNote || "Not recorded"}`,
     "",
     "Manual steps:",
-    "1. Create the Stripe Hosted Invoice manually in the LLC Stripe account.",
-    "2. Copy the hosted invoice URL.",
-    "3. Convert or update the Operations order.",
-    "4. Paste the hosted URL into the order and Sheet ledger.",
-    "5. Mark Sent only after the invoice is actually sent.",
+    "1. Create the reviewed hosted payment request or manual invoice for the Brazilian operator.",
+    "2. Confirm the NFS-e or fiscal receipt step with the accountant-approved process.",
+    "3. Copy the hosted payment/invoice URL.",
+    "4. Convert or update the Operations order.",
+    "5. Paste the hosted URL into the order and Sheet ledger.",
+    "6. Mark Sent only after the payment request is actually sent.",
     "",
     "Static site boundary: no card data, no auto-created invoices, no customer-private records."
   ].join("\n");
@@ -3843,6 +4275,115 @@ function buildSetupEvidenceModel() {
   };
 }
 
+function buildBrazilComplianceAgentsModel() {
+  const setupModel = buildSetupEvidenceModel();
+  const byId = new Map(setupModel.records.map((record) => [record.id, record]));
+  const agents = BRAZIL_COMPLIANCE_AGENTS.map((agent) => {
+    const records = agent.setupIds
+      .map((id) => byId.get(id))
+      .filter(Boolean);
+    const verified = records.filter((record) => record.status === "verified");
+    const pending = records.filter((record) => record.status === "pending");
+    const blocked = records.filter((record) => record.status === "blocked");
+    const missing = records.filter((record) => record.status === "missing");
+    const openRecords = records.filter((record) => record.status !== "verified");
+    let status = "Missing evidence";
+    let tone = "red";
+    if (blocked.length) {
+      status = "Blocked";
+      tone = "red";
+    } else if (records.length && verified.length === records.length) {
+      status = "Ready for human sign-off";
+      tone = "green";
+    } else if (pending.length || verified.length) {
+      status = "In review";
+      tone = "amber";
+    }
+    const nextRecord = openRecords[0];
+    const nextAction = nextRecord
+      ? `Close Setup Evidence: ${nextRecord.label}.`
+      : "Record the human sign-off dates before enabling live mode.";
+    return {
+      ...agent,
+      records,
+      verifiedCount: verified.length,
+      totalCount: records.length,
+      pendingCount: pending.length,
+      blockedCount: blocked.length,
+      missingCount: missing.length,
+      openRecords,
+      allVerified: records.length > 0 && verified.length === records.length,
+      status,
+      tone,
+      nextAction
+    };
+  });
+  const ready = agents.filter((agent) => agent.allVerified);
+  const blockedAgents = agents.filter((agent) => agent.blockedCount > 0);
+  const missingAgents = agents.filter((agent) => agent.missingCount > 0);
+  let state = "Human closure needed";
+  let tone = "amber";
+  if (blockedAgents.length) {
+    state = "Compliance blocked";
+    tone = "red";
+  } else if (ready.length === agents.length) {
+    state = "Prepared for final review";
+    tone = "green";
+  } else if (ready.length === 0 && missingAgents.length === agents.length) {
+    state = "Not started";
+    tone = "red";
+  }
+  const firstOpen = agents.find((agent) => !agent.allVerified);
+  return {
+    agents,
+    readyCount: ready.length,
+    blockedCount: blockedAgents.length,
+    missingCount: missingAgents.length,
+    totalCount: agents.length,
+    state,
+    tone,
+    nextAction: firstOpen ? firstOpen.nextAction : "Have the lawyer/accountant/operator review the final Brazil and AI handoff gates."
+  };
+}
+
+function brazilComplianceAgentPacket(agentId) {
+  const model = buildBrazilComplianceAgentsModel();
+  const agent = model.agents.find((item) => item.id === agentId) || model.agents[0];
+  if (!agent) {
+    return "No Brazil compliance agent found.";
+  }
+  const evidenceRows = agent.records.length
+    ? agent.records.map((record) => {
+      const verifiedAt = record.verifiedAt ? `; verified ${formatReceiptDate(record.verifiedAt)}` : "";
+      const url = record.evidenceUrl ? `; evidence ${record.evidenceUrl}` : "";
+      const note = record.operatorNote ? `; note ${record.operatorNote}` : "";
+      return `- ${record.label}: ${record.status}${verifiedAt}${url}${note}`;
+    })
+    : ["- No linked Setup Evidence rows."];
+  return [
+    `Brazil compliance agent: ${agent.title}`,
+    `Status: ${agent.status}`,
+    `Next action: ${agent.nextAction}`,
+    "",
+    "AI can prepare:",
+    agent.aiCan,
+    "",
+    "Human must close:",
+    agent.humanMust,
+    "",
+    "Evidence required:",
+    agent.evidence,
+    "",
+    "Linked Setup Evidence:",
+    ...evidenceRows,
+    "",
+    "Stop rule:",
+    agent.stopRule,
+    "",
+    "Boundary: AI output is draft preparation only. It is not legal, tax, accounting, privacy, payment-provider, or public-authority approval."
+  ].join("\n");
+}
+
 function buildProfitReadiness() {
   const satelliteModel = buildSatelliteCompanyModel();
   const operationsModel = buildOperationsModel();
@@ -3886,7 +4427,7 @@ function buildProfitReadiness() {
   } else if (!blockers.length && invoiceReadyLeads.length > 0) {
     state = "Invoice ready";
     tone = "green";
-    nextAction = "Create a manual Stripe Hosted Invoice for the invoice-ready lead.";
+    nextAction = "Create the manual payment request and fiscal evidence packet for the invoice-ready lead.";
   } else if (!blockers.length) {
     state = "Sell today";
     tone = "green";
@@ -4050,7 +4591,7 @@ function buildOperationsModel() {
       state: "Ready for intake",
       tone: "amber",
       headline: "The operating lane is ready to accept the first order.",
-      detail: "Add an external customer order, issue a manual Stripe invoice, and deliver only the scoped service."
+      detail: "Add an external customer order, issue the reviewed manual payment request, and deliver only the scoped service."
     };
   }
 
@@ -4060,7 +4601,7 @@ function buildOperationsModel() {
       state: "Ready to invoice",
       tone: "amber",
       headline: "Orders can move through manual Stripe invoicing.",
-      detail: "Create the Stripe invoice, paste the hosted URL into the order, and mark Paid only after funds settle."
+      detail: "Create the payment request, paste the hosted URL into the order, and mark Paid only after funds settle and fiscal evidence reconciles."
     };
   }
 
@@ -4187,7 +4728,7 @@ function buildRevenueStartModel() {
   } else if (!openRequired.length && !readiness.blockers.length && readiness.invoiceReadyLeadCount > 0) {
     state = "Invoice ready";
     tone = "green";
-    nextAction = "Create the manual Stripe Hosted Invoice and move the order through the Sheet ledger.";
+    nextAction = "Create the manual payment request, handle the fiscal evidence, and move the order through the Sheet ledger.";
   } else if (!openRequired.length && !readiness.blockers.length) {
     state = "Sell today";
     tone = "green";
@@ -4381,7 +4922,7 @@ function revenueStartPacket(packet) {
     "Day-one sequence:",
     "1. Keep Strange Company sealed; do not invoice customers directly from the sealed lane.",
     "2. Run revenue through Strange Works Studio only after external setup evidence and commercial controls are real.",
-    "3. Use a manually created Stripe Hosted Invoice and mirror the row into the Sheet ledger.",
+    "3. Use a manually created payment request or hosted invoice and mirror the row into the Sheet ledger.",
     "4. Start and close the Daily pilot run, attach incidents if any, and seal the receipt chain after material changes.",
     "",
     "Boundary: this packet is an operator receipt. It is not legal formation, tax advice, accounting software, payment automation, or customer-data storage."
@@ -4724,6 +5265,474 @@ function draftGrowthTreasuryProposal(button) {
   }
 }
 
+function buildAdaptiveOperatorModel() {
+  const receipts = adaptiveOperator.receipts || [];
+  const latestReceipt = receipts[0] || null;
+  const openReceipts = receipts.filter((receipt) => receipt.status === "open");
+  const routedReceipts = receipts.filter((receipt) => receipt.status === "routed" || receipt.routeTargetId);
+  const setupModel = buildSetupEvidenceModel();
+  const complianceModel = buildBrazilComplianceAgentsModel();
+  const revenueStartModel = buildRevenueStartModel();
+  const operationsModel = buildOperationsModel();
+  const launchDecision = buildLaunchDecision();
+  const currentDamage = [];
+  if (launchDecision.blockers && launchDecision.blockers.length) currentDamage.push("live gate blockers");
+  if (!setupModel.allVerified) currentDamage.push("missing setup evidence");
+  if (setupModel.blockedIds.length) currentDamage.push("blocked setup evidence");
+  if (complianceModel.blockedCount) currentDamage.push("Brazil compliance blockers");
+  if (operationsModel.pausedReason) currentDamage.push("daily run stop rules");
+  if (revenueStartModel.blockers.length) currentDamage.push("revenue start blockers");
+
+  let state = "Protocol armed";
+  let tone = "amber";
+  let nextAction = "Use the protocol when a command, plan, customer step, or live gate fails.";
+  if (openReceipts.length) {
+    state = "Adaptation open";
+    tone = "red";
+    nextAction = `Close or route ${openReceipts.length} open adaptation receipt${openReceipts.length === 1 ? "" : "s"}.`;
+  } else if (currentDamage.length) {
+    state = "Damage detected";
+    tone = "amber";
+    nextAction = `Record the highest-risk signal: ${currentDamage[0]}.`;
+  } else if (latestReceipt) {
+    state = "Adapted";
+    tone = "green";
+    nextAction = "Keep the latest countermeasure in the receipt chain and watch for the next blocker.";
+  }
+
+  return {
+    receipts,
+    latestReceipt,
+    openReceipts,
+    routedReceipts,
+    currentDamage: Array.from(new Set(currentDamage)),
+    state,
+    tone,
+    nextAction
+  };
+}
+
+function adaptiveReceiptPacket(receipt) {
+  const route = adaptiveRouteFor(receipt.damageType);
+  return [
+    "Strange Company adaptive operator receipt",
+    `Receipt id: ${receipt.id}`,
+    `Created: ${receipt.createdAt}`,
+    `Status: ${receipt.status}`,
+    `Damage type: ${route.label}`,
+    `Routing lane: ${receipt.routeLane || route.lane}`,
+    receipt.routeTargetId ? `Route target: ${receipt.routeTargetType || "execution-packet"} / ${receipt.routeTargetId}` : "Route target: not issued",
+    receipt.cooldownId ? `Cooldown lane: ${receipt.cooldownId}` : "",
+    "",
+    "[Damage Received]",
+    receipt.damage,
+    "",
+    "[Adaptation Complete]",
+    receipt.revealed || "Not recorded.",
+    "",
+    "[Countermeasure]",
+    receipt.countermeasure || route.countermeasure,
+    "",
+    "[Next Evolution]",
+    receipt.nextEvolution || "If this countermeasure fails, narrow the scope and issue a human handoff or hardening packet.",
+    "",
+    "Boundary: this receipt cannot turn on live intake, certify legal/tax/privacy review, accept payment, expose private state, or replace external evidence."
+  ].join("\n");
+}
+
+function renderAdaptiveOperatorOutput(text, copied) {
+  const output = document.querySelector("#adaptiveOperatorOutput");
+  if (!output || !text) {
+    return;
+  }
+  output.innerHTML = `
+    <article>
+      <span class="metric-label">${copied ? "Adaptive receipt copied" : "Adaptive receipt generated"}</span>
+      <pre>${escapeHtml(text)}</pre>
+    </article>
+  `;
+}
+
+function renderAdaptiveOperator() {
+  const panel = document.querySelector("#adaptiveOperatorPanel");
+  if (!panel) {
+    return;
+  }
+  const model = buildAdaptiveOperatorModel();
+  const routeOptions = ADAPTIVE_DAMAGE_ROUTES
+    .map((route) => `<option value="${escapeHtml(route.id)}">${escapeHtml(route.label)}</option>`)
+    .join("");
+  const currentDamage = model.currentDamage.length
+    ? model.currentDamage.map((item) => `<span class="state amber">${escapeHtml(item)}</span>`).join("")
+    : `<span class="state green">no automatic blocker signal</span>`;
+  const receiptCards = model.receipts.length
+    ? model.receipts.slice(0, 8).map((receipt) => {
+        const route = adaptiveRouteFor(receipt.damageType);
+        const tone = receipt.status === "closed" ? "green" : receipt.status === "routed" ? "amber" : "red";
+        const routeDisabled = receipt.routeTargetId || receipt.status === "closed" ? "disabled" : "";
+        const routedLine = receipt.routeTargetId
+          ? `<p><strong>Routed:</strong> ${escapeHtml(receipt.routeTargetType || "execution-packet")} / ${escapeHtml(receipt.routeTargetId)}</p>`
+          : "";
+        const cooldownLine = receipt.cooldownId
+          ? `<p><strong>Cooldown:</strong> ${escapeHtml(receipt.cooldownId)}</p>`
+          : "";
+        return `
+          <article class="adaptive-receipt-card">
+            <div>
+              <span class="metric-label">${escapeHtml(formatReceiptDate(receipt.createdAt))}</span>
+              <h4>${escapeHtml(route.label)}</h4>
+              <p>${escapeHtml(receipt.damage)}</p>
+              <p><strong>Route:</strong> ${escapeHtml(receipt.routeLane || route.lane)}</p>
+              ${routedLine}
+              ${cooldownLine}
+            </div>
+            <span class="state ${tone}">${escapeHtml(receipt.status)}</span>
+            <div class="adaptive-receipt-actions">
+              <button type="button" data-route-adaptive-receipt="${escapeHtml(receipt.id)}" ${routeDisabled}>Route</button>
+              <button type="button" data-copy-adaptive-receipt="${escapeHtml(receipt.id)}">Copy</button>
+              <button type="button" data-close-adaptive-receipt="${escapeHtml(receipt.id)}" ${receipt.status === "closed" ? "disabled" : ""}>Close</button>
+              <button type="button" data-remove-adaptive-receipt="${escapeHtml(receipt.id)}">Remove</button>
+            </div>
+          </article>
+        `;
+      }).join("")
+    : `
+      <article class="adaptive-receipt-card empty">
+        <span class="metric-label">No adaptation receipts yet</span>
+        <p>Record one when a command fails, an external gate blocks progress, a customer objects, or a plan needs to change.</p>
+      </article>
+    `;
+
+  panel.innerHTML = `
+    <article class="adaptive-operator-card ${escapeHtml(model.tone)}">
+      <div>
+        <span class="metric-label">Adaptive operator protocol</span>
+        <h3>${escapeHtml(model.state)}</h3>
+        <p>${escapeHtml(model.nextAction)} Damage is information; the next action must become smaller, safer, or better evidenced.</p>
+      </div>
+      <div class="adaptive-operator-metrics">
+        <span><strong>${model.receipts.length}</strong><small>Receipts</small></span>
+        <span><strong>${model.openReceipts.length}</strong><small>Open</small></span>
+        <span><strong>${model.currentDamage.length}</strong><small>Current blockers</small></span>
+        <span><strong>${escapeHtml(model.latestReceipt ? adaptiveRouteFor(model.latestReceipt.damageType).label : "None")}</strong><small>Latest route</small></span>
+      </div>
+      <div class="growth-review-blockers">${currentDamage}</div>
+    </article>
+    <form class="adaptive-operator-form" id="adaptiveOperatorForm" autocomplete="off">
+      <div class="field-row">
+        <label class="field" for="adaptiveDamageType">
+          <span>Damage type</span>
+          <select id="adaptiveDamageType" name="damageType">${routeOptions}</select>
+        </label>
+        <label class="field" for="adaptiveStatus">
+          <span>Status</span>
+          <select id="adaptiveStatus" name="status">
+            <option value="open">open</option>
+            <option value="routed">routed</option>
+            <option value="closed">closed</option>
+          </select>
+        </label>
+      </div>
+      <label class="field" for="adaptiveDamage">
+        <span>Damage received</span>
+        <textarea id="adaptiveDamage" name="damage" rows="3" required placeholder="What failed, changed, became unsafe, or blocked progress?"></textarea>
+      </label>
+      <label class="field" for="adaptiveRevealed">
+        <span>What the damage revealed</span>
+        <textarea id="adaptiveRevealed" name="revealed" rows="2" placeholder="What assumption was weak or incomplete?"></textarea>
+      </label>
+      <label class="field" for="adaptiveCountermeasure">
+        <span>Countermeasure</span>
+        <textarea id="adaptiveCountermeasure" name="countermeasure" rows="2" placeholder="Next smallest safe action. Leave blank to use the route default."></textarea>
+      </label>
+      <label class="field" for="adaptiveNextEvolution">
+        <span>Next evolution if this fails</span>
+        <textarea id="adaptiveNextEvolution" name="nextEvolution" rows="2" placeholder="What to try next if this countermeasure fails?"></textarea>
+      </label>
+      <button class="primary-action" type="submit">
+        <i data-lucide="file-plus-2"></i>
+        <span>Record adaptation</span>
+      </button>
+      <p class="evidence-form-error" id="adaptiveOperatorError" hidden></p>
+    </form>
+    <div class="adaptive-operator-output" id="adaptiveOperatorOutput" aria-live="polite"></div>
+    <div class="adaptive-receipt-list">${receiptCards}</div>
+  `;
+
+  const form = document.querySelector("#adaptiveOperatorForm");
+  if (form) {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      recordAdaptiveReceipt(form);
+    });
+  }
+  document.querySelectorAll("[data-copy-adaptive-receipt]").forEach((button) => {
+    button.addEventListener("click", () => copyAdaptiveReceipt(button.dataset.copyAdaptiveReceipt, button));
+  });
+  document.querySelectorAll("[data-route-adaptive-receipt]").forEach((button) => {
+    button.addEventListener("click", () => routeAdaptiveReceipt(button.dataset.routeAdaptiveReceipt));
+  });
+  document.querySelectorAll("[data-close-adaptive-receipt]").forEach((button) => {
+    button.addEventListener("click", () => closeAdaptiveReceipt(button.dataset.closeAdaptiveReceipt));
+  });
+  document.querySelectorAll("[data-remove-adaptive-receipt]").forEach((button) => {
+    button.addEventListener("click", () => removeAdaptiveReceipt(button.dataset.removeAdaptiveReceipt));
+  });
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+}
+
+function showAdaptiveOperatorError(message) {
+  const target = document.querySelector("#adaptiveOperatorError");
+  if (!target) return;
+  target.textContent = message || "";
+  target.hidden = !message;
+}
+
+function recordAdaptiveReceipt(form) {
+  const formData = new FormData(form);
+  const damageType = String(formData.get("damageType") || "");
+  const route = adaptiveRouteFor(damageType);
+  const damage = String(formData.get("damage") || "").trim();
+  const revealed = String(formData.get("revealed") || "").trim();
+  const countermeasure = String(formData.get("countermeasure") || "").trim() || route.countermeasure;
+  const nextEvolution = String(formData.get("nextEvolution") || "").trim();
+  const status = String(formData.get("status") || "open");
+  if (!damage) {
+    showAdaptiveOperatorError("Record what failed or changed first.");
+    return;
+  }
+  const sensitive = findSensitiveData([damage, revealed, countermeasure, nextEvolution].join("\n"));
+  if (sensitive.length) {
+    showAdaptiveOperatorError(`Receipt text contains ${sensitive.join(", ")}. Strip and retry.`);
+    return;
+  }
+  const receipt = normalizeAdaptiveReceipt({
+    id: `adapt-${Date.now().toString(36)}`,
+    createdAt: new Date().toISOString(),
+    damageType: route.id,
+    damage,
+    revealed,
+    countermeasure,
+    nextEvolution,
+    routeLane: route.lane,
+    status
+  });
+  if (!receipt) {
+    showAdaptiveOperatorError("Unable to create adaptation receipt.");
+    return;
+  }
+  adaptiveOperator.receipts = [receipt, ...(adaptiveOperator.receipts || [])].slice(0, 50);
+  saveAdaptiveOperator();
+  form.reset();
+  renderAdaptiveOperator();
+  renderAdaptiveOperatorOutput(adaptiveReceiptPacket(receipt), false);
+  renderReceiptChain();
+  renderLogs();
+}
+
+async function copyAdaptiveReceipt(receiptId, button) {
+  const receipt = (adaptiveOperator.receipts || []).find((item) => item.id === receiptId);
+  if (!receipt) {
+    return;
+  }
+  const packet = adaptiveReceiptPacket(receipt);
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(packet);
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  renderAdaptiveOperatorOutput(packet, copied);
+  if (button) {
+    const previous = button.textContent;
+    button.textContent = copied ? "Copied" : "Copy failed";
+    setTimeout(() => {
+      button.textContent = previous;
+    }, 1500);
+  }
+}
+
+function copyLatestAdaptiveReceipt(button) {
+  const latest = (adaptiveOperator.receipts || [])[0];
+  if (!latest) {
+    renderAdaptiveOperatorOutput("No adaptive receipt exists yet.", false);
+    return;
+  }
+  copyAdaptiveReceipt(latest.id, button);
+}
+
+function adaptiveReceiptNeedsCooldown(receipt) {
+  return ["growth-experiment", "customer-objection"].includes(receipt.damageType);
+}
+
+function adaptiveRouteDue(receipt) {
+  if (["live-gate", "brazil-compliance", "google-form", "support-incident", "customer-order"].includes(receipt.damageType)) {
+    return "1 day";
+  }
+  if (receipt.damageType === "security-resilience") {
+    return "2 days";
+  }
+  return "3 days";
+}
+
+function adaptiveRoutePacketTitle(receipt) {
+  const route = adaptiveRouteFor(receipt.damageType);
+  if (receipt.damageType === "security-resilience") {
+    return `Harden adaptive weakness: ${route.label}`;
+  }
+  return `Route adaptive receipt: ${route.label}`;
+}
+
+function adaptiveRoutePacketDetail(receipt) {
+  return [
+    `Damage: ${receipt.damage}`,
+    receipt.revealed ? `Revealed: ${receipt.revealed}` : "",
+    `Countermeasure: ${receipt.countermeasure || adaptiveRouteFor(receipt.damageType).countermeasure}`,
+    receipt.nextEvolution ? `Next evolution: ${receipt.nextEvolution}` : ""
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 1800);
+}
+
+function issueAdaptiveExecutionPacket(receipt) {
+  const route = adaptiveRouteFor(receipt.damageType);
+  const packetId = `adaptive-packet-${slugify(receipt.id) || Date.now().toString(36)}`;
+  const existing = executionPackets.find((packet) => packet.id === packetId);
+  if (existing) {
+    return existing;
+  }
+  const packet = {
+    id: packetId,
+    title: adaptiveRoutePacketTitle(receipt),
+    detail: adaptiveRoutePacketDetail(receipt),
+    budget: 0,
+    due: adaptiveRouteDue(receipt),
+    state: "Open",
+    source: `Adaptive operator / ${receipt.id}`,
+    acceptance: [
+      `Execute the recorded countermeasure for ${route.label}.`,
+      "Keep public live intake closed unless external evidence and review dates are real.",
+      receipt.damageType === "security-resilience" ? "Add or update a survival check if the weakness is structural." : ""
+    ].filter(Boolean).join(" "),
+    adaptiveReceiptId: receipt.id,
+    adaptiveDamageType: receipt.damageType,
+    createdAt: new Date().toISOString()
+  };
+  executionPackets.unshift(packet);
+  return packet;
+}
+
+function issueAdaptiveCooldownLane(receipt) {
+  if (!adaptiveReceiptNeedsCooldown(receipt)) {
+    return "";
+  }
+  const cooldownId = `cooldown-adapt-${slugify(receipt.id) || Date.now().toString(36)}`;
+  const existing = cooldownLanes.find((lane) => lane.id === cooldownId);
+  if (existing) {
+    return existing.id;
+  }
+  const route = adaptiveRouteFor(receipt.damageType);
+  cooldownLanes.unshift({
+    id: cooldownId,
+    lane: receipt.damageType === "customer-objection" ? "Customer objection route" : "Experiment or spend route",
+    reason: [
+      receipt.damage,
+      receipt.revealed ? `Revealed: ${receipt.revealed}` : "",
+      `Countermeasure: ${receipt.countermeasure || route.countermeasure}`
+    ].filter(Boolean).join(" "),
+    source: `Adaptive operator / ${receipt.id}`,
+    sourceAdaptationId: receipt.id,
+    expires: "2 cycles",
+    createdAt: new Date().toISOString()
+  });
+  return cooldownId;
+}
+
+function routeAdaptiveReceipt(receiptId) {
+  const receipt = (adaptiveOperator.receipts || []).find((item) => item.id === receiptId);
+  if (!receipt) {
+    return;
+  }
+  const sensitive = findSensitiveData([
+    receipt.damage,
+    receipt.revealed,
+    receipt.countermeasure,
+    receipt.nextEvolution
+  ].join("\n"));
+  if (sensitive.length) {
+    showAdaptiveOperatorError(`Receipt text contains ${sensitive.join(", ")}. Strip and retry.`);
+    return;
+  }
+
+  const packet = issueAdaptiveExecutionPacket(receipt);
+  const cooldownId = issueAdaptiveCooldownLane(receipt) || receipt.cooldownId || "";
+  const routedAt = receipt.routedAt || new Date().toISOString();
+  adaptiveOperator.receipts = (adaptiveOperator.receipts || []).map((item) =>
+    item.id === receipt.id
+      ? {
+          ...item,
+          status: "routed",
+          routedAt,
+          routeTargetType: "execution-packet",
+          routeTargetId: packet.id,
+          cooldownId
+        }
+      : item
+  );
+
+  saveExecutionPackets();
+  if (cooldownId) {
+    saveCooldownLanes();
+  }
+  saveAdaptiveOperator();
+  renderAdaptiveOperator();
+  renderBounties();
+  renderCooldownLanes();
+  renderReceiptChain();
+  renderLogs();
+  renderAdaptiveOperatorOutput([
+    "Adaptive receipt routed",
+    `Receipt id: ${receipt.id}`,
+    `Execution packet: ${packet.id}`,
+    cooldownId ? `Cooldown lane: ${cooldownId}` : "",
+    "",
+    "Boundary: this is a private no-spend action packet. It does not turn on live intake or certify external evidence."
+  ].filter((line) => line !== "").join("\n"), false);
+}
+
+function closeAdaptiveReceipt(receiptId) {
+  const now = new Date().toISOString();
+  adaptiveOperator.receipts = (adaptiveOperator.receipts || []).map((receipt) =>
+    receipt.id === receiptId
+      ? { ...receipt, status: "closed", closedAt: receipt.closedAt || now }
+      : receipt
+  );
+  saveAdaptiveOperator();
+  renderAdaptiveOperator();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function removeAdaptiveReceipt(receiptId) {
+  adaptiveOperator.receipts = (adaptiveOperator.receipts || []).filter((receipt) => receipt.id !== receiptId);
+  saveAdaptiveOperator();
+  renderAdaptiveOperator();
+  renderReceiptChain();
+  renderLogs();
+}
+
+function resetAdaptiveOperator() {
+  adaptiveOperator = defaultAdaptiveOperator();
+  saveAdaptiveOperator();
+  renderAdaptiveOperator();
+  renderReceiptChain();
+  renderLogs();
+}
+
 function renderSetupEvidence() {
   const panel = document.querySelector("#setupEvidencePanel");
   if (!panel) return;
@@ -4783,7 +5792,7 @@ function renderSetupEvidence() {
       <div>
         <span class="metric-label">Setup evidence</span>
         <h3>${escapeHtml(model.state)}</h3>
-        <p>Operator-asserted proof of external setup. The repo cannot certify LLC, EIN, bank, or Stripe completion by itself; verified rows mean the operator confirmed the artifact outside this prototype.</p>
+        <p>Operator-asserted proof of external setup. The repo cannot certify Brazilian entity, CNPJ, tax regime, NFS-e, bank/payment, support, or LGPD completion by itself; verified rows mean the operator confirmed the artifact outside this prototype.</p>
       </div>
       <div class="setup-evidence-counts">
         <span><strong>${verifiedCount}/${total}</strong><small>Verified</small></span>
@@ -4813,6 +5822,115 @@ function renderSetupEvidence() {
   document.querySelectorAll("[data-save-evidence]").forEach((btn) => {
     btn.addEventListener("click", () => saveSetupEvidenceCard(btn.dataset.saveEvidence, btn));
   });
+  renderBrazilComplianceAgents();
+}
+
+function renderBrazilComplianceAgents() {
+  const panel = document.querySelector("#brazilComplianceAgentsPanel");
+  if (!panel) return;
+  const model = buildBrazilComplianceAgentsModel();
+  const agentCards = model.agents
+    .map((agent) => {
+      const rows = agent.records
+        .map((record) => {
+          const tone = record.status === "verified" ? "green" : record.status === "blocked" ? "red" : record.status === "pending" ? "amber" : "";
+          return `
+            <li>
+              <span>${escapeHtml(record.label)}</span>
+              <strong class="state ${tone}">${escapeHtml(record.status)}</strong>
+            </li>
+          `;
+        })
+        .join("");
+      return `
+        <article class="compliance-agent-card ${escapeHtml(agent.tone)}">
+          <div class="compliance-agent-head">
+            <div>
+              <span class="metric-label">AI prep / human closure</span>
+              <h4>${escapeHtml(agent.title)}</h4>
+            </div>
+            <span class="state ${escapeHtml(agent.tone)}">${escapeHtml(agent.status)}</span>
+          </div>
+          <p>${escapeHtml(agent.nextAction)}</p>
+          <dl class="compliance-agent-work">
+            <div>
+              <dt>AI prepares</dt>
+              <dd>${escapeHtml(agent.aiCan)}</dd>
+            </div>
+            <div>
+              <dt>Human closes</dt>
+              <dd>${escapeHtml(agent.humanMust)}</dd>
+            </div>
+            <div>
+              <dt>Evidence</dt>
+              <dd>${escapeHtml(agent.evidence)}</dd>
+            </div>
+          </dl>
+          <ul class="compliance-agent-evidence">${rows}</ul>
+          <div class="compliance-agent-footer">
+            <span>${escapeHtml(agent.stopRule)}</span>
+            <button type="button" data-copy-compliance-agent="${escapeHtml(agent.id)}">
+              <i data-lucide="copy"></i>
+              <span>Copy packet</span>
+            </button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+  panel.innerHTML = `
+    <article class="compliance-agent-summary ${escapeHtml(model.tone)}">
+      <div>
+        <span class="metric-label">Brazil compliance agents</span>
+        <h3>${escapeHtml(model.state)}</h3>
+        <p>${escapeHtml(model.nextAction)} Agents organize draft work for CNPJ/entity, tax, NFS-e, LGPD, consumer terms, payment, intake, support, and AI handoff. They do not certify legal compliance.</p>
+      </div>
+      <div class="compliance-agent-counts">
+        <span><strong>${model.readyCount}/${model.totalCount}</strong><small>Ready</small></span>
+        <span><strong>${model.blockedCount}</strong><small>Blocked</small></span>
+        <span><strong>${model.missingCount}</strong><small>Missing</small></span>
+      </div>
+    </article>
+    <div class="compliance-agent-list">${agentCards}</div>
+    <div class="compliance-agent-output" id="complianceAgentOutput" aria-live="polite"></div>
+  `;
+  document.querySelectorAll("[data-copy-compliance-agent]").forEach((button) => {
+    button.addEventListener("click", () => copyBrazilComplianceAgentPacket(button.dataset.copyComplianceAgent, button));
+  });
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+}
+
+function renderComplianceAgentOutput(text, copied) {
+  const output = document.querySelector("#complianceAgentOutput");
+  if (!output) return;
+  output.innerHTML = `
+    <article>
+      <span class="metric-label">${copied ? "Agent packet copied" : "Agent packet generated"}</span>
+      <pre>${escapeHtml(text)}</pre>
+    </article>
+  `;
+}
+
+async function copyBrazilComplianceAgentPacket(agentId, button) {
+  const packet = brazilComplianceAgentPacket(agentId);
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(packet);
+    copied = true;
+  } catch {
+    copied = false;
+  }
+  renderComplianceAgentOutput(packet, copied);
+  if (button) {
+    const label = button.querySelector("span") || button;
+    const previous = label.textContent;
+    label.textContent = copied ? "Copied" : "Copy failed";
+    setTimeout(() => {
+      label.textContent = previous;
+    }, 1500);
+  }
 }
 
 function showSetupEvidenceError(slotId, message) {
@@ -5291,6 +6409,8 @@ function renderOperations() {
   renderProfitReadiness();
   renderRevenueStart();
   renderSalesPipeline();
+  renderBrazilComplianceAgents();
+  renderAdaptiveOperator();
   renderGrowthReview();
   const services = operationServices();
   const selectedService = serviceSelect.value || services[0]?.id || "";
@@ -5351,10 +6471,10 @@ function renderOperations() {
   policy.innerHTML = `
     <span class="metric-label">Operating route</span>
     <h3>${escapeHtml(operations.paymentMode)}</h3>
-    <p>Stripe Hosted Invoices are created manually. The static site never collects payment data. Each row is mirrored to the Sheet ledger.</p>
+    <p>Manual payment requests are created outside the static site. The static site never collects payment data. Each row is mirrored to the Sheet ledger and reconciled with the fiscal route.</p>
     <div class="ops-link-grid">
-      <a href="TERMS.md" target="_blank" rel="noreferrer">Terms</a>
-      <a href="PRIVACY.md" target="_blank" rel="noreferrer">Privacy</a>
+      <a href="TERMOS.md" target="_blank" rel="noreferrer">Termos</a>
+      <a href="AVISO_DE_PRIVACIDADE.md" target="_blank" rel="noreferrer">Privacidade</a>
       <a href="SUPPORT.md" target="_blank" rel="noreferrer">Support</a>
       <a href="RUN_LIVE_PILOT.md" target="_blank" rel="noreferrer">Live pilot</a>
       <span>${escapeHtml(operations.supportEmail)}</span>
@@ -5433,8 +6553,8 @@ function renderOperations() {
         const stripeLine = safeStripeInvoiceUrl
           ? `<a href="${escapeHtml(safeStripeInvoiceUrl)}" target="_blank" rel="noreferrer">Hosted invoice</a>`
           : stripeMissing
-            ? `<span class="state amber">Paste Stripe URL before send</span>`
-            : `<span class="metric-label">No Stripe URL yet</span>`;
+            ? `<span class="state amber">Paste payment URL before send</span>`
+            : `<span class="metric-label">No payment URL yet</span>`;
         const dueLine = order.deliveryDue
           ? `Delivery due ${escapeHtml(order.deliveryDue)}`
           : "Delivery date not set";
@@ -5481,7 +6601,7 @@ function renderOperations() {
             <span class="state ${tone}">${escapeHtml(order.status)}</span>
             <div class="ops-order-fields">
               <label>
-                <span>Stripe hosted invoice URL</span>
+                <span>Hosted payment/invoice URL</span>
                 <input type="text" inputmode="url" placeholder="https://invoice.stripe.com/i/..." value="${escapeHtml(order.stripeInvoiceUrl || "")}" data-stripe-url-order="${escapeHtml(order.id)}" />
               </label>
               <label>
@@ -6001,8 +7121,8 @@ function renderOrderDesk() {
     <p>${escapeHtml(firstService?.detail || "A scoped compliance proof packet service for the first operating loop.")}</p>
     <p>Use this desk for invoice requests only. Do not submit protected health information, payment credentials, passwords, private keys, or regulated source documents.</p>
     <div class="ops-link-grid">
-      <a href="TERMS.md" target="_blank" rel="noreferrer">Terms</a>
-      <a href="PRIVACY.md" target="_blank" rel="noreferrer">Privacy</a>
+      <a href="TERMOS.md" target="_blank" rel="noreferrer">Termos</a>
+      <a href="AVISO_DE_PRIVACIDADE.md" target="_blank" rel="noreferrer">Privacidade</a>
       <a href="SUPPORT.md" target="_blank" rel="noreferrer">Support</a>
       <span>${escapeHtml(operations.supportEmail)}</span>
     </div>
@@ -6428,7 +7548,7 @@ function orderAdvanceBlock(order, model) {
     return pausedReason;
   }
   if (order.status === "Draft" && !safeExternalUrl(order.stripeInvoiceUrl, STRIPE_INVOICE_URLS)) {
-    return "Paste a Stripe Hosted Invoice URL before marking Sent.";
+    return "Paste the reviewed hosted payment/invoice URL before marking Sent.";
   }
   if (order.status === "Sent" && model.openCriticalControls.length > 0) {
     return `Close ${model.openCriticalControls.length} critical control${model.openCriticalControls.length === 1 ? "" : "s"} before marking Paid.`;
@@ -6746,7 +7866,7 @@ function operationPacket(order) {
     `Status: ${order.status}`,
     `Source: ${order.source || "Operations console"}`,
     `Payment route: ${operations.paymentMode}`,
-    `Stripe invoice URL: ${order.stripeInvoiceUrl || "Not yet created"}`,
+    `Hosted payment/invoice URL: ${order.stripeInvoiceUrl || "Not yet created"}`,
     `Delivery due: ${order.deliveryDue || "Not set"}`,
     `Sheet ledger: ${integration.googleSheetUrl || "Not configured"}`,
     "",
@@ -6761,7 +7881,7 @@ function operationPacket(order) {
     "",
     "Controls:",
     "Do not request protected health information, payment credentials, passwords, or regulated source documents in v0.",
-    "Payment is collected only through a manually created Stripe Hosted Invoice. The static site never collects card data."
+    "Payment is collected only through a reviewed manual payment or hosted invoice route. The static site never collects card data."
   ].join("\n");
 }
 
@@ -7140,6 +8260,13 @@ function collectReceiptEvents() {
     });
   }
 
+  const liveEvidence = buildLiveEvidenceModel();
+  push("Live Evidence", "external-live-evidence", "External live evidence packet", "Launch gate", liveEvidence.state, "baseline", {
+    blockers: liveEvidence.evidenceBlockers.map((row) => row.id),
+    liveMode: liveEvidence.liveMode,
+    readyToTurnOn: liveEvidence.readyToTurnOn
+  });
+
   const pilotReadiness = buildPilotReadiness();
   const pilotTimes = [
     ...(revenuePilot.leads || []).map((lead) => lead.updatedAt || lead.createdAt),
@@ -7278,6 +8405,37 @@ function collectReceiptEvents() {
     qualifiedLeadCount: growthReview.readiness.qualifiedLeadCount,
     todayAttempts: growthReview.acquisition.todayAttempts,
     outreachTarget: growthReview.acquisition.target
+  });
+
+  const adaptiveModel = buildAdaptiveOperatorModel();
+  push(
+    "Adaptation",
+    "adaptive-operator",
+    "Adaptive operator protocol",
+    "Operations console",
+    adaptiveModel.state,
+    adaptiveModel.latestReceipt ? adaptiveModel.latestReceipt.createdAt : "baseline",
+    {
+      currentDamage: adaptiveModel.currentDamage.slice(0, 12),
+      latestReceiptId: adaptiveModel.latestReceipt ? adaptiveModel.latestReceipt.id : "",
+      openReceipts: adaptiveModel.openReceipts.length,
+      routedReceipts: adaptiveModel.routedReceipts.length,
+      receiptCount: adaptiveModel.receipts.length
+    }
+  );
+  adaptiveModel.receipts.forEach((receipt) => {
+    const route = adaptiveRouteFor(receipt.damageType);
+    push("Adaptation Receipt", receipt.id, route.label, "Adaptive operator", receipt.status, receipt.closedAt || receipt.routedAt || receipt.createdAt, {
+      countermeasure: receipt.countermeasure,
+      damage: receipt.damage,
+      cooldownId: receipt.cooldownId || "",
+      nextEvolution: receipt.nextEvolution,
+      revealed: receipt.revealed,
+      routeLane: receipt.routeLane || route.lane,
+      routedAt: receipt.routedAt || "",
+      routeTargetId: receipt.routeTargetId || "",
+      routeTargetType: receipt.routeTargetType || ""
+    });
   });
 
   operations.orders.forEach((order) => {
@@ -7427,6 +8585,8 @@ function collectReceiptEvents() {
   executionPackets.forEach((packet) => {
     push("Packet", packet.id, packet.title, "Execution market", packet.state, packet.outcomeAt || packet.updatedAt || packet.createdAt, {
       budget: Number(packet.budget || 0),
+      adaptiveDamageType: packet.adaptiveDamageType || "",
+      adaptiveReceiptId: packet.adaptiveReceiptId || "",
       due: packet.due,
       launchGate: Boolean(packet.launchGate),
       outcomeId: packet.outcomeId || "",
@@ -7477,6 +8637,7 @@ function collectReceiptEvents() {
       sourceSignalReference: lane.sourceSignalReference || "",
       sourceSignalSource: lane.sourceSignalSource || "",
       sourceSignalSubject: lane.sourceSignalSubject || "",
+      sourceAdaptationId: lane.sourceAdaptationId || "",
       sourceOutcomeId: lane.sourceOutcomeId || ""
     });
   });
@@ -8092,6 +9253,14 @@ function renderLogs() {
     growthReview.state,
     growthReview.tone
   ]];
+  const adaptiveModel = buildAdaptiveOperatorModel();
+  const adaptiveRows = [[
+    "Adapt",
+    `Adaptive operator: ${adaptiveModel.receipts.length} receipt${adaptiveModel.receipts.length === 1 ? "" : "s"}`,
+    "Operations console",
+    adaptiveModel.state,
+    adaptiveModel.tone
+  ]];
   const signalRows = externalSignals.slice(0, 4).map((signal) => [
     "Signal",
     `${signal.source}: ${signal.subject}`,
@@ -8168,7 +9337,7 @@ function renderLogs() {
     run.recommendation,
     toneForRecommendation(run.recommendation)
   ]);
-  log.innerHTML = [...receiptRows, ...launchRows, ...pilotRows, ...satelliteRows, ...operationsRows, ...profitRows, ...revenueStartRows, ...growthRows, ...signalRows, ...drillRows, ...routeRows, ...outcomeRows, ...executionRows, ...treasuryRows, ...gateLogRows, ...logs]
+  log.innerHTML = [...receiptRows, ...launchRows, ...pilotRows, ...satelliteRows, ...operationsRows, ...profitRows, ...revenueStartRows, ...growthRows, ...adaptiveRows, ...signalRows, ...drillRows, ...routeRows, ...outcomeRows, ...executionRows, ...treasuryRows, ...gateLogRows, ...logs]
     .map(
       ([className, entry, owner, state, tone]) => `
         <div class="log-row" role="row">
@@ -8382,6 +9551,7 @@ function setupResilienceDrills() {
 function setupLaunchGate() {
   const runButton = document.querySelector("#runLaunchCheck");
   const draftButton = document.querySelector("#draftLaunchPacket");
+  const copyEvidenceButton = document.querySelector("#copyLiveEvidencePacket");
 
   if (runButton) {
     runButton.addEventListener("click", refreshLaunchGateStatus);
@@ -8389,6 +9559,10 @@ function setupLaunchGate() {
 
   if (draftButton) {
     draftButton.addEventListener("click", issueLaunchPacket);
+  }
+
+  if (copyEvidenceButton) {
+    copyEvidenceButton.addEventListener("click", () => copyLiveEvidencePacket(copyEvidenceButton));
   }
 }
 
@@ -8500,6 +9674,14 @@ function setupOperations() {
   const resetAcquisitionButton = document.querySelector("#resetCustomerAcquisition");
   if (resetAcquisitionButton) {
     resetAcquisitionButton.addEventListener("click", () => resetCustomerAcquisition());
+  }
+  const copyLatestAdaptiveButton = document.querySelector("#copyLatestAdaptiveReceipt");
+  if (copyLatestAdaptiveButton) {
+    copyLatestAdaptiveButton.addEventListener("click", () => copyLatestAdaptiveReceipt(copyLatestAdaptiveButton));
+  }
+  const resetAdaptiveButton = document.querySelector("#resetAdaptiveOperator");
+  if (resetAdaptiveButton) {
+    resetAdaptiveButton.addEventListener("click", resetAdaptiveOperator);
   }
   const copyGrowthReviewButton = document.querySelector("#copyGrowthReview");
   if (copyGrowthReviewButton) {

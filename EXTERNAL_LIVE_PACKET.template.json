@@ -24,6 +24,8 @@
     "termsReviewedAt": "",
     "privacyReviewedAt": "",
     "supportReviewedAt": "",
+    "brazilComplianceReviewedAt": "",
+    "aiHandoffReviewedAt": "",
     "reviewer": "",
     "documentsChanged": false
   },
@@ -48,12 +50,16 @@
   },
   "publicConfig": {
     "operatorName": "Strange Works Studio",
+    "jurisdiction": "BR",
+    "aiGeneratedLegalDocsRequireHumanReview": true,
     "supportEmail": "",
     "googleFormUrl": "",
     "supportInboxVerified": false,
     "googleFormVerified": false,
     "termsReviewedAt": "",
     "privacyReviewedAt": "",
+    "brazilComplianceReviewedAt": "",
+    "aiHandoffReviewedAt": "",
     "liveMode": false
   },
   "attestation": {

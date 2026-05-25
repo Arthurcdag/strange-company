@@ -7,6 +7,9 @@ Current state:
 - [x] GitHub Pages static public prototype is deployed at `https://arthurcdag.github.io/strange-company/`.
 - [x] Issue #14 is closed: every Operations order card has an expandable receipt-chain timeline.
 - [x] Public launch preflight and company functionality audit pass locally.
+- [x] Pilot support/privacy inbox exists: `tuiidagnese+strangeworks@gmail.com`.
+- [x] Support inbox receiving test passed; see `SUPPORT_INBOX_EVIDENCE.md`.
+- [x] Google Sheet ledger/control workbook exists in Drive; keep its URL in private Setup Evidence/operator records.
 - [ ] Real live intake is not enabled. `public-config.js` still has `liveMode: false`.
 
 Do not set `liveMode: true` until every external control below is real and tested.
@@ -45,19 +48,21 @@ node tools/audit_company_functionality.js
 
 Use [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md) for the detailed setup instructions and evidence fields.
 
-- [ ] US LLC or approved operating entity is formed.
-- [ ] Responsible human party is identified for tax and banking control.
-- [ ] EIN or required tax identity is issued.
-- [ ] Business bank account is open in the operating entity name.
-- [ ] Stripe account is active, verified, and wired to the business bank account.
-- [ ] Real support inbox exists and is monitored daily.
-- [ ] Test email has been sent to and received from the support inbox.
-- [ ] Google Sheet ledger exists with tabs: `Requests`, `Invoices`, `Customers`, `Delivery`, `Incidents`, `Leads`.
-- [ ] Ledger tabs use the documented columns in `GOOGLE_SHEET_LEDGER.md`.
+- [ ] Brazilian entity/CNPJ or approved operating structure is confirmed.
+- [ ] Responsible human party is identified for tax, banking/payment, support, privacy, and customer control.
+- [ ] Tax regime, CNAE, municipal registration needs, and NFS-e/receipt route are reviewed with an accountant.
+- [ ] Business bank/payment account is open in the operating entity name.
+- [ ] Payment provider/manual invoice route is active, verified, and wired to the business bank/payment account.
+- [x] Real support inbox exists and is monitored daily.
+- [x] Test email has been sent to and received from the support inbox.
+- [x] LGPD contact or encarregado path exists and is monitored.
+- [x] Google Sheet ledger exists with tabs: `Requests`, `Invoices`, `Customers`, `Delivery`, `Incidents`, `Leads`.
+- [x] Ledger tabs use the documented columns in `GOOGLE_SHEET_LEDGER.md`.
 - [ ] Google Form intake is linked to the ledger Sheet.
 - [ ] Test Google Form submission lands in the Sheet without sensitive data.
 - [ ] Terms have been reviewed for the live offer.
 - [ ] Privacy notice has been reviewed for the live offer.
+- [ ] `BRAZIL_COMPLIANCE.md` and `AI_LEGAL_HANDOFF.md` have been reviewed for the actual launch route.
 - [ ] Incident response route is documented and owned.
 - [ ] Payment/data recovery rehearsal has been run.
 
@@ -65,10 +70,11 @@ Use [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md) for the detailed setu
 
 - [ ] Open local/private `index.html`, not the public Pages site.
 - [ ] In Operations, clear each critical launch checklist item only after matching outside evidence exists.
-- [ ] In Operations, close critical commercial controls only after legal, payment, accounting, support, terms, and privacy are real.
+- [ ] In Setup Evidence, verify entity/CNPJ, tax regime, NFS-e, bank/payment, support, LGPD contact, Sheet/Form, terms, and privacy only after matching outside evidence exists.
+- [ ] In Operations, close critical commercial controls only after legal, payment, accounting, support, terms, privacy, and AI-human review boundaries are real.
 - [ ] In Satellite, close transaction controls only after written scopes, invoices/bookkeeping, conflict review, and vendor-exit rules are real.
 - [ ] Add or import at least one safe test order.
-- [ ] Confirm `Draft -> Sent` requires a Stripe Hosted Invoice URL.
+- [ ] Confirm `Draft -> Sent` requires a reviewed hosted payment/invoice URL.
 - [ ] Confirm `Sent -> Paid` is blocked while critical Operations controls are open.
 - [ ] Confirm `Paid -> Delivered` requires an `https://` delivery artifact and acceptance note.
 - [ ] Expand `Receipt chain timeline` on the order and verify created, sent, paid, delivered, blocked, and incident events appear chronologically when present.
@@ -78,12 +84,16 @@ Use [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md) for the detailed setu
 
 Edit `public-config.js` only after sections 2 and 3 are complete.
 
-- [ ] Set `supportEmail` to the monitored inbox.
+- [x] Set `supportEmail` to the monitored inbox.
 - [ ] Set `googleFormUrl` to the verified Google Form URL.
-- [ ] Set `supportInboxVerified: true`.
+- [x] Set `supportInboxVerified: true`.
 - [ ] Set `googleFormVerified: true`.
+- [ ] Confirm `jurisdiction: "BR"`.
+- [ ] Keep `aiGeneratedLegalDocsRequireHumanReview: true`.
 - [ ] Set `termsReviewedAt` to `YYYY-MM-DD`.
 - [ ] Set `privacyReviewedAt` to `YYYY-MM-DD`.
+- [ ] Set `brazilComplianceReviewedAt` to `YYYY-MM-DD`.
+- [ ] Set `aiHandoffReviewedAt` to `YYYY-MM-DD`.
 - [ ] Confirm service names, descriptions, and prices are the approved public offer.
 - [ ] Set `liveMode: true` last.
 
@@ -106,8 +116,9 @@ Both commands must pass before publishing the config change.
 - [ ] Confirm the public readiness banner shows live intake configured.
 - [ ] Submit one safe test request with no PHI, credentials, card data, secrets, or regulated source documents.
 - [ ] Confirm the request reaches the support inbox or Google Form response Sheet.
-- [ ] Create one Stripe test invoice manually.
-- [ ] Paste the hosted invoice URL into the private Operations console.
+- [ ] Create one manual payment request or hosted invoice.
+- [ ] Confirm the NFS-e/receipt evidence route for the test.
+- [ ] Paste the hosted payment/invoice URL into the private Operations console.
 - [ ] Move the test order through `Sent`, `Paid`, and `Delivered`.
 - [ ] Confirm the order timeline and receipt chain show the full path.
 
@@ -117,9 +128,10 @@ Immediately revert `liveMode` to `false` or stop sending traffic if any of these
 
 - [ ] Support inbox is unavailable.
 - [ ] Google Form or Sheet ledger is unavailable.
-- [ ] Stripe or business bank account is restricted.
+- [ ] Payment provider, business bank account, or NFS-e/fiscal route is restricted.
+- [ ] LGPD request cannot be answered.
 - [ ] Terms or privacy need unscheduled changes.
 - [ ] A request includes regulated data or secrets.
-- [ ] Ledger, Stripe, and Operations console disagree on paid/delivered state.
+- [ ] Ledger, payment provider, fiscal evidence, and Operations console disagree on paid/delivered state.
 
 Record the failure as an incident before resuming.

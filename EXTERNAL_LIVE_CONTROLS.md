@@ -4,6 +4,8 @@ This is the developer/operator handoff for creating the outside routes that must
 
 The developer can prepare the repo and verify URLs. The operator or account owner must create and approve the support inbox, Google Form, Stripe account, bank route, terms review, and privacy review. Do not store private keys, bank numbers, tax documents, customer secrets, or payment credentials in this repo.
 
+Use `HUMAN_REVIEW_PACKET.md` as the manual close sheet before editing `public-config.js`.
+
 ## Output Values
 
 Collect these values before editing `public-config.js`:
@@ -16,6 +18,8 @@ Collect these values before editing `public-config.js`:
 | Google Form test row reached Sheet | `googleFormVerified` | yes | private Operations setup evidence |
 | Terms reviewed date | `termsReviewedAt` | yes | commit plus private review note |
 | Privacy reviewed date | `privacyReviewedAt` | yes | commit plus private review note |
+| Brazil compliance reviewed date | `brazilComplianceReviewedAt` | yes | accountant/legal/operator review note |
+| AI handoff reviewed date | `aiHandoffReviewedAt` | yes | human review note for AI-prepared legal/compliance material |
 | Stripe dashboard URL | none | no | private Operations integration config |
 | Stripe test hosted invoice URL | none | no | private Operations setup evidence |
 | Business bank verified | none | no | private Operations setup evidence only |
@@ -30,12 +34,26 @@ Copy the template and fill it locally after the outside accounts are created:
 copy EXTERNAL_LIVE_PACKET.template.json EXTERNAL_LIVE_PACKET.local.json
 ```
 
+Or generate a draft from the current public config:
+
+```bash
+node tools/draft_external_live_packet.js --write-local
+```
+
 Keep `EXTERNAL_LIVE_PACKET.local.json` out of git. It is ignored on purpose because it can identify private operator accounts, dashboards, bank-route metadata, and test invoice evidence.
+
+The draft generator copies only public-safe values from `public-config.js`. It leaves private evidence fields blank and must still fail `--require-live` until the operator fills real support, Google, legal/privacy, Stripe, bank, and attestation evidence.
 
 Validate the blank template:
 
 ```bash
 node tools/validate_external_live_packet.js --template-ok
+```
+
+Run the gate regression that proves an otherwise-complete live packet still fails without Brazil compliance and AI handoff review dates:
+
+```bash
+node tools/check_external_live_packet_gate.js
 ```
 
 Validate the completed local packet before changing `public-config.js`:
@@ -45,6 +63,19 @@ node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --re
 ```
 
 Only use the resulting public values in `public-config.js`; keep Stripe dashboard URLs, Sheet URLs, bank last4, and operator names in the private Operations evidence lane.
+
+## Launch Gate Evidence Panel
+
+The private Launch Gate view reads `public-config.js` and shows an **External live evidence** panel. Use **Copy live evidence packet** to capture the current public config snapshot, the missing evidence rows, and the exact validation commands before editing `public-config.js`.
+
+The panel is a handoff aid only. It does not verify Google, Stripe, bank, support, legal, tax, privacy, fiscal, or AI-review evidence by itself, and it must not be used as approval to set `liveMode: true`.
+
+For a terminal-only handoff, generate the same gap packet from `public-config.js`:
+
+```bash
+node tools/generate_external_live_gap_packet.js
+node tools/generate_external_live_gap_packet.js --json
+```
 
 ## 1. Support Inbox
 
@@ -127,7 +158,7 @@ Questions:
 | --- | --- | --- | --- |
 | Customer or company name | Short answer | yes | no individual patient/client records |
 | Contact email | Short answer | yes | enable email validation when available |
-| Requested service | Dropdown | yes | `Compliance proof sprint - 750 USD/mo`; `Compliance template pack - 79 USD/mo` |
+| Requested service | Dropdown | yes | `Compliance proof sprint - R$750/mo`; `Compliance template pack - R$79/mo` |
 | Requested monthly amount | Short answer | yes | default public amounts only unless operator approved |
 | What do you need? | Paragraph | yes | instruct customer to summarize without sensitive data |
 | Safety confirmation | Checkboxes | yes | require every safety checkbox below |

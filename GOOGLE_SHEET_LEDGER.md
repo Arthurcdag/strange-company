@@ -2,6 +2,20 @@
 
 Create one Google Sheet for the manual paid pilot. This Sheet is the source of truth for Strange Works Studio operations; the public site is only an intake packet builder.
 
+## Current External Artifact
+
+As of 2026-05-21, the Drive workbook has been created for the operator account. It includes both the Google Form control tabs and the operational ledger tabs. Keep the raw Sheet URL in the private operator record and Setup Evidence; do not commit private ledger URLs to this public repo.
+
+Control tabs:
+
+- `Form Spec`
+- `Responses`
+- `Ops Review`
+- `Verification`
+- `Repo Config`
+
+`tools/google_apps_script_create_intake_form.gs` can create the Google Form from code and link it to this workbook. Use it before doing the slower manual Google Forms build.
+
 ## Tabs
 
 Create these tabs:
@@ -29,7 +43,7 @@ Use this header row on the optional `Leads` tab:
 created_at,lead_id,customer,contact,service,amount,source,stage,qualification_note,order_id,notes
 ```
 
-`Leads` mirrors the private sales pipeline only. It is not public intake, not a payment record, and not proof of market demand until an external customer pays through the real Stripe invoice route.
+`Leads` mirrors the private sales pipeline only. It is not public intake, not a payment record, and not proof of market demand until an external customer pays through the reviewed payment route and the fiscal/NFS-e path can be reconciled.
 
 ## Public Intake Rule
 
@@ -47,16 +61,17 @@ Recommended deployment posture:
 - Choose the narrowest access level that still supports the intended private workflow.
 - Keep public intake on Google Forms until a proper backend or proxy exists.
 
-## Stripe Reconciliation
+## Payment And Fiscal Reconciliation
 
-After creating a Stripe Hosted Invoice:
+After creating a manual payment request or hosted invoice:
 
-1. Copy the hosted invoice URL.
+1. Copy the hosted payment/invoice URL.
 2. Paste it into the private Operations order.
 3. Paste it into the Sheet row.
-4. Mark the order `Sent`.
-5. After payment settles, mark it `Paid`.
-6. After delivery, mark it `Delivered`.
+4. Confirm the NFS-e or reviewed fiscal receipt step required for the transaction.
+5. Mark the order `Sent`.
+6. After payment settles and fiscal evidence is reconciled, mark it `Paid`.
+7. After delivery, mark it `Delivered`.
 
 ## Private Ledger Bridge
 
@@ -79,7 +94,7 @@ A row is rejected, and the rest of the paste is still processed, if any of the f
 - `amount` is blank, non-numeric, zero, or negative.
 - `status` is anything other than `Draft`, `Sent`, `Paid`, or `Delivered`.
 - `contact` is set but is not a plausible email address.
-- `stripe_invoice_url` is set but does not start with `https://invoice.stripe.com/`.
+- `stripe_invoice_url` is set but does not start with `https://invoice.stripe.com/`. This column name remains for prototype compatibility; the Brazil launch gate still requires the reviewed payment/fiscal route outside the Sheet.
 - `delivery_due` is set but is not `YYYY-MM-DD`.
 - `created_at` is set but is not parseable as a date.
 - The sensitive-data scan flags PHI, payment card data, secrets, or private keys anywhere in the row.
@@ -89,7 +104,7 @@ Duplicate `invoice_id` values inside one paste are rejected so the operator reso
 
 ### Upsert Rule
 
-Rows are upserted using `invoice_id` against the private order's `invoiceNumber`. For existing orders, an incoming blank value never overwrites a non-empty local value. This lets the operator paste partial rows from the Sheet (for example just a Stripe URL on a row keyed by invoice id) without erasing the rest.
+Rows are upserted using `invoice_id` against the private order's `invoiceNumber`. For existing orders, an incoming blank value never overwrites a non-empty local value. This lets the operator paste partial rows from the Sheet (for example just a payment URL on a row keyed by invoice id) without erasing the rest.
 
 ### Preview Then Apply
 
@@ -106,10 +121,10 @@ Each row in the Operations order list now has a `Copy row` button that copies a 
 
 The Operations `Orders` section header has a copy icon that copies the full header plus every order row as TSV, ready to paste into a fresh Sheet tab.
 
-The Operations `Paid pilot pipeline` section has its own copy icon for the optional `Leads` tab. Individual lead cards can also copy a single lead row, a lead qualification packet, or a manual Stripe invoice creation packet. These are operator handoff tools; they do not submit to Google Sheets or Stripe.
+The Operations `Paid pilot pipeline` section has its own copy icon for the optional `Leads` tab. Individual lead cards can also copy a single lead row, a lead qualification packet, or a manual payment/fiscal packet. These are operator handoff tools; they do not submit to Google Sheets or the payment provider.
 
 ### Boundaries
 
 - The public Order Desk does not call the bridge; only the private Operations console does.
-- The bridge writes only to `localStorage`. It does not call the Sheet API, the Google Form, the Apps Script web app, or Stripe.
+- The bridge writes only to `localStorage`. It does not call the Sheet API, the Google Form, the Apps Script web app, payment provider, or NFS-e system.
 - The bridge never touches `public.html`, `public.js`, or `public-config.js`. The preflight enforces this.
