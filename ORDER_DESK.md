@@ -22,7 +22,7 @@ The Order Desk does not:
 - guarantee acceptance,
 - create a legal contract by itself,
 - accept protected health information,
-- accept credentials, payment data, private keys, or regulated source documents,
+- accept credentials, payment data, private keys, sensitive personal data, or regulated source documents,
 - bypass the Operations controls.
 
 ## Required Handoff
@@ -33,8 +33,9 @@ Before money is accepted, the operator must verify:
 - the customer accepted the data boundary,
 - the terms and privacy notice are visible,
 - the real support inbox exists,
-- the payment and bookkeeping route exists,
-- the invoice is sent manually through the approved route.
+- the LGPD contact path exists,
+- the Brazilian entity/CNPJ, NFS-e or receipt route, payment, and bookkeeping route exist,
+- the payment request or invoice is sent manually through the approved route.
 
 ## Current Functional State
 
@@ -49,7 +50,7 @@ The static site can now:
 - record requests in the private Operations ledger when used locally,
 - include the order in the receipt chain.
 
-That makes the software operational for a manual v0 workflow. It does not replace forming the actual satellite entity, bank route, support inbox, Sheet ledger, Stripe account, or bookkeeping process.
+That makes the software operational for a manual v0 workflow. It does not replace confirming the Brazilian operating entity/CNPJ route, tax regime, NFS-e/receipt path, bank/payment route, support inbox, LGPD contact path, Sheet ledger, or bookkeeping process.
 
 ## Operational V1 Handoff
 
@@ -58,7 +59,8 @@ Operational v1 binds the Order Desk to real external systems:
 - the Google Sheet ledger is the source of truth (`Requests`, `Invoices`, `Customers`, `Delivery`, `Incidents` tabs),
 - a Google Form is the first public intake route,
 - the Apps Script template is internal/sandbox only until abuse monitoring and access settings are reviewed,
-- Stripe Hosted Invoices are created manually from the dashboard,
+- payment requests or hosted invoices are created manually through the reviewed provider,
+- NFS-e or fiscal receipt evidence is reconciled outside this static site,
 - the static site never collects card data and never auto-charges.
 
 See [RUN_LIVE_PILOT.md](RUN_LIVE_PILOT.md) for the daily operating loop.

@@ -25,6 +25,7 @@ Threat scenario
 - Vendor lock-in: a critical provider traps data, pricing, or access.
 - Claim laundering: a weak growth claim is disguised as a safety claim.
 - Data loss: audit records become unavailable during proof export.
+- Pathology classification: a suspected virus, bacteria, eukaryotic-cell, prion, or mirrored-protein incident must be classified before the operator adapts.
 
 ## Packet Boundary
 
@@ -43,3 +44,13 @@ The Resilience view now contains:
 - and a resilience score that changes as drills run and packets are issued.
 
 The Decisions view records drill results, and the Bounties view receives hardening packets.
+
+## Repo Survival Check
+
+Run the repo-level survival drill before claiming the company can survive a launch attempt:
+
+```bash
+node tools/survival_check.js
+```
+
+The script passes when the guarded prototype survives: public/private separation holds, the charter and resilience model still exist, receipt-chain and hardening-packet code is present, Brazil/AI legal gates remain documented, normal audits pass, and `--require-live` fails while external evidence is missing.

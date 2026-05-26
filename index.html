@@ -6,6 +6,7 @@
     <title>Strange Company Command Center</title>
     <link rel="stylesheet" href="styles.css" />
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script src="public-config.js" defer></script>
     <script src="script.js" defer></script>
   </head>
   <body>
@@ -166,7 +167,7 @@
               <p class="section-kicker">Public intake</p>
               <h2 id="order-title">Request an invoice packet</h2>
             </div>
-            <a class="primary-action" href="TERMS.md" target="_blank" rel="noreferrer">
+            <a class="primary-action" href="TERMOS.md" target="_blank" rel="noreferrer">
               <i data-lucide="file-text"></i>
               <span>Read terms</span>
             </a>
@@ -206,7 +207,7 @@
               </label>
               <label class="order-check">
                 <input id="requestTerms" name="requestTerms" type="checkbox" />
-                <span>I understand this creates a manual invoice request, not an automatic payment or guaranteed acceptance.</span>
+                <span>I read the Portuguese Terms and Privacy Notice and understand this creates a manual invoice request, not an automatic payment or guaranteed acceptance.</span>
               </label>
               <button class="primary-action" type="submit">
                 <i data-lucide="send"></i>
@@ -248,11 +249,16 @@
               <button class="icon-button" id="copyDraftFilingPacket" type="button" aria-label="Copy draft filing packet" title="Copy draft filing packet">
                 <i data-lucide="file-pen-line"></i>
               </button>
+              <button class="icon-button" id="copyLiveEvidencePacket" type="button" aria-label="Copy live evidence packet" title="Copy live evidence packet">
+                <i data-lucide="clipboard-check"></i>
+              </button>
             </div>
           </div>
 
           <div class="launch-panel" id="launchVerdict"></div>
           <div class="launch-metrics-grid" id="launchMetrics"></div>
+          <div class="launch-evidence-panel" id="liveEvidencePanel"></div>
+          <div class="launch-evidence-output" id="liveEvidenceOutput" aria-live="polite"></div>
 
           <div class="view-header compact-header launch-section-header">
             <div>
@@ -460,6 +466,31 @@
             </div>
           </div>
           <div class="setup-evidence" id="setupEvidencePanel"></div>
+
+          <div class="view-header compact-header ops-section-header">
+            <div>
+              <p class="section-kicker">Brazil compliance agents</p>
+              <h3>AI prep queues for human legal closure</h3>
+            </div>
+          </div>
+          <div class="compliance-agents" id="brazilComplianceAgentsPanel"></div>
+
+          <div class="view-header compact-header ops-section-header">
+            <div>
+              <p class="section-kicker">Adaptive operator</p>
+              <h3>Damage-to-adaptation receipts</h3>
+            </div>
+            <div class="topbar-actions">
+              <button class="primary-action" id="copyLatestAdaptiveReceipt" type="button">
+                <i data-lucide="copy"></i>
+                <span>Copy latest</span>
+              </button>
+              <button class="icon-button" id="resetAdaptiveOperator" type="button" aria-label="Reset adaptive receipts" title="Reset adaptive receipts">
+                <i data-lucide="rotate-ccw"></i>
+              </button>
+            </div>
+          </div>
+          <div class="adaptive-operator" id="adaptiveOperatorPanel"></div>
 
           <div class="view-header compact-header ops-section-header">
             <div>

@@ -25,6 +25,14 @@ jobs:
           node --check public.js
           node --check script.js
           node --check tools/preflight_public_launch.js
+          node --check tools/audit_company_functionality.js
+          node --check tools/validate_external_live_packet.js
+
+      - name: Run Python tool tests
+        run: |
+          python -m unittest discover -s tests
 
       - name: Run public launch preflight
-        run: node tools/preflight_public_launch.js
+        run: |
+          node tools/validate_external_live_packet.js --template-ok
+          node tools/preflight_public_launch.js

@@ -38,6 +38,21 @@ Use Binance only for public market-structure context such as open interest, basi
 
 Do not use Binance for trading, futures positioning, treasury speculation, or automated reinvestment rules.
 
+### Counterparty Finance Claims
+
+Treat claims about trading profit, managed capital, guaranteed monthly returns, offshore investment companies, crypto leverage, customer balances, screenshots, or private investment methods as unverified external signals.
+
+These claims may help define diligence questions, but they must not become Strange Company evidence unless independently verified by the appropriate professional, legal, accounting, tax, and regulatory review lane.
+
+Do not use counterparty finance claims to:
+
+- approve treasury spend,
+- justify taking customer capital,
+- promise returns,
+- market investment performance,
+- route money to a trader,
+- or describe Strange Company as an investment manager.
+
 ### Zotero
 
 Use Zotero for public citation keys, bibliographic metadata, and evidence-library organization once the local API is enabled.

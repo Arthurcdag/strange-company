@@ -10,6 +10,8 @@ The company is not designed to be untouchable. It is designed to keep functionin
 
 ## Threat Model
 
+Before adapting to a security or autonomy incident, classify it through [THREAT_PATHOLOGY.md](THREAT_PATHOLOGY.md). The pathology label determines containment: infected code needs clean-source recovery, runaway replication needs caps and kill switches, complex agent systems need permission review, poisoned information needs quarantine, and inverted controls need invariant tests.
+
 ### 1. Governance Capture
 
 Risk:
@@ -210,6 +212,8 @@ Every incident must produce at least one permanent improvement:
 - improved contract language,
 - simpler architecture,
 - or clearer public trust signal.
+
+Every incident must also name its pathology class when applicable: virus, bacteria, eukaryotic cell, prion, or mirrored protein. This prevents the company from treating corrupted information, runaway autonomy, and infected code as the same problem.
 
 ## Drill Rule
 
