@@ -28,6 +28,10 @@ jobs:
           node --check tools/audit_company_functionality.js
           node --check tools/validate_external_live_packet.js
 
+      - name: Run Python tool tests
+        run: |
+          python -m unittest discover -s tests
+
       - name: Run public launch preflight
         run: |
           node tools/validate_external_live_packet.js --template-ok
