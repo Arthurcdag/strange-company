@@ -8,6 +8,14 @@ Core rule:
 No spend proposal can be approved unless it has a passing Research Gate receipt.
 ```
 
+Finance firewall:
+
+```text
+The treasury allocates Strange Company's own retained surplus only. It must not accept, pool, custody, trade, or manage customer/investor funds, and it must not promise fixed, minimum, daily, or monthly returns.
+```
+
+Market, crypto, trading, or yield claims may be observed as external context, but they cannot approve treasury spend, create customer obligations, justify public investment language, or bypass legal/regulatory review.
+
 Passing recommendations:
 
 - `accept`

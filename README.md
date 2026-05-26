@@ -58,6 +58,8 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 ## Founding Documents
 
 - [CHARTER.md](CHARTER.md): the constitutional rules.
+- [SC_GAME_THEORY_RATIONALE.md](SC_GAME_THEORY_RATIONALE.md): refined plain-language rationale for the no-CEO reinvestment/game-theory model, plus the investment/trading firewall.
+- [SC_HUMAN_REVIEW_REQUEST.md](SC_HUMAN_REVIEW_REQUEST.md): short reviewer handoff for checking whether the rationale stays outside investment/trading/customer-money territory.
 - [OPERATING_SYSTEM.md](OPERATING_SYSTEM.md): how the company makes decisions and executes work.
 - [RESILIENCE_MODEL.md](RESILIENCE_MODEL.md): how the company survives attacks and shocks.
 - [RESILIENCE_DRILLS.md](RESILIENCE_DRILLS.md): how attack drills become receipts and hardening packets.
@@ -101,6 +103,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [OUTCOME_REVIEW.md](OUTCOME_REVIEW.md): how outcome evidence must be reviewed before routing into Treasury or cooldown lanes.
 - [CAPITAL_ROUTER.md](CAPITAL_ROUTER.md): how outcomes draft follow-on proposals or cool down weak spend lanes.
 - [RECEIPT_CHAIN.md](RECEIPT_CHAIN.md): how material state changes become a local tamper-evident proof chain.
+- [VAU_SIM_TO_REAL_RATIONALE.md](VAU_SIM_TO_REAL_RATIONALE.md): why VAU uses many imperfect futures, how sim-to-real transfer is gated, and when evolutionary search is preferred over RL.
 
 ## Prototype
 
