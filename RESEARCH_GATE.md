@@ -1,110 +1,50 @@
-# Strange Company Research Gate
+# Research Gate
 
-Strange Company now uses the cloned `reactive-research-tools` repository as a decision sanity layer.
+The Research Gate is a local Strange Company claim filter. It is not a truth oracle and it does not approve live operation.
 
-Source:
+Its job is narrower:
 
-```text
-external/reactive-research-tools
-```
+- catch claims that try to replace human review,
+- catch requests to skip Brazil/LGPD/privacy/terms/tax/legal gates,
+- catch attempts to turn on live intake without evidence,
+- catch simulation-as-proof language,
+- catch fake/backdated evidence,
+- route vague repo criticism into actionable cleanup work.
 
-Primary module:
-
-```text
-projects/effective_boolean_filter
-```
-
-The Effective Boolean Argument Filter is not a truth oracle. It checks whether a claim preserves its yes/no structure across negation, scope, context, definitions, contradictions, and reactive probes.
-
-## Why It Fits Strange Company
-
-Strange Company needs growth, but growth claims are dangerous when they quietly change scope.
-
-Examples the gate should catch:
-
-- "Works in simulation" becoming "works in production."
-- "No evidence against this" becoming "this is true."
-- "Not legally impossible" becoming "physically or commercially viable."
-- "A test did not fail" becoming "scale treasury spend now."
-
-## Local Adapter
-
-Run the default Strange Company sample:
-
-```bash
-python tools/strange_research_gate.py
-```
-
-Run your own decision:
+## Run
 
 ```bash
 python tools/strange_research_gate.py \
-  --claim "This bounty should receive scale funding" \
-  --argument "The prototype worked in simulation, therefore it will improve production revenue" \
-  --context "treasury review" \
-  --strictness high
+  --claim "The repo has too many docs" \
+  --argument "README.md is noisy, install is unclear, and VAU sounds like a proof engine." \
+  --context "external repo review"
 ```
 
-The adapter exits with code `0` only for `accept` or `accept_with_caveats`. Other recommendations return `1`, which makes it usable in future automation.
+Expected local guardrail:
 
-## Live Dashboard
+```text
+repo_signal_to_noise_review
+```
 
-Start the filter dashboard:
+Vague criticism is also handled:
 
 ```bash
-python -m uvicorn effective_boolean_filter.api:app \
-  --app-dir external/reactive-research-tools/projects/effective_boolean_filter/src \
-  --host 127.0.0.1 \
-  --port 8000
+python tools/strange_research_gate.py \
+  --claim "Verdict: slop" \
+  --argument "The repository is slop." \
+  --format json
 ```
 
-Then open:
+Expected local guardrail:
 
 ```text
-http://127.0.0.1:8000/
+critique_requires_specifics
 ```
 
-The Strange Company prototype links to this dashboard from the `Research Gate` tab.
+That means the next action is to ask for exact files, sections, or failing workflows instead of defending the repo abstractly.
 
-## Prototype Console
+## Dependency Policy
 
-The Strange Company prototype can now post directly to the local filter API from:
+The core repo no longer ships the external research submodule. `tools/strange_research_gate.py` runs with a local fallback so reviewers can test the guardrails without cloning a large external workbench.
 
-```text
-index.html#research
-```
-
-The console:
-
-- evaluates a claim, argument, context, and strictness level,
-- renders recommendation, polarity, score, confidence, issues, and probes,
-- stores recent gate receipts in browser local storage,
-- mirrors recent gate runs into the decision log.
-
-Because the prototype opens from `file://`, the local filter API includes a conservative CORS bridge for `Origin: null` and localhost origins.
-
-## Verification Run
-
-Completed locally:
-
-```text
-python -m pytest projects/effective_boolean_filter/tests/test_negation_parity.py projects/effective_boolean_filter/tests/test_scope_shifts.py projects/effective_boolean_filter/tests/test_scoring_and_report.py -q
-```
-
-Result:
-
-```text
-16 passed
-```
-
-Full collection found 290 tests. The narrower run validates the core deterministic behavior we are using for the first Strange Company integration.
-
-Latest evolution checks:
-
-```text
-python -m pytest projects/effective_boolean_filter/tests -q
-290 passed
-
-POST /evaluate_argument with Origin: null
-status=200, Access-Control-Allow-Origin=null
-```
+If the external Effective Boolean Filter is cloned locally at `external/reactive-research-tools`, the adapter can still use it. The Strange Company hard rules remain local either way.

@@ -10,7 +10,7 @@ Current verified pilot inbox:
 tuiidagnese+strangeworks@gmail.com
 ```
 
-This inbox received a verification email on 2026-05-21 and is labeled in Gmail as `Strange Works Studio/Support`. See [SUPPORT_INBOX_EVIDENCE.md](SUPPORT_INBOX_EVIDENCE.md).
+This inbox received a verification email on 2026-05-21 and is labeled in Gmail as `Strange Works Studio/Support`. Keep private mailbox evidence out of the public repo.
 
 Planned branded inbox:
 

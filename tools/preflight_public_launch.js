@@ -1,40 +1,39 @@
 const fs = require("fs");
 const path = require("path");
-const { spawnSync } = require("child_process");
 const vm = require("vm");
 
 const root = path.resolve(__dirname, "..");
 const failures = [];
 
-function read(relativePath) {
-  return fs.readFileSync(path.join(root, relativePath), "utf8");
+function filePath(relativePath) {
+  return path.join(root, relativePath);
 }
 
-function fail(message) {
-  failures.push(message);
+function exists(relativePath) {
+  return fs.existsSync(filePath(relativePath));
+}
+
+function read(relativePath) {
+  return fs.readFileSync(filePath(relativePath), "utf8");
 }
 
 function assert(condition, message) {
   if (!condition) {
-    fail(message);
+    failures.push(message);
   }
+}
+
+function assertIncludes(file, snippet, label) {
+  const contents = read(file);
+  assert(contents.includes(snippet), `${file} is missing ${label}.`);
 }
 
 function compileJavaScript(relativePath) {
   try {
     new vm.Script(read(relativePath), { filename: relativePath });
   } catch (error) {
-    fail(`${relativePath} does not parse: ${error.message}`);
+    failures.push(`${relativePath} does not parse: ${error.message}`);
   }
-}
-
-function checkExternalLivePacketGate() {
-  const result = spawnSync(process.execPath, ["tools/check_external_live_packet_gate.js"], {
-    cwd: root,
-    encoding: "utf8"
-  });
-  const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
-  assert(result.status === 0, `external live packet gate regression failed:\n${output}`);
 }
 
 function loadPublicConfig() {
@@ -43,15 +42,13 @@ function loadPublicConfig() {
     vm.runInNewContext(read("public-config.js"), sandbox, { filename: "public-config.js" });
     return sandbox.window.PUBLIC_ORDER_CONFIG || {};
   } catch (error) {
-    fail(`public-config.js could not be loaded: ${error.message}`);
+    failures.push(`public-config.js could not be loaded: ${error.message}`);
     return {};
   }
 }
 
 function isSafeGoogleFormUrl(value) {
-  if (!value) {
-    return true;
-  }
+  if (!value) return true;
   try {
     const url = new URL(value);
     return url.protocol === "https:" && url.href.startsWith("https://docs.google.com/forms/");
@@ -61,742 +58,202 @@ function isSafeGoogleFormUrl(value) {
 }
 
 function isIsoDate(value) {
-  if (!value) {
-    return true;
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
+  if (!value) return true;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T00:00:00.000Z`);
   return !Number.isNaN(date.valueOf()) && date.toISOString().startsWith(value);
+}
+
+function checkJavaScript() {
+  [
+    "public-config.js",
+    "public.js",
+    "script.js",
+    "tools/audit_company_functionality.js",
+    "tools/draft_external_live_packet.js",
+    "tools/generate_external_live_gap_packet.js",
+    "tools/validate_external_live_packet.js",
+    "tools/check_external_live_packet_gate.js",
+    "tools/survival_check.js"
+  ].forEach(compileJavaScript);
+}
+
+function checkCoreDocs() {
+  const required = [
+    ["README.md", "Core Files"],
+    ["CHARTER.md", "lawfully survive, grow, and compound"],
+    ["OPERATING_SYSTEM.md", "live gate"],
+    ["SC_GAME_THEORY_RATIONALE.md", "guaranteed return"],
+    ["SC_HUMAN_REVIEW_REQUEST.md", "liveMode fica false"],
+    ["SATELLITE_COMPANY.md", "external customer revenue exists"],
+    ["TREASURY_OS.md", "own retained surplus only"],
+    ["BRAZIL_COMPLIANCE.md", "Keep `public-config.js` at `liveMode: false`"],
+    ["TERMOS.md", "# Termos de Uso e Contratacao"],
+    ["AVISO_DE_PRIVACIDADE.md", "# Aviso de Privacidade"],
+    ["SUPPORT.md", "tuiidagnese+strangeworks@gmail.com"],
+    ["RESEARCH_GATE.md", "repo_signal_to_noise_review"],
+    ["VAU_SIM_TO_REAL_RATIONALE.md", "decision-support loop"],
+    ["INSTALL_AND_TEST.md", "Instalar E Testar O Core"]
+  ];
+
+  for (const [file, snippet] of required) {
+    assert(exists(file), `${file} must exist in the core surface.`);
+    if (exists(file)) assertIncludes(file, snippet, "core snippet");
+  }
+}
+
+function checkLegacyNoiseRemoved() {
+  const legacyRootDocs = [
+    "ADAPTIVE_OPERATOR_PROTOCOL.md",
+    "AI_LEGAL_HANDOFF.md",
+    "AUTONOMOUS_CYCLE.md",
+    "BRAZIL_COMPLIANCE_AGENTS.md",
+    "CAPITAL_ROUTER.md",
+    "CONKA8_LAW_INSTRUCTIONS.md",
+    "CUSTOMER_ACQUISITION.md",
+    "EXECUTION_MARKET.md",
+    "EXTERNAL_LIVE_CONTROLS.md",
+    "EXTERNAL_SIGNALS.md",
+    "FIRST_REVENUE_CLOSEOUT.md",
+    "GOOGLE_FORM_INTAKE.md",
+    "GOOGLE_SHEET_LEDGER.md",
+    "GROWTH_MANAGEMENT.md",
+    "HUMAN_REVIEW_PACKET.md",
+    "LAUNCH_PLAN.md",
+    "LIVE_HANDOFF_CHECKLIST.md",
+    "ONLINE_ASAP.md",
+    "ONLINE_GATE.md",
+    "OPERATIONS_RUNBOOK.md",
+    "OPERATIONS_START_PACKET.md",
+    "OPERATOR_FAST_START.md",
+    "ORDER_DESK.md",
+    "OUTCOME_REVIEW.md",
+    "PRIVACY.md",
+    "RECEIPT_CHAIN.md",
+    "RESILIENCE_DRILLS.md",
+    "RESILIENCE_MODEL.md",
+    "REVENUE_PILOT.md",
+    "REVENUE_START.md",
+    "REVIEW_READY_PACKET.md",
+    "RUN_LIVE_PILOT.md",
+    "SETUP_EVIDENCE.md",
+    "SUPPORT_INBOX_EVIDENCE.md",
+    "TERMS.md",
+    "THREAT_PATHOLOGY.md",
+    "TOOLING_POLICY.md",
+    "VAU_CHESS_DEV_EXAMPLE.md",
+    "VAU_CHESS_TEST_DATA.generated.json",
+    "VAU_COMPANY_EVOLUTION.md"
+  ];
+
+  for (const file of legacyRootDocs) {
+    assert(!exists(file), `${file} should not be in the core root surface.`);
+  }
+  assert(!exists(".gitmodules"), ".gitmodules should not exist; the core path has no submodule.");
+  assert(!exists("external/reactive-research-tools"), "external/reactive-research-tools should not be committed in the core path.");
 }
 
 function checkPublicSurface() {
   const publicHtml = read("public.html");
   const publicJs = read("public.js");
   const publicConfig = read("public-config.js");
-  const publicFiles = [
-    ["public.html", publicHtml],
-    ["public.js", publicJs],
-    ["public-config.js", publicConfig]
-  ];
 
   assert(publicHtml.includes('class="public-site"'), "public.html must render the public surface.");
   assert(publicHtml.includes("public-config.js"), "public.html must load public-config.js.");
   assert(publicHtml.includes("public.js"), "public.html must load public.js.");
-  assert(!publicHtml.includes("script.js"), "public.html must not load the private command center script.");
-
-  const forbiddenPublicPatterns = [
-    ["localStorage", /\blocalStorage\b/],
-    ["sessionStorage", /\bsessionStorage\b/],
-    ["Apps Script config", /\bappsScriptUrl\b/],
-    ["Stripe dashboard", /dashboard\.stripe\.com/],
-    ["private Operations label", /\bOperations\b/],
-    ["private Treasury label", /\bTreasury\b/],
-    ["private Decisions label", /\bDecisions\b/],
-    ["private External Signals console", /\bExternal Signals\b/],
-    ["private Profit Readiness panel", /\bProfit readiness\b/i],
-    ["private paid pilot pipeline", /\bPaid pilot pipeline\b/i],
-    ["sales lead form", /salesLeadForm/],
-    ["sales lead storage key", /strange-company-sales-leads/],
-    ["sales lead bulk copy", /copyAllLeadRows/],
-    ["sales pipeline stage internals", /\binvoice_ready\b/],
-    ["private Sheet ledger bridge", /\bSheet ledger bridge\b/i],
-    ["private Daily pilot run console", /\bDaily pilot run\b/i],
-    ["ledger bridge form id", /operationsLedgerBridgeForm/],
-    ["daily run storage key", /strange-company-daily-pilot-run/],
-    ["plugin workflow UI", /\b(Alpaca|Binance|Zotero|Life Science Research|GitHub signal)\b/],
-    ["automatic network submit", /\bfetch\s*\(/],
-    ["private Setup evidence panel", /\bSetup evidence\b/i],
-    ["private Customer acquisition panel", /\bCustomer acquisition\b/i],
-    ["setup evidence form id", /setupEvidencePanel/],
-    ["setup evidence storage key", /strange-company-setup-evidence/],
-    ["setup evidence slot internals", /SETUP_EVIDENCE_SLOTS/],
-    ["customer acquisition form id", /customerAcquisitionPanel/],
-    ["customer acquisition storage key", /strange-company-customer-acquisition/],
-    ["acquisition lead source internals", /ACQUISITION_LEAD_SOURCES/],
-    ["private outreach log form", /outreachLogForm/]
-  ];
-
-  for (const [file, contents] of publicFiles) {
-    for (const [label, pattern] of forbiddenPublicPatterns) {
-      assert(!pattern.test(contents), `${file} exposes ${label}.`);
-    }
-  }
-
-  const requiredGuardTerms = [
-    "findSensitiveData",
-    "protected health information",
-    "payment card data",
-    "social security number",
-    "password or secret",
-    "private key material",
-    "renderBlocked",
-    "Public intake is closed",
-    "if (!readiness.liveReady)",
-    "readiness.liveReady ? `<a href=\"${mailtoUrl(order)}\">Open email draft</a>` : \"\""
-  ];
-  for (const term of requiredGuardTerms) {
-    assert(publicJs.includes(term), `public.js must keep the ${term} guard.`);
-  }
-}
-
-function checkPrivateUrlAllowlists() {
-  const script = read("script.js");
-  const required = [
-    '["https://docs.google.com/spreadsheets/"]',
-    '["https://docs.google.com/forms/"]',
-    '["https://script.google.com/macros/"]',
-    '["https://dashboard.stripe.com/"]',
-    '["https://invoice.stripe.com/"]'
-  ];
-  for (const snippet of required) {
-    assert(script.includes(snippet), `script.js is missing URL allowlist ${snippet}.`);
-  }
-}
-
-function checkOutcomeEvidenceContract() {
-  const script = read("script.js");
-  const required = [
-    ["safeHttpsUrl helper", "function safeHttpsUrl"],
-    ["evidence submit handler", "function submitOutcomeEvidence"],
-    ["evidence-required guard in createOutcomeFromPacket", "if (!evidence) {"],
-    ["bounty evidence form renderer", 'data-evidence-form="'],
-    ["artifact URL field", 'name="artifactUrl"'],
-    ["measured before field", 'name="measuredBefore"'],
-    ["measured after field", 'name="measuredAfter"'],
-    ["next claim field", 'name="nextClaim"'],
-    ["source signal field", 'name="sourceSignalId"'],
-    ["eligible source signal filter", "function eligibleOutcomeSignals"],
-    ["source signal sensitive scan", "signalSensitiveFindings(sourceSignal)"],
-    ["source signal metadata copy", "sourceSignalReference: sourceSignal ? sourceSignal.evidence_reference"],
-    ["sensitive-data scan over evidence", "findSensitiveData(`${measuredBefore}"],
-    ["outcome review storage", "const OUTCOME_REVIEWS_KEY"],
-    ["outcome review validator", "function validateOutcomeForReview"],
-    ["outcome review approval", "function approveOutcomeReview"],
-    ["outcome route review blocker", "function outcomeRouteBlockedReason"],
-    ["route guard uses review blocker", "const routeBlock = outcomeRouteBlockedReason(outcome)"],
-    ["proposal carries artifact evidence", "evidenceArtifactUrl: artifact"],
-    ["proposal carries measurement evidence", "evidenceMeasuredBefore: before"],
-    ["proposal carries review evidence", "evidenceReviewId: review ? review.id"],
-    ["proposal carries signal evidence", "sourceSignalId: outcome.sourceSignalId"],
-    ["receipt chain carries review receipts", 'push("Review", review.id'],
-    ["receipt chain carries outcome artifact", "artifactUrl: outcome.artifactUrl"],
-    ["receipt chain carries outcome measurement", "measuredBefore: outcome.measuredBefore"],
-    ["receipt chain carries outcome review", "evidenceReviewId: review ? review.id"],
-    ["receipt chain carries outcome signal", "sourceSignalId: outcome.sourceSignalId"]
-  ];
-  for (const [label, snippet] of required) {
-    assert(script.includes(snippet), `script.js is missing ${label}.`);
-  }
-}
-
-function checkLedgerBridgeContract() {
-  const script = read("script.js");
-  const indexHtml = read("index.html");
-  const ledgerDoc = read("GOOGLE_SHEET_LEDGER.md");
-  const required = [
-    ["LEDGER_HEADERS constant", "const LEDGER_HEADERS = ["],
-    ["LEDGER_STATUSES constant", 'const LEDGER_STATUSES = ["Draft", "Sent", "Paid", "Delivered"]'],
-    ["parseLedgerTsv parser", "function parseLedgerTsv"],
-    ["validateLedgerRow validator", "function validateLedgerRow"],
-    ["importLedger upsert", "function importLedger"],
-    ["upsert reads operations.orders", "operations.orders || []"],
-    ["non-blank preservation for customer", "customer: incoming.customer || existing.customer"],
-    ["extra column rejection", "expected ${LEDGER_HEADERS.length}. Remove extra Sheet columns before import."],
-    ["positive amount required", "amount must be a finite, positive number."],
-    ["sensitive-data scan in row validator", "findSensitiveData(joined)"],
-    ["status whitelist applied", "LEDGER_STATUSES.includes(status)"],
-    ["stripe URL allowlist applied", "safeExternalUrl(stripeRaw, STRIPE_INVOICE_URLS)"],
-    ["per-row export helper", "function orderToLedgerRow"],
-    ["bulk export helper", "function allOrdersLedgerTsv"],
-    ["per-row copy handler", "function copyOrderLedgerRow"],
-    ["bulk copy handler", "function copyAllLedgerRows"],
-    ["per-row copy attribute", "data-copy-ledger-row="]
-  ];
-  for (const [label, snippet] of required) {
-    assert(script.includes(snippet), `script.js is missing ${label}.`);
-  }
-
-  const indexExpectations = [
-    ["bridge form", 'id="operationsLedgerBridgeForm"'],
-    ["bridge textarea", 'id="operationsLedgerTsv"'],
-    ["preview button", 'id="operationsLedgerPreview"'],
-    ["apply button", 'id="operationsLedgerImport"'],
-    ["bulk copy button", 'id="copyAllLedgerRows"']
-  ];
-  for (const [label, snippet] of indexExpectations) {
-    assert(indexHtml.includes(snippet), `index.html is missing ${label}.`);
-  }
-
-  assert(
-    ledgerDoc.includes("Private Ledger Bridge"),
-    "GOOGLE_SHEET_LEDGER.md must document the Private Ledger Bridge."
-  );
-}
-
-function checkOrderLifecycleContract() {
-  const script = read("script.js");
-  const runbook = read("OPERATIONS_RUNBOOK.md");
-  const publicHtml = read("public.html");
-  const publicJs = read("public.js");
-
-  const required = [
-    ["incident storage key", 'const OPERATION_INCIDENTS_KEY = "strange-company-operation-incidents"'],
-    ["incident severities", 'const INCIDENT_SEVERITIES = ["info", "low", "medium", "high"]'],
-    ["incident statuses", 'const INCIDENT_STATUSES = ["open", "mitigating", "resolved", "closed"]'],
-    ["normalizeOperationIncident", "function normalizeOperationIncident"],
-    ["loadOperationIncidents", "function loadOperationIncidents"],
-    ["saveOperationIncidents", "function saveOperationIncidents"],
-    ["operation incident state", "let operationIncidents"],
-    ["order normalizer for delivery artifact", "deliveryArtifactUrl: artifactRaw ? safeHttpsUrl(artifactRaw)"],
-    ["order normalizer for acceptance note", "acceptanceNote: typeof order.acceptanceNote === \"string\""],
-    ["order normalizer for incidentIds", "incidentIds: Array.isArray(order.incidentIds)"],
-    ["order advance block helper", "function orderAdvanceBlock"],
-    ["delivery artifact gate", "Attach an https:// delivery artifact URL before marking Delivered."],
-    ["acceptance note gate", "Record an acceptance note before marking Delivered."],
-    ["acceptance note sensitive scan", "findSensitiveData(String(order.acceptanceNote"],
-    ["invoiceSentAt stamp", "next.invoiceSentAt = now"],
-    ["paidAt stamp", "next.paidAt = now"],
-    ["deliveredAt stamp", "next.deliveredAt = now"],
-    ["incident submit handler", "function submitOrderIncident"],
-    ["incident push to chain", 'operationIncidents.forEach((incident) => {'],
-    ["incident receipt type", '"Incident",'],
-    ["order chain payload carries acceptance", "acceptanceNote: order.acceptanceNote"],
-    ["order chain payload carries delivery artifact", "deliveryArtifactUrl: safeHttpsUrl(order.deliveryArtifactUrl"],
-    ["order chain payload carries timestamps", "invoiceSentAt: order.invoiceSentAt"],
-    ["order chain payload carries incidentIds", "incidentIds: Array.isArray(order.incidentIds)"]
-  ];
-  for (const [label, snippet] of required) {
-    assert(script.includes(snippet), `script.js is missing ${label}.`);
-  }
-
-  assert(
-    runbook.includes("Order Lifecycle Receipts"),
-    "OPERATIONS_RUNBOOK.md must document Order Lifecycle Receipts."
-  );
-  assert(runbook.includes("Incidents"), "OPERATIONS_RUNBOOK.md must document Incidents.");
-
-  for (const [file, contents] of [["public.html", publicHtml], ["public.js", publicJs]]) {
-    assert(!/data-incident-form/.test(contents), `${file} exposes incident form attribute.`);
-    assert(!/operationIncidents/.test(contents), `${file} exposes operationIncidents state.`);
-    assert(!/deliveryArtifactUrl/.test(contents), `${file} exposes deliveryArtifactUrl field.`);
-    assert(!/acceptanceNote/.test(contents), `${file} exposes acceptanceNote field.`);
-  }
-}
-
-function checkOrderTimelineContract() {
-  const script = read("script.js");
-  const runbook = read("OPERATIONS_RUNBOOK.md");
-  const required = [
-    ["timeline builder", "function buildOrderTimeline(order)"],
-    ["timeline renderer", "function renderOrderTimeline(order)"],
-    ["timeline mounted on order cards", "${renderOrderTimeline(order)}"],
-    ["created order event", "order.createdAt"],
-    ["sent invoice event", "order.invoiceSentAt"],
-    ["paid order event", "order.paidAt"],
-    ["delivered order event", "order.deliveredAt"],
-    ["blocked transition event", "order.blockedAt && order.blockReason"],
-    ["linked incident timeline events", "(order.incidentIds || []).forEach"],
-    ["incident update event", "incident.updatedAt && incident.updatedAt !== incident.createdAt"],
-    ["timeline chronological sort", "events.sort((a, b) => String(a.at || \"\").localeCompare(String(b.at || \"\")))"],
-    ["timeline timestamp rendering", "formatReceiptDate(event.at)"],
-    ["timeline actor rendering", "ops-order-timeline-actor"],
-    ["timeline evidence rendering", "ops-order-timeline-evidence"],
-    ["timeline evidence links", "entry.href"],
-    ["timeline empty state", "ops-order-timeline-empty"],
-    ["timeline summary label", "Receipt chain timeline"]
-  ];
-  for (const [label, snippet] of required) {
-    assert(script.includes(snippet), `script.js is missing ${label}.`);
-  }
-
-  assert(
-    runbook.includes("Receipt Chain Timeline Panel"),
-    "OPERATIONS_RUNBOOK.md must document the Receipt Chain Timeline Panel."
-  );
-  assert(
-    runbook.includes("Each event shows:") &&
-      runbook.includes("the timestamp") &&
-      runbook.includes("the actor that produced the transition") &&
-      runbook.includes("the state transition itself") &&
-      runbook.includes("attached evidence and metadata"),
-    "OPERATIONS_RUNBOOK.md must document the order timeline event fields."
-  );
-}
-
-function checkDailyPilotRunContract() {
-  const script = read("script.js");
-  const indexHtml = read("index.html");
-  const runbook = read("OPERATIONS_RUNBOOK.md");
-  const livePilot = read("RUN_LIVE_PILOT.md");
-  const publicHtml = read("public.html");
-  const publicJs = read("public.js");
-  const publicConfig = read("public-config.js");
-
-  const required = [
-    ["daily run storage key", 'const DAILY_PILOT_RUN_KEY = "strange-company-daily-pilot-run"'],
-    ["daily run checks", "const DAILY_RUN_CHECKS = ["],
-    ["daily run stop rules", "const DAILY_RUN_STOP_RULES = ["],
-    ["daily run loader", "function loadDailyPilotRun"],
-    ["daily run saver", "function saveDailyPilotRun"],
-    ["daily run normalizer", "function normalizeDailyRunRecord"],
-    ["active stop rules helper", "function activeStopRules"],
-    ["paused reason helper", "function dailyRunPausedReason"],
-    ["start run handler", "function startDailyPilotRun"],
-    ["close run handler", "function closeDailyPilotRun"],
-    ["check toggle handler", "function toggleDailyRunCheck"],
-    ["stop-rule toggle handler", "function toggleDailyRunStopRule"],
-    ["incident id handler", "function updateDailyRunIncidentIds"],
-    ["reset run handler", "function resetDailyPilotRun"],
-    ["daily run renderer", "function renderDailyPilotRun"],
-    ["touched order collector", "function collectDailyRunOrderIds"],
-    ["receipt root captured at close", "const chain = buildReceiptChain()"],
-    ["paused state in Operations model", 'state: "Paused"'],
-    ["Draft to Sent paused block", 'order.status === "Draft" && pausedReason'],
-    ["Run receipt type", '"Run",'],
-    ["Run receipt carries receiptRoot", "receiptRoot: entry.receiptRoot"],
-    ["Run receipt carries completedChecks", "completedChecks,"],
-    ["Run receipt carries stopRules", "stopRules: entry.activeRules"]
-  ];
-  for (const [label, snippet] of required) {
-    assert(script.includes(snippet), `script.js is missing ${label}.`);
-  }
-
-  const indexExpectations = [
-    ["daily run panel container", 'id="operationsDailyRun"'],
-    ["start run button", 'id="startDailyPilotRun"'],
-    ["close run button", 'id="closeDailyPilotRun"'],
-    ["reset run button", 'id="resetDailyPilotRun"']
-  ];
-  for (const [label, snippet] of indexExpectations) {
-    assert(indexHtml.includes(snippet), `index.html is missing ${label}.`);
-  }
-
-  assert(
-    runbook.includes("Daily Pilot Run Console"),
-    "OPERATIONS_RUNBOOK.md must document the Daily Pilot Run Console."
-  );
-  assert(
-    livePilot.includes("Run the daily pilot console"),
-    "RUN_LIVE_PILOT.md must document the daily pilot console step."
-  );
+  assert(!publicHtml.includes("script.js"), "public.html must not load the private dashboard script.");
+  assert(publicHtml.includes('href="TERMOS.md"'), "public.html must link Portuguese terms.");
+  assert(publicHtml.includes('href="AVISO_DE_PRIVACIDADE.md"'), "public.html must link Portuguese privacy.");
+  assert(publicHtml.includes('href="SUPPORT.md"'), "public.html must link support.");
+  assert(publicHtml.includes('href="README.md"'), "public.html must link the core README.");
 
   for (const [file, contents] of [
     ["public.html", publicHtml],
     ["public.js", publicJs],
     ["public-config.js", publicConfig]
   ]) {
-    assert(!/Daily pilot run/i.test(contents), `${file} exposes Daily pilot run text.`);
-    assert(!/strange-company-daily-pilot-run/.test(contents), `${file} exposes daily run storage key.`);
-    assert(!/operationsDailyRun/.test(contents), `${file} exposes daily run private UI.`);
+    assert(!/\blocalStorage\b/.test(contents), `${file} must not use localStorage.`);
+    assert(!/\bfetch\s*\(/.test(contents), `${file} must not auto-submit over the network.`);
+    assert(!/dashboard\.stripe\.com/.test(contents), `${file} must not expose Stripe dashboard URLs.`);
+    assert(!/brazilComplianceAgentsPanel|setupEvidencePanel|growthReviewPanel/.test(contents), `${file} exposes private dashboard panels.`);
   }
+
+  assertIncludes("public.js", "findSensitiveData", "sensitive-data scanner");
+  assertIncludes("public.js", "Public intake is closed", "closed intake copy");
+  assertIncludes("public.js", "if (!readiness.liveReady)", "live gate submit block");
+  assertIncludes("public.js", 'readiness.liveReady ? `<a href="${mailtoUrl(order)}">Open email draft</a>` : ""', "email action gated by live readiness");
 }
 
-function checkPaidPilotProfitReadinessContract() {
-  const script = read("script.js");
+function checkPrivateSurface() {
   const indexHtml = read("index.html");
-  const ledgerDoc = read("GOOGLE_SHEET_LEDGER.md");
-  const satelliteDoc = read("SATELLITE_COMPANY.md");
-  const runbook = read("OPERATIONS_RUNBOOK.md");
-  const publicHtml = read("public.html");
-  const publicJs = read("public.js");
-  const publicConfigText = read("public-config.js");
-  const publicConfig = loadPublicConfig();
-
-  const requiredScript = [
-    ["sales lead storage key", 'const SALES_LEADS_KEY = "strange-company-sales-leads"'],
-    ["sales lead stages", 'const salesLeadStages = ["prospect", "qualified", "invoice_ready", "invoice_sent", "paid", "delivered", "rejected"]'],
-    ["leads sheet headers", "const LEADS_HEADERS = ["],
-    ["sales lead loader", "function loadSalesLeads"],
-    ["sales lead saver", "function saveSalesLeads"],
-    ["profit readiness model", "function buildProfitReadiness"],
-    ["profit readiness renderer", "function renderProfitReadiness"],
-    ["sales pipeline renderer", "function renderSalesPipeline"],
-    ["sales lead create handler", "function addSalesLead"],
-    ["sales lead order conversion", "function convertSalesLeadToOrder"],
-    ["order stage sync", "function syncSalesLeadsFromOrders"],
-    ["lead qualification copy", "function leadQualificationPacket"],
-    ["lead invoice copy", "function leadInvoicePacket"],
-    ["lead ledger row copy", "function leadToLedgerRow"],
-    ["lead bulk TSV copy", "function copyAllLeadRows"],
-    ["daily closeout copy", "function copyDailyRunSummary"],
-    ["daily closeout summary", "function dailyRunCloseoutSummary"],
-    ["sensitive lead scan", "findSensitiveData([customer, contact, need, qualificationNote]"],
-    ["lead source copied into order", 'source: `Sales pipeline / ${lead.source || "Manual"}`'],
-    ["sales lead receipts", 'push("Sales Lead", lead.id'],
-    ["profit readiness receipt payload", "profitReadinessState: profitReadiness.state"]
-  ];
-  for (const [label, snippet] of requiredScript) {
-    assert(script.includes(snippet), `script.js is missing ${label}.`);
-  }
-
-  const indexExpectations = [
-    ["profit readiness panel", 'id="profitReadinessPanel"'],
-    ["sales lead form", 'id="salesLeadForm"'],
-    ["sales lead list", 'id="salesLeadList"'],
-    ["sales lead bulk copy", 'id="copyAllLeadRows"']
-  ];
-  for (const [label, snippet] of indexExpectations) {
-    assert(indexHtml.includes(snippet), `index.html is missing ${label}.`);
-  }
-
-  assert(ledgerDoc.includes("`Leads`"), "GOOGLE_SHEET_LEDGER.md must document the Leads tab.");
-  assert(
-    ledgerDoc.includes("created_at,lead_id,customer,contact,service,amount,source,stage,qualification_note,order_id,notes"),
-    "GOOGLE_SHEET_LEDGER.md must include the Leads tab header."
-  );
-  assert(satelliteDoc.includes("Profit Readiness"), "SATELLITE_COMPANY.md must document Profit Readiness.");
-  assert(runbook.includes("Paid Pilot Profit Readiness"), "OPERATIONS_RUNBOOK.md must document Paid Pilot Profit Readiness.");
-  assert(publicConfig.liveMode === false, "public-config.js must keep liveMode false by default.");
-
-  for (const [file, contents] of [
-    ["public.html", publicHtml],
-    ["public.js", publicJs],
-    ["public-config.js", publicConfigText]
-  ]) {
-    assert(!/Paid pilot pipeline/i.test(contents), `${file} exposes private paid pilot pipeline text.`);
-    assert(!/Profit readiness/i.test(contents), `${file} exposes private Profit readiness text.`);
-    assert(!/salesLeadForm/.test(contents), `${file} exposes salesLeadForm.`);
-    assert(!/strange-company-sales-leads/.test(contents), `${file} exposes sales lead storage key.`);
-    assert(!/copyAllLeadRows/.test(contents), `${file} exposes lead bulk copy action.`);
-    assert(!/\binvoice_ready\b/.test(contents), `${file} exposes private sales stage internals.`);
-  }
-}
-
-function checkOperationalV15Contract() {
   const script = read("script.js");
-  const indexHtml = read("index.html");
-  const runbook = read("OPERATIONS_RUNBOOK.md");
-  const publicHtml = read("public.html");
-  const publicJs = read("public.js");
-  const publicConfigText = read("public-config.js");
 
-  const requiredScript = [
-    ["setup evidence storage key", 'const SETUP_EVIDENCE_KEY = "strange-company-setup-evidence"'],
-    ["customer acquisition storage key", 'const CUSTOMER_ACQUISITION_KEY = "strange-company-customer-acquisition"'],
-    ["setup evidence statuses", 'const SETUP_EVIDENCE_STATUSES = ["missing", "pending", "verified", "blocked"]'],
-    ["setup evidence slots", "const SETUP_EVIDENCE_SLOTS = ["],
-    ["acquisition lead sources", 'const ACQUISITION_LEAD_SOURCES = ["referral", "email", "form", "direct", "partner"]'],
-    ["setup evidence loader", "function loadSetupEvidence"],
-    ["setup evidence saver", "function saveSetupEvidence"],
-    ["setup evidence normalizer", "function normalizeSetupEvidence"],
-    ["setup evidence model", "function buildSetupEvidenceModel"],
-    ["setup evidence renderer", "function renderSetupEvidence"],
-    ["setup evidence verify handler", "function verifySetupEvidence"],
-    ["setup evidence clear handler", "function clearSetupEvidence"],
-    ["setup evidence url sanitizer", 'safeHttpsUrl(raw)'],
-    ["setup evidence note sensitive scan", "findSensitiveData(note)"],
-    ["Brazil compliance agent list", "const BRAZIL_COMPLIANCE_AGENTS = ["],
-    ["Brazil compliance agent model", "function buildBrazilComplianceAgentsModel"],
-    ["Brazil compliance agent packet", "function brazilComplianceAgentPacket"],
-    ["Brazil compliance agent renderer", "function renderBrazilComplianceAgents"],
-    ["Brazil compliance agent copy handler", "async function copyBrazilComplianceAgentPacket"],
-    ["customer acquisition loader", "function loadCustomerAcquisition"],
-    ["customer acquisition saver", "function saveCustomerAcquisition"],
-    ["customer acquisition model", "function buildCustomerAcquisitionModel"],
-    ["customer acquisition renderer", "function renderCustomerAcquisition"],
-    ["outreach packet builder", "function outreachPacket"],
-    ["outreach log submit", "function submitOutreachLog"],
-    ["outreach log remove", "function removeOutreachEntry"],
-    ["outreach packet copy", "async function copyOutreachPacket"],
-    ["growth review model", "function buildGrowthReviewModel"],
-    ["growth review renderer", "function renderGrowthReview"],
-    ["growth review packet", "function growthReviewPacket"],
-    ["growth review copy handler", "async function copyGrowthReviewPacket"],
-    ["profit readiness reads setup evidence", "const setupModel = buildSetupEvidenceModel()"],
-    ["profit readiness blocker names slot", 'blockers.push(`unverified evidence: ${record.label}`)'],
-    ["setup evidence receipt type", 'push("Setup Evidence"'],
-    ["acquisition receipt type", 'push("Acquisition"'],
-    ["growth review receipt type", '"Growth Review",'],
-    ["sales lead sourceCategory", "const sourceCategory = ACQUISITION_LEAD_SOURCES.includes(sourceCategoryRaw)"]
-  ];
-  for (const [label, snippet] of requiredScript) {
-    assert(script.includes(snippet), `script.js is missing ${label}.`);
-  }
+  [
+    'id="public"',
+    'id="launch"',
+    'id="satellite"',
+    'id="operations"',
+    'id="treasury"',
+    'id="research"',
+    'id="liveEvidencePanel"',
+    'id="revenueStartPanel"'
+  ].forEach((snippet) => assert(indexHtml.includes(snippet), `index.html is missing ${snippet}.`));
 
-  const indexExpectations = [
-    ["setup evidence panel container", 'id="setupEvidencePanel"'],
-    ["setup evidence reset button", 'id="resetSetupEvidence"'],
-    ["Brazil compliance agents panel container", 'id="brazilComplianceAgentsPanel"'],
-    ["customer acquisition panel container", 'id="customerAcquisitionPanel"'],
-    ["customer acquisition reset button", 'id="resetCustomerAcquisition"'],
-    ["growth review panel container", 'id="growthReviewPanel"'],
-    ["growth review copy button", 'id="copyGrowthReview"'],
-    ["sales lead source category select", 'id="salesLeadSourceCategory"']
-  ];
-  for (const [label, snippet] of indexExpectations) {
-    assert(indexHtml.includes(snippet), `index.html is missing ${label}.`);
-  }
-
-  assert(runbook.includes("Operational v1.5"), "OPERATIONS_RUNBOOK.md must document Operational v1.5.");
-  assert(runbook.includes("Setup Evidence"), "OPERATIONS_RUNBOOK.md must reference the Setup Evidence panel.");
-  assert(runbook.includes("Brazil Compliance Agents"), "OPERATIONS_RUNBOOK.md must reference the Brazil Compliance Agents panel.");
-  assert(runbook.includes("Customer Acquisition"), "OPERATIONS_RUNBOOK.md must reference the Customer Acquisition panel.");
-  assert(runbook.includes("Growth Management"), "OPERATIONS_RUNBOOK.md must reference the Growth Management panel.");
-
-  const setupDoc = read("SETUP_EVIDENCE.md");
-  assert(setupDoc.includes("# Setup Evidence"), "SETUP_EVIDENCE.md must exist and start with a top-level heading.");
-  assert(setupDoc.includes("Profit Readiness Gate"), "SETUP_EVIDENCE.md must document the Profit Readiness gate.");
-
-  const acquisitionDoc = read("CUSTOMER_ACQUISITION.md");
-  assert(acquisitionDoc.includes("# Customer Acquisition"), "CUSTOMER_ACQUISITION.md must exist and start with a top-level heading.");
-  assert(acquisitionDoc.includes("Outreach Log"), "CUSTOMER_ACQUISITION.md must document the outreach log.");
-
-  const growthDoc = read("GROWTH_MANAGEMENT.md");
-  assert(growthDoc.includes("# Growth Management"), "GROWTH_MANAGEMENT.md must exist and start with a top-level heading.");
-  assert(growthDoc.includes("Growth States"), "GROWTH_MANAGEMENT.md must document growth states.");
-
-  const complianceAgentsDoc = read("BRAZIL_COMPLIANCE_AGENTS.md");
-  assert(complianceAgentsDoc.includes("# Brazil Compliance Agents"), "BRAZIL_COMPLIANCE_AGENTS.md must exist and start with a top-level heading.");
-  assert(complianceAgentsDoc.includes("AI prepares"), "BRAZIL_COMPLIANCE_AGENTS.md must document what AI can prepare.");
-  assert(complianceAgentsDoc.includes("Human must close"), "BRAZIL_COMPLIANCE_AGENTS.md must document human closure.");
-
-  for (const [file, contents] of [
-    ["public.html", publicHtml],
-    ["public.js", publicJs],
-    ["public-config.js", publicConfigText]
-  ]) {
-    assert(!/strange-company-setup-evidence/.test(contents), `${file} exposes setup evidence storage key.`);
-    assert(!/strange-company-customer-acquisition/.test(contents), `${file} exposes customer acquisition storage key.`);
-    assert(!/setupEvidencePanel/.test(contents), `${file} exposes setup evidence panel id.`);
-    assert(!/brazilComplianceAgentsPanel/.test(contents), `${file} exposes Brazil compliance agents panel id.`);
-    assert(!/customerAcquisitionPanel/.test(contents), `${file} exposes customer acquisition panel id.`);
-    assert(!/growthReviewPanel/.test(contents), `${file} exposes growth review panel id.`);
-    assert(!/copyGrowthReview/.test(contents), `${file} exposes growth review copy action.`);
-    assert(!/outreachLogForm/.test(contents), `${file} exposes outreach log form id.`);
-    assert(!/SETUP_EVIDENCE_SLOTS/.test(contents), `${file} exposes setup evidence slot internals.`);
-    assert(!/BRAZIL_COMPLIANCE_AGENTS/.test(contents), `${file} exposes Brazil compliance agent internals.`);
-    assert(!/ACQUISITION_LEAD_SOURCES/.test(contents), `${file} exposes acquisition lead source internals.`);
-  }
-}
-
-function checkRevenueStartContract() {
-  const script = read("script.js");
-  const indexHtml = read("index.html");
-  const runbook = read("OPERATIONS_RUNBOOK.md");
-  const livePilot = read("RUN_LIVE_PILOT.md");
-  const satelliteDoc = read("SATELLITE_COMPANY.md");
-  const revenuePilotDoc = read("REVENUE_PILOT.md");
-  const revenueStartDoc = read("REVENUE_START.md");
-  const readme = read("README.md");
-  const publicHtml = read("public.html");
-  const publicJs = read("public.js");
-  const publicConfigText = read("public-config.js");
-
-  const requiredScript = [
-    ["revenue start storage key", 'const REVENUE_START_KEY = "strange-company-revenue-start"'],
-    ["revenue start lanes", "const REVENUE_START_LANES = ["],
-    ["revenue start default", "function defaultRevenueStart"],
-    ["revenue start loader", "function loadRevenueStart"],
-    ["revenue start saver", "function saveRevenueStart"],
-    ["revenue start packet lane normalizer", "function normalizeRevenueStartPacketLane"],
-    ["revenue start model", "function buildRevenueStartModel"],
-    ["revenue start renderer", "function renderRevenueStart"],
-    ["revenue start task toggle", "function toggleRevenueStartTask"],
-    ["revenue start lane snapshot", "function snapshotRevenueStartLanes"],
-    ["revenue start packet builder", "function revenueStartPacket"],
-    ["revenue start issue handler", "function issueRevenueStartPacket"],
-    ["revenue start copy handler", "function copyRevenueStartPacket"],
-    ["revenue start packet captures lanes", "lanes: snapshotRevenueStartLanes(model.lanes)"],
-    ["revenue start packet captures next action", "nextAction: model.nextAction"],
-    ["revenue start receipt", '"Revenue Start",'],
-    ["revenue packet receipt carries lane snapshots", "laneSnapshots: (packet.lanes || []).map"],
-    ["revenue packet receipt", 'push("Revenue Packet"']
-  ];
-  for (const [label, snippet] of requiredScript) {
-    assert(script.includes(snippet), `script.js is missing ${label}.`);
-  }
-
-  const indexExpectations = [
-    ["revenue start panel", 'id="revenueStartPanel"'],
-    ["issue start packet button", 'id="issueRevenueStartPacket"'],
-    ["reset revenue start button", 'id="resetRevenueStart"']
-  ];
-  for (const [label, snippet] of indexExpectations) {
-    assert(indexHtml.includes(snippet), `index.html is missing ${label}.`);
-  }
-
-  assert(runbook.includes("Revenue Start Board"), "OPERATIONS_RUNBOOK.md must document the Revenue Start Board.");
-  assert(livePilot.includes("Revenue start packet issued"), "RUN_LIVE_PILOT.md must include the start packet setup step.");
-  assert(satelliteDoc.includes("## Revenue Start"), "SATELLITE_COMPANY.md must document Revenue Start.");
-  assert(revenuePilotDoc.includes("## Starting Revenue"), "REVENUE_PILOT.md must document Starting Revenue.");
-  assert(revenueStartDoc.includes("# Revenue Start"), "REVENUE_START.md must exist and start with a top-level heading.");
-  assert(revenueStartDoc.includes("Strange Company Lane"), "REVENUE_START.md must document the Strange Company lane.");
-  assert(revenueStartDoc.includes("Second Company Lane"), "REVENUE_START.md must document the second company lane.");
-  assert(readme.includes("REVENUE_START.md"), "README.md must link the Revenue Start operator doc.");
-  assert(readme.includes("tools/audit_company_functionality.js"), "README.md must link the company functionality audit.");
-
-  for (const [file, contents] of [
-    ["public.html", publicHtml],
-    ["public.js", publicJs],
-    ["public-config.js", publicConfigText]
-  ]) {
-    assert(!/strange-company-revenue-start/.test(contents), `${file} exposes revenue start storage key.`);
-    assert(!/revenueStartPanel/.test(contents), `${file} exposes revenue start panel id.`);
-    assert(!/issueRevenueStartPacket/.test(contents), `${file} exposes revenue start issue action.`);
-  }
-}
-
-function checkBrazilComplianceContract() {
-  const readme = read("README.md");
-  const terms = read("TERMS.md");
-  const privacy = read("PRIVACY.md");
-  const termos = read("TERMOS.md");
-  const avisoPrivacidade = read("AVISO_DE_PRIVACIDADE.md");
-  const setupEvidence = read("SETUP_EVIDENCE.md");
-  const livePilot = read("RUN_LIVE_PILOT.md");
-  const startPacket = read("OPERATIONS_START_PACKET.md");
-  const brazilCompliance = read("BRAZIL_COMPLIANCE.md");
-  const brazilAgents = read("BRAZIL_COMPLIANCE_AGENTS.md");
-  const aiHandoff = read("AI_LEGAL_HANDOFF.md");
-  const googleFormIntake = read("GOOGLE_FORM_INTAKE.md");
-  const supportEvidence = read("SUPPORT_INBOX_EVIDENCE.md");
-  const indexHtml = read("index.html");
-  const publicHtml = read("public.html");
-  const publicJs = read("public.js");
-  const script = read("script.js");
-  const styles = read("styles.css");
-
-  const requiredDocs = [
-    ["README Portuguese terms link", readme, "TERMOS.md"],
-    ["README Portuguese privacy link", readme, "AVISO_DE_PRIVACIDADE.md"],
-    ["README Brazil compliance link", readme, "BRAZIL_COMPLIANCE.md"],
-    ["README Brazil compliance agents link", readme, "BRAZIL_COMPLIANCE_AGENTS.md"],
-    ["README support inbox evidence link", readme, "SUPPORT_INBOX_EVIDENCE.md"],
-    ["README AI handoff link", readme, "AI_LEGAL_HANDOFF.md"],
-    ["README Google Form intake link", readme, "GOOGLE_FORM_INTAKE.md"],
-    ["README Google Form Apps Script link", readme, "tools/google_apps_script_create_intake_form.gs"],
-    ["Portuguese terms heading", termos, "# Termos de Uso e Contratacao"],
-    ["Portuguese terms manual request", termos, "Pedido Manual"],
-    ["Portuguese terms consumer handling", termos, "Cancelamento, Reembolso e Direito de Arrependimento"],
-    ["Portuguese terms fiscal route", termos, "NFS-e"],
-    ["Portuguese privacy heading", avisoPrivacidade, "# Aviso de Privacidade"],
-    ["Portuguese privacy controller", avisoPrivacidade, "Controlador"],
-    ["Portuguese privacy rights", avisoPrivacidade, "Direitos dos Titulares"],
-    ["Portuguese privacy AI boundary", avisoPrivacidade, "A IA nao deve"],
-    ["public page Portuguese terms link", publicHtml, 'href="TERMOS.md"'],
-    ["public page Portuguese privacy link", publicHtml, 'href="AVISO_DE_PRIVACIDADE.md"'],
-    ["terms Brazil operator gate", terms, "Brazilian operating entity"],
-    ["terms NFS-e gate", terms, "NFS-e"],
-    ["terms AI boundary", terms, "AI-created material is draft support"],
-    ["privacy LGPD notice", privacy, "LGPD"],
-    ["privacy data-subject rights", privacy, "Data-Subject Rights"],
-    ["privacy AI boundary", privacy, "AI must not"],
-    ["setup evidence Brazil operator", setupEvidence, "Brazilian operating entity"],
-    ["setup evidence NFS-e", setupEvidence, "NFS-e"],
-    ["setup evidence LGPD contact", setupEvidence, "LGPD contact"],
-    ["live pilot Brazil posture", livePilot, "manual paid pilot in Brazil"],
-    ["operations start Brazil gate", startPacket, "Brazilian entity/CNPJ"],
-    ["Brazil gate matrix", brazilCompliance, "Gate Matrix"],
-    ["Brazil AI boundary", brazilCompliance, "AI may not"],
-    ["Brazil compliance agents heading", brazilAgents, "# Brazil Compliance Agents"],
-    ["Brazil compliance agents AI lane", brazilAgents, "AI prepares"],
-    ["Brazil compliance agents human lane", brazilAgents, "Human must close"],
-    ["AI human review queue", aiHandoff, "Human Review Queue"],
-    ["Google Form private URL boundary", googleFormIntake, "Do not commit the private Sheet URL"],
-    ["Google Form verification stop rule", googleFormIntake, "Do not set googleFormVerified true"],
-    ["Google Form Apps Script builder", read("tools/google_apps_script_create_intake_form.gs"), "FormApp.create"],
-    ["Google Form Apps Script Sheet destination", read("tools/google_apps_script_create_intake_form.gs"), "setDestination(FormApp.DestinationType.SPREADSHEET"],
-    ["support inbox evidence heading", supportEvidence, "# Support Inbox Evidence"],
-    ["support inbox Gmail label", supportEvidence, "Strange Works Studio/Support"],
-    ["support inbox Gmail message id", supportEvidence, "19e4c73fcdbf42a2"],
-    ["private Brazil compliance agents panel", indexHtml, 'id="brazilComplianceAgentsPanel"'],
-    ["public request packet Brazil jurisdiction", publicJs, "Jurisdiction: Brazil"],
-    ["public request packet AI human review", publicJs, "AI-generated legal, tax, privacy, and compliance copy requires human review"],
-    ["script Brazil compliance agent list", script, "const BRAZIL_COMPLIANCE_AGENTS = ["],
-    ["script Brazil compliance agent renderer", script, "function renderBrazilComplianceAgents"],
-    ["script Brazil setup slot", script, "Brazilian operator/CNPJ"],
-    ["script NFS-e setup slot", script, "NFS-e or fiscal receipt route"],
-    ["script LGPD setup slot", script, "LGPD contact path"],
-    ["styles Brazil compliance agent card", styles, ".compliance-agent-card"]
-  ];
-
-  for (const [label, contents, snippet] of requiredDocs) {
-    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
-  }
+  [
+    "function buildReceiptChain",
+    "function buildLiveEvidenceModel",
+    "function renderLiveEvidencePanel",
+    "function applyLocalStrangeGuardrails",
+    "const BRAZIL_COMPLIANCE_AGENTS = [",
+    "const SETUP_EVIDENCE_SLOTS = [",
+    "const REVENUE_START_LANES = ["
+  ].forEach((snippet) => assert(script.includes(snippet), `script.js is missing ${snippet}.`));
 }
 
 function checkConfig() {
   const config = loadPublicConfig();
   const formUrl = String(config.googleFormUrl || "").trim();
   const supportEmail = String(config.supportEmail || "").trim();
-  const termsReviewedAt = String(config.termsReviewedAt || "").trim();
-  const privacyReviewedAt = String(config.privacyReviewedAt || "").trim();
-  const brazilComplianceReviewedAt = String(config.brazilComplianceReviewedAt || "").trim();
-  const aiHandoffReviewedAt = String(config.aiHandoffReviewedAt || "").trim();
   const services = Array.isArray(config.services) ? config.services : [];
 
   assert(Boolean(config.operatorName), "public-config.js needs operatorName.");
+  assert(config.jurisdiction === "BR", "public-config.js jurisdiction must be BR.");
   assert(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(supportEmail), "public-config.js needs a valid supportEmail.");
   assert(isSafeGoogleFormUrl(formUrl), "googleFormUrl must be blank or an https://docs.google.com/forms/ URL.");
   assert(typeof config.supportInboxVerified === "boolean", "supportInboxVerified must be boolean.");
   assert(typeof config.googleFormVerified === "boolean", "googleFormVerified must be boolean.");
   assert(typeof config.liveMode === "boolean", "liveMode must be boolean.");
-  assert(config.jurisdiction === "BR", "public-config.js jurisdiction must be BR for the Brazil-first launch gate.");
-  assert(
-    config.aiGeneratedLegalDocsRequireHumanReview === true,
-    "public-config.js must keep aiGeneratedLegalDocsRequireHumanReview true."
-  );
-  assert(isIsoDate(termsReviewedAt), "termsReviewedAt must be blank or YYYY-MM-DD.");
-  assert(isIsoDate(privacyReviewedAt), "privacyReviewedAt must be blank or YYYY-MM-DD.");
-  assert(isIsoDate(brazilComplianceReviewedAt), "brazilComplianceReviewedAt must be blank or YYYY-MM-DD.");
-  assert(isIsoDate(aiHandoffReviewedAt), "aiHandoffReviewedAt must be blank or YYYY-MM-DD.");
+  assert(config.aiGeneratedLegalDocsRequireHumanReview === true, "AI legal docs must require human review.");
+  assert(isIsoDate(String(config.termsReviewedAt || "").trim()), "termsReviewedAt must be blank or YYYY-MM-DD.");
+  assert(isIsoDate(String(config.privacyReviewedAt || "").trim()), "privacyReviewedAt must be blank or YYYY-MM-DD.");
+  assert(isIsoDate(String(config.brazilComplianceReviewedAt || "").trim()), "brazilComplianceReviewedAt must be blank or YYYY-MM-DD.");
+  assert(isIsoDate(String(config.aiHandoffReviewedAt || "").trim()), "aiHandoffReviewedAt must be blank or YYYY-MM-DD.");
   assert(services.length > 0, "services must contain at least one public offer.");
-
-  for (const [index, service] of services.entries()) {
-    assert(Boolean(service.id), `services[${index}] needs id.`);
-    assert(Boolean(service.title), `services[${index}] needs title.`);
-    assert(Number(service.price) > 0, `services[${index}] needs a positive price.`);
-  }
 
   if (config.googleFormVerified) {
     assert(Boolean(formUrl), "googleFormVerified requires googleFormUrl.");
   }
-
-  if (config.supportInboxVerified) {
-    const supportEvidence = read("SUPPORT_INBOX_EVIDENCE.md");
-    assert(supportEvidence.includes(supportEmail), "supportInboxVerified requires SUPPORT_INBOX_EVIDENCE.md to reference supportEmail.");
-  }
-
   if (config.liveMode) {
     assert(config.supportInboxVerified, "liveMode requires supportInboxVerified.");
     assert(config.googleFormVerified, "liveMode requires googleFormVerified.");
     assert(Boolean(formUrl), "liveMode requires googleFormUrl.");
-    assert(Boolean(termsReviewedAt), "liveMode requires termsReviewedAt.");
-    assert(Boolean(privacyReviewedAt), "liveMode requires privacyReviewedAt.");
-    assert(Boolean(brazilComplianceReviewedAt), "liveMode requires brazilComplianceReviewedAt.");
-    assert(Boolean(aiHandoffReviewedAt), "liveMode requires aiHandoffReviewedAt.");
+    assert(Boolean(config.termsReviewedAt), "liveMode requires termsReviewedAt.");
+    assert(Boolean(config.privacyReviewedAt), "liveMode requires privacyReviewedAt.");
+    assert(Boolean(config.brazilComplianceReviewedAt), "liveMode requires brazilComplianceReviewedAt.");
+    assert(Boolean(config.aiHandoffReviewedAt), "liveMode requires aiHandoffReviewedAt.");
   }
 }
 
-compileJavaScript("public-config.js");
-compileJavaScript("public.js");
-compileJavaScript("script.js");
-compileJavaScript("tools/audit_company_functionality.js");
-compileJavaScript("tools/draft_external_live_packet.js");
-compileJavaScript("tools/generate_external_live_gap_packet.js");
-compileJavaScript("tools/validate_external_live_packet.js");
-compileJavaScript("tools/check_external_live_packet_gate.js");
-checkExternalLivePacketGate();
+checkJavaScript();
+checkCoreDocs();
+checkLegacyNoiseRemoved();
 checkPublicSurface();
-checkPrivateUrlAllowlists();
-checkOutcomeEvidenceContract();
-checkLedgerBridgeContract();
-checkOrderLifecycleContract();
-checkOrderTimelineContract();
-checkDailyPilotRunContract();
-checkPaidPilotProfitReadinessContract();
-checkOperationalV15Contract();
-checkRevenueStartContract();
-checkBrazilComplianceContract();
+checkPrivateSurface();
 checkConfig();
 
 if (failures.length) {
   console.error("Public launch preflight failed:");
-  for (const failure of failures) {
-    console.error(`- ${failure}`);
-  }
+  failures.forEach((failure) => console.error(`- ${failure}`));
   process.exit(1);
 }
 

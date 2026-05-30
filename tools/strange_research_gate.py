@@ -126,6 +126,30 @@ FAKE_EVIDENCE_PATTERNS = [
     ),
 ]
 
+VAGUE_REPO_CRITIQUE_PATTERNS = [
+    re.compile(r"\b(?:ai\s+)?slop\b", re.I),
+    re.compile(r"\b(?:trash|garbage|nonsense|word\s+salad)\b", re.I),
+]
+
+ACTIONABLE_CRITIQUE_MARKERS = [
+    re.compile(r"\b[A-Z0-9_./-]+\.(?:md|js|py|html|json|yml|yaml)\b", re.I),
+    re.compile(r"\b(?:line|section|file|readme|dashboard|install|test|function|public\s+offer|business\s+model|vau)\b", re.I),
+    re.compile(r"\b(?:delete|rewrite|split|reduce|replace|fix|broken|unclear|missing|fails?)\b", re.I),
+]
+
+REPO_SIGNAL_NOISE_PATTERNS = [
+    re.compile(r"\btoo\s+many\s+docs?\b", re.I),
+    re.compile(r"\b(?:no|not\s+enough)\s+(?:runnable|product|code|tests?)\b", re.I),
+    re.compile(r"\b(?:install|setup|test(?:ing)?|dashboard)\s+(?:is\s+)?(?:unclear|broken|missing|confusing)\b", re.I),
+    re.compile(r"\b(?:business\s+model|public\s+offer|value\s+proposition)\s+(?:is\s+)?(?:unclear|missing|confusing)\b", re.I),
+    re.compile(r"\b(?:ai\s+filler|ai-written|inflated\s+language|vague\s+language)\b", re.I),
+    re.compile(r"\bvau\b.*\b(?:claims?\s+too\s+much|fake\s+proof|proof\s+engine|overclaim)\b", re.I),
+]
+
+
+def _has_actionable_critique_detail(text: str) -> bool:
+    return any(pattern.search(text) for pattern in ACTIONABLE_CRITIQUE_MARKERS)
+
 
 def detect_strange_guardrails(
     claim: str,
@@ -215,22 +239,111 @@ def detect_strange_guardrails(
             )
         )
 
+    vague_match = _first_match(text, VAGUE_REPO_CRITIQUE_PATTERNS)
+    if vague_match and not _has_actionable_critique_detail(text):
+        issues.append(
+            StrangeGuardrailIssue(
+                code="critique_requires_specifics",
+                severity="warning",
+                message=(
+                    "A vague repo verdict such as 'slop' is not actionable by itself. "
+                    "Ask for 3-5 exact files, sections, or failing workflows to delete, "
+                    "rewrite, or turn into runnable value."
+                ),
+                evidence=vague_match,
+            )
+        )
+
+    signal_noise_match = _first_match(text, REPO_SIGNAL_NOISE_PATTERNS)
+    if signal_noise_match:
+        issues.append(
+            StrangeGuardrailIssue(
+                code="repo_signal_to_noise_review",
+                severity="warning",
+                message=(
+                    "Treat this as a repo signal-to-noise review: separate runnable "
+                    "dashboard/functions, install/test path, public offer, business "
+                    "model, and VAU claim boundaries before defending the repo."
+                ),
+                evidence=signal_noise_match,
+            )
+        )
+
     return issues
+
+
+def fallback_evaluate_argument(
+    claim: str,
+    argument: str,
+    context: str = "",
+    task: str = "",
+    strictness: str = "high",
+) -> dict[str, Any]:
+    text = "\n".join([claim, argument, context, task])
+    caveat_patterns = [
+        r"\btoo\s+many\s+docs?\b",
+        r"\bunclear|missing|confusing|broken\b",
+        r"\bslop|trash|garbage|nonsense|word\s+salad\b",
+        r"\bvau\b.*\bproof\b",
+    ]
+    has_caveat = any(re.search(pattern, text, re.I) for pattern in caveat_patterns)
+    return {
+        "id": "local-strange-fallback",
+        "recommendation": "accept_with_caveats" if has_caveat else "accept",
+        "effective_polarity": "effective_yes" if not has_caveat else "needs_review",
+        "effectiveness_score": 0.55 if has_caveat else 0.7,
+        "bogusness_score": 0.35 if has_caveat else 0.2,
+        "confidence": 0.55,
+        "issues": [
+            {
+                "code": "local_fallback_review",
+                "severity": "warning",
+                "message": (
+                    "External reactive tools are not installed; this is the local "
+                    "Strange Company fallback plus hard guardrails."
+                ),
+            }
+        ],
+        "probes": [
+            {
+                "type": "local_guardrail",
+                "question": "Does the claim violate the Strange Company hard rules?",
+                "purpose": f"fallback check with strictness={strictness}",
+            }
+        ],
+    }
+
+
+def fallback_to_human(report: Any) -> str:
+    data = report if isinstance(report, dict) else {}
+    return "\n".join(
+        [
+            "Local Strange Company fallback report",
+            f"Recommendation: {data.get('recommendation', 'unknown')}",
+            f"Effective polarity: {data.get('effective_polarity', 'unknown')}",
+            "External reactive tools were not loaded; local hard guardrails still apply.",
+        ]
+    )
+
+
+def fallback_to_json_dict(report: Any) -> dict[str, Any]:
+    if isinstance(report, dict):
+        return report
+    return fallback_evaluate_argument("", "")
 
 
 def load_reactive_tools() -> tuple[Callable[..., Any], Callable[[Any], str], Callable[[Any], dict[str, Any]]]:
     if not FILTER_SRC.exists():
-        raise SystemExit(
-            "Effective Boolean Filter source not found. "
-            "Clone https://github.com/Arthurcdag/reactive-research-tools into "
-            "external/reactive-research-tools."
-        )
+        return fallback_evaluate_argument, fallback_to_human, fallback_to_json_dict
 
     if str(FILTER_SRC) not in sys.path:
         sys.path.insert(0, str(FILTER_SRC))
 
-    from effective_boolean_filter.engine import evaluate_argument  # noqa: PLC0415
-    from effective_boolean_filter.report import to_human, to_json_dict  # noqa: PLC0415
+    try:
+        from effective_boolean_filter.engine import evaluate_argument  # noqa: PLC0415
+        from effective_boolean_filter.report import to_human, to_json_dict  # noqa: PLC0415
+    except ModuleNotFoundError:
+        return fallback_evaluate_argument, fallback_to_human, fallback_to_json_dict
 
     return evaluate_argument, to_human, to_json_dict
 

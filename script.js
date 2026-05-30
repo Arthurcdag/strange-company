@@ -756,7 +756,7 @@ const BRAZIL_COMPLIANCE_AGENTS = [
     setupIds: ["terms-review", "privacy-review", "lgpd-contact"],
     aiCan: "Prepare a no-submit handoff with every AI-drafted legal, tax, privacy, and compliance artifact that needs human approval.",
     humanMust: "Lawyer, accountant, founder, or operator signs off the relevant artifact and records dates in public-config.js before live mode.",
-    evidence: "AI_LEGAL_HANDOFF.md reviewed, terms/privacy review dates set, Brazil compliance review date set, and AI handoff review date set.",
+    evidence: "SC_HUMAN_REVIEW_REQUEST.md reviewed, terms/privacy review dates set, Brazil compliance review date set, and AI handoff review date set.",
     stopRule: "Do not treat AI output as legal, accounting, privacy, or tax approval."
   }
 ];
@@ -856,55 +856,55 @@ const ADAPTIVE_DAMAGE_ROUTES = [
   {
     id: "live-gate",
     label: "Live gate blocker",
-    lane: "public-config.js / OPERATOR_FAST_START.md / LIVE_HANDOFF_CHECKLIST.md / OPERATIONS_START_PACKET.md",
+    lane: "public-config.js / README.md / INSTALL_AND_TEST.md",
     countermeasure: "Keep liveMode false, record the missing external evidence, and rerun the live audit only after the artifact is real."
   },
   {
     id: "brazil-compliance",
     label: "Brazil compliance blocker",
-    lane: "BRAZIL_COMPLIANCE.md / BRAZIL_COMPLIANCE_AGENTS.md / AI_LEGAL_HANDOFF.md",
+    lane: "BRAZIL_COMPLIANCE.md / TERMOS.md / AVISO_DE_PRIVACIDADE.md",
     countermeasure: "Prepare the smallest legal, tax, LGPD, fiscal, or AI handoff packet and leave final closure to the responsible human."
   },
   {
     id: "google-form",
     label: "Google Form or ledger blocker",
-    lane: "GOOGLE_FORM_INTAKE.md / tools/google_apps_script_create_intake_form.gs / GOOGLE_SHEET_LEDGER.md",
+    lane: "public-config.js / tools/google_apps_script_create_intake_form.gs / private Sheet evidence",
     countermeasure: "Narrow the intake route to a manual Form or Sheet verification step, then require one safe test response before marking the route verified."
   },
   {
     id: "support-incident",
     label: "Support or incident failure",
-    lane: "SUPPORT.md / SUPPORT_INBOX_EVIDENCE.md / OPERATIONS_RUNBOOK.md",
+    lane: "SUPPORT.md / private inbox evidence / INSTALL_AND_TEST.md",
     countermeasure: "Pause affected work, record the incident response, and verify the monitored inbox or escalation owner before reopening the lane."
   },
   {
     id: "customer-order",
     label: "Customer order or delivery failure",
-    lane: "ORDER_DESK.md / OPERATIONS_RUNBOOK.md / receipt-chain order timeline",
+    lane: "public.html / index.html / receipt-chain order timeline",
     countermeasure: "Keep the order in its current safe state, add missing payment, fiscal, delivery, or acceptance evidence, and avoid advancing the status early."
   },
   {
     id: "growth-experiment",
     label: "Experiment or spend weakness",
-    lane: "AUTONOMOUS_CYCLE.md / OUTCOME_REVIEW.md / CAPITAL_ROUTER.md",
+    lane: "OPERATING_SYSTEM.md / RESEARCH_GATE.md / TREASURY_OS.md",
     countermeasure: "Route the weak outcome to revise or kill, narrow the next experiment, and require a Research Gate receipt before new spend."
   },
   {
     id: "security-resilience",
     label: "Security or resilience weakness",
-    lane: "RESILIENCE_MODEL.md / RESILIENCE_DRILLS.md / tools/survival_check.js",
+    lane: "CHARTER.md / OPERATING_SYSTEM.md / tools/survival_check.js",
     countermeasure: "Issue a hardening packet, add a survival check if the weakness is structural, and keep private state off the public surface."
   },
   {
     id: "failed-command",
     label: "Failed command or workflow",
-    lane: "ADAPTIVE_OPERATOR_PROTOCOL.md / OPERATING_SYSTEM.md",
+    lane: "OPERATING_SYSTEM.md / INSTALL_AND_TEST.md",
     countermeasure: "Capture the exact failure, change one condition, retry only when the cause is addressed, and leave a reproducible command for the next operator."
   },
   {
     id: "customer-objection",
     label: "Customer objection or rejection",
-    lane: "CUSTOMER_ACQUISITION.md / GROWTH_MANAGEMENT.md / ORDER_DESK.md",
+    lane: "SATELLITE_COMPANY.md / public.html / SUPPORT.md",
     countermeasure: "Turn the objection into a qualification note, narrow the offer or refund path, and do not scale the channel until the concern is resolved."
   }
 ];
@@ -1199,7 +1199,7 @@ function coreLiveEvidenceRows(config) {
       title: "Support inbox verified",
       field: "supportEmail + supportInboxVerified",
       passed: Boolean(String(config.supportEmail || "").trim() && config.supportInboxVerified === true),
-      evidence: "SUPPORT_INBOX_EVIDENCE.md plus the support section of EXTERNAL_LIVE_PACKET.local.json.",
+      evidence: "SUPPORT.md plus private inbox evidence kept outside the repo.",
       fix: "Record monitored inbox owner, cadence, test received timestamp, and reply timestamp."
     },
     {
@@ -1207,7 +1207,7 @@ function coreLiveEvidenceRows(config) {
       title: "Google Form URL public and safe",
       field: "googleFormUrl",
       passed: googleFormUrlReady(config.googleFormUrl),
-      evidence: "GOOGLE_FORM_INTAKE.md and the Google section of EXTERNAL_LIVE_PACKET.local.json.",
+      evidence: "public-config.js public Form URL plus private Sheet/Form test evidence.",
       fix: "Create the Form, link it to the private Sheet, then paste only the public Form URL."
     },
     {
@@ -1223,7 +1223,7 @@ function coreLiveEvidenceRows(config) {
       title: "Terms reviewed by human",
       field: "termsReviewedAt",
       passed: isIsoDate(config.termsReviewedAt),
-      evidence: "TERMS.md / TERMOS.md review note and external live packet legalReview section.",
+      evidence: "TERMOS.md review note and external live packet legalReview section.",
       fix: "Record the actual human review date as YYYY-MM-DD."
     },
     {
@@ -1231,7 +1231,7 @@ function coreLiveEvidenceRows(config) {
       title: "Privacy reviewed by human",
       field: "privacyReviewedAt",
       passed: isIsoDate(config.privacyReviewedAt),
-      evidence: "PRIVACY.md / AVISO_DE_PRIVACIDADE.md review note and external live packet legalReview section.",
+      evidence: "AVISO_DE_PRIVACIDADE.md review note and external live packet legalReview section.",
       fix: "Record the actual privacy review date as YYYY-MM-DD."
     },
     {
@@ -1239,7 +1239,7 @@ function coreLiveEvidenceRows(config) {
       title: "Brazil compliance review closed",
       field: "brazilComplianceReviewedAt",
       passed: isIsoDate(config.brazilComplianceReviewedAt),
-      evidence: "BRAZIL_COMPLIANCE.md, BRAZIL_COMPLIANCE_AGENTS.md, and human accounting/legal review notes.",
+      evidence: "BRAZIL_COMPLIANCE.md and human accounting/legal review notes.",
       fix: "Close CNPJ/fiscal/LGPD/payment support review with a responsible human."
     },
     {
@@ -1247,7 +1247,7 @@ function coreLiveEvidenceRows(config) {
       title: "AI legal handoff reviewed",
       field: "aiHandoffReviewedAt",
       passed: isIsoDate(config.aiHandoffReviewedAt),
-      evidence: "AI_LEGAL_HANDOFF.md and the responsible human review record.",
+      evidence: "SC_HUMAN_REVIEW_REQUEST.md and the responsible human review record.",
       fix: "Confirm which AI-prepared text remains draft-only and which human-owned changes are accepted."
     },
     {
@@ -6476,7 +6476,7 @@ function renderOperations() {
       <a href="TERMOS.md" target="_blank" rel="noreferrer">Termos</a>
       <a href="AVISO_DE_PRIVACIDADE.md" target="_blank" rel="noreferrer">Privacidade</a>
       <a href="SUPPORT.md" target="_blank" rel="noreferrer">Support</a>
-      <a href="RUN_LIVE_PILOT.md" target="_blank" rel="noreferrer">Live pilot</a>
+      <a href="INSTALL_AND_TEST.md" target="_blank" rel="noreferrer">Core test</a>
       <span>${escapeHtml(operations.supportEmail)}</span>
       ${sheetLink}
       ${stripeLink}
@@ -8835,6 +8835,76 @@ function toneForProposal(proposal) {
   return "amber";
 }
 
+function hasActionableCritiqueDetail(text) {
+  return /\b[A-Z0-9_./-]+\.(md|js|py|html|json|ya?ml)\b/i.test(text)
+    || /\b(line|section|file|readme|dashboard|install|test|function|public offer|business model|vau)\b/i.test(text)
+    || /\b(delete|rewrite|split|reduce|replace|fix|broken|unclear|missing|fails?)\b/i.test(text);
+}
+
+function detectLocalStrangeGuardrails(payload) {
+  const text = [
+    payload.claim || "",
+    payload.argument || "",
+    payload.context || "",
+    payload.task || ""
+  ].join("\n");
+  const issues = [];
+  const add = (code, severity, message, evidence) => {
+    issues.push({ code, severity, message, evidence });
+  };
+  const vagueCritique = text.match(/\b(?:ai\s+)?slop\b|\b(?:trash|garbage|nonsense|word\s+salad)\b/i);
+  if (vagueCritique && !hasActionableCritiqueDetail(text)) {
+    add(
+      "critique_requires_specifics",
+      "warning",
+      "Vague repo criticism is not actionable by itself. Ask for 3-5 exact files, sections, or failing workflows to delete, rewrite, or turn into runnable value.",
+      vagueCritique[0]
+    );
+  }
+  const signalNoise = text.match(/\btoo\s+many\s+docs?\b|\b(?:no|not\s+enough)\s+(?:runnable|product|code|tests?)\b|\b(?:install|setup|test(?:ing)?|dashboard)\s+(?:is\s+)?(?:unclear|broken|missing|confusing)\b|\b(?:business\s+model|public\s+offer|value\s+proposition)\s+(?:is\s+)?(?:unclear|missing|confusing)\b|\b(?:ai\s+filler|ai-written|inflated\s+language|vague\s+language)\b|\bvau\b.*\b(?:claims?\s+too\s+much|fake\s+proof|proof\s+engine|overclaim)\b/i);
+  if (signalNoise) {
+    add(
+      "repo_signal_to_noise_review",
+      "warning",
+      "Treat this as a repo signal-to-noise review: separate runnable dashboard/functions, install/test path, public offer, business model, and VAU claim boundaries before defending the repo.",
+      signalNoise[0]
+    );
+  }
+  return issues;
+}
+
+function applyLocalStrangeGuardrails(report, payload) {
+  const existing = Array.isArray(report.strange_guardrails) ? report.strange_guardrails : [];
+  const local = detectLocalStrangeGuardrails(payload);
+  const seen = new Set();
+  const guardrails = [...existing, ...local].filter((issue) => {
+    const key = `${issue.code}:${issue.evidence || ""}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+  if (!guardrails.length) {
+    return report;
+  }
+  const guarded = {
+    ...report,
+    reactive_recommendation: report.reactive_recommendation || report.recommendation || "unknown",
+    strange_guardrails: guardrails
+  };
+  const blocking = guardrails.some((issue) => issue.severity === "error");
+  if (blocking) {
+    guarded.recommendation = "reject";
+    guarded.effectiveness_score = Math.min(Number(guarded.effectiveness_score || 0), 0.25);
+    guarded.bogusness_score = Math.max(Number(guarded.bogusness_score || 0), 0.75);
+    guarded.confidence = Math.max(Number(guarded.confidence || 0), 0.9);
+  } else if (guarded.recommendation === "accept") {
+    guarded.recommendation = "accept_with_caveats";
+  }
+  return guarded;
+}
+
 function setGateStatus(status, tone = "") {
   const statusEl = document.querySelector("#gateStatus");
   statusEl.textContent = status;
@@ -8853,9 +8923,17 @@ function renderGateResult(report) {
     Number(report.confidence || 0).toFixed(3);
 
   const issues = Array.isArray(report.issues) ? report.issues : [];
+  const guardrails = Array.isArray(report.strange_guardrails) ? report.strange_guardrails : [];
+  const visibleIssues = [
+    ...guardrails.map((issue) => ({
+      code: issue.code,
+      message: `${issue.message}${issue.evidence ? ` Evidence: ${issue.evidence}` : ""}`
+    })),
+    ...issues
+  ];
   const probes = Array.isArray(report.probes) ? report.probes : [];
-  document.querySelector("#gateIssues").innerHTML = issues.length
-    ? issues
+  document.querySelector("#gateIssues").innerHTML = visibleIssues.length
+    ? visibleIssues
         .slice(0, 5)
         .map((issue) => `<li>${escapeHtml(issue.code)}: ${escapeHtml(issue.message)}</li>`)
         .join("")
@@ -8880,7 +8958,8 @@ function addGateRun(report, payload) {
     polarity: report.effective_polarity || "unknown",
     effectiveness: Number(report.effectiveness_score || 0),
     confidence: Number(report.confidence || 0),
-    issueCount: Array.isArray(report.issues) ? report.issues.length : 0,
+    issueCount: (Array.isArray(report.issues) ? report.issues.length : 0)
+      + (Array.isArray(report.strange_guardrails) ? report.strange_guardrails.length : 0),
     createdAt: new Date().toISOString()
   });
   gateRuns = gateRuns.slice(0, 12);
@@ -9452,7 +9531,7 @@ function setupResearchGate() {
       if (!response.ok) {
         throw new Error(`Gate returned ${response.status}`);
       }
-      const report = await response.json();
+      const report = applyLocalStrangeGuardrails(await response.json(), payload);
       renderGateResult(report);
       addGateRun(report, payload);
       renderGateRuns();
@@ -10238,13 +10317,14 @@ async function runTreasuryProposalGate(proposalId) {
     if (!response.ok) {
       throw new Error(`Gate returned ${response.status}`);
     }
-    const report = await response.json();
+    const report = applyLocalStrangeGuardrails(await response.json(), payload);
     proposal.reportId = report.id || "";
     proposal.recommendation = report.recommendation || "unknown";
     proposal.polarity = report.effective_polarity || "unknown";
     proposal.effectiveness = Number(report.effectiveness_score || 0);
     proposal.confidence = Number(report.confidence || 0);
-    proposal.issueCount = Array.isArray(report.issues) ? report.issues.length : 0;
+    proposal.issueCount = (Array.isArray(report.issues) ? report.issues.length : 0)
+      + (Array.isArray(report.strange_guardrails) ? report.strange_guardrails.length : 0);
     proposal.checkedAt = new Date().toISOString();
     proposal.status = isGatePassing(proposal.recommendation) ? "ready" : "blocked";
     addGateRun(report, payload);
