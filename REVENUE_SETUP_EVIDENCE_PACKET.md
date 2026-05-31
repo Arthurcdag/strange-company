@@ -475,6 +475,7 @@ Required checks before live mode:
 ```powershell
 node tools\preflight_public_launch.js
 node tools\revenue_setup_doctor.js
+node tools\check_revenue_setup_doctor_gate.js
 node tools\validate_revenue_setup_evidence.js
 node tools\report_revenue_setup_gaps.js
 node tools\audit_company_functionality.js

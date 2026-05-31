@@ -75,6 +75,7 @@ function checkJavaScript() {
     "tools/validate_external_live_packet.js",
     "tools/revenue_setup_schema.js",
     "tools/revenue_setup_doctor.js",
+    "tools/check_revenue_setup_doctor_gate.js",
     "tools/validate_revenue_setup_evidence.js",
     "tools/report_revenue_setup_gaps.js",
     "tools/check_revenue_setup_schema_sync.js",
