@@ -72,7 +72,7 @@ function auditRuntimeSurfaces() {
   assertIncludes("tools/strange_research_gate.py", "fallback_evaluate_argument", "local research fallback");
   assertIncludes("tools/preflight_public_launch.js", "checkLegacyNoiseRemoved", "core cleanup check");
   assertIncludes("tools/validate_external_live_packet.js", "External live packet validation", "external packet validator");
-  assertIncludes("tools/revenue_setup_schema.js", "REQUIRED_GATE_IDS", "revenue setup shared schema");
+  assertIncludes("tools/revenue_setup_schema.js", "REVENUE_SETUP_SCHEMA_VERSION", "revenue setup shared schema");
   assertIncludes("tools/validate_revenue_setup_evidence.js", "Revenue setup evidence validation", "revenue setup evidence validator");
   assertIncludes("tools/report_revenue_setup_gaps.js", "Revenue Setup Gap Report", "revenue setup gap reporter");
   assertIncludes("tools/check_revenue_setup_schema_sync.js", "Revenue setup schema sync passed", "revenue setup schema sync");

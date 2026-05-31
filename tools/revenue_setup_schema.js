@@ -1,3 +1,8 @@
+const REVENUE_SETUP_SCHEMA_VERSION = "2026-05-31-revenue-setup-evidence-index";
+const REVENUE_SETUP_TEMPLATE_STATUS = "template_only";
+const REVENUE_SETUP_OPERATOR = "Strange Works Studio";
+const PUBLIC_SAFE_RULE_REQUIRED_SNIPPET = "Do not store customer data";
+
 const REQUIRED_GATE_IDS = Object.freeze([
   "entity",
   "tax_nfse",
@@ -86,10 +91,14 @@ function gatePriority(status) {
 module.exports = {
   ALLOWED_STATUSES,
   GATE_LABELS,
+  PUBLIC_SAFE_RULE_REQUIRED_SNIPPET,
   REQUIRED_CHECKS_BEFORE_LIVE_MODE,
   REQUIRED_GATE_IDS,
   REQUIRED_PUBLIC_CONFIG_DATES,
   REQUIRED_READY_GATE_FIELDS,
+  REVENUE_SETUP_OPERATOR,
+  REVENUE_SETUP_SCHEMA_VERSION,
+  REVENUE_SETUP_TEMPLATE_STATUS,
   gatePriority,
   hasPlaceholder,
   isBlank,

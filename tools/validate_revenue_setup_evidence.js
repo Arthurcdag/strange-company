@@ -2,8 +2,11 @@ const fs = require("fs");
 const path = require("path");
 const {
   ALLOWED_STATUSES,
+  PUBLIC_SAFE_RULE_REQUIRED_SNIPPET,
   REQUIRED_CHECKS_BEFORE_LIVE_MODE,
   REQUIRED_GATE_IDS,
+  REVENUE_SETUP_SCHEMA_VERSION,
+  REVENUE_SETUP_TEMPLATE_STATUS,
   hasPlaceholder,
   isBlank,
   isClosedBlocker,
@@ -97,14 +100,16 @@ function assertArray(value, label) {
 
 function validateRootShape(index) {
   assertObject(index, "revenue setup evidence index");
-  if (isBlank(index.schema_version)) fail("schema_version is required.");
+  if (index.schema_version !== REVENUE_SETUP_SCHEMA_VERSION) {
+    fail(`schema_version must be ${REVENUE_SETUP_SCHEMA_VERSION}.`);
+  }
   if (isBlank(index.status)) fail("status is required.");
   if (isBlank(index.decision)) fail("decision is required.");
   if (typeof index.live_mode_requested !== "boolean") fail("live_mode_requested must be boolean.");
   if (typeof index.live_payment_intake_allowed !== "boolean") fail("live_payment_intake_allowed must be boolean.");
   if (isBlank(index.last_updated)) fail("last_updated is required.");
   if (isBlank(index.operator)) fail("operator is required.");
-  if (!String(index.public_safe_rule || "").includes("Do not store customer data")) {
+  if (!String(index.public_safe_rule || "").includes(PUBLIC_SAFE_RULE_REQUIRED_SNIPPET)) {
     fail("public_safe_rule must keep the no-customer-data rule.");
   }
   assertArray(index.service_offers, "service_offers");
@@ -185,7 +190,7 @@ function validateRequiredChecks(index) {
 
 function validateTemplate(index) {
   if (!templateOk) return;
-  if (index.status !== "template_only") {
+  if (index.status !== REVENUE_SETUP_TEMPLATE_STATUS) {
     warn("index status is not template_only; run with --require-ready before using it for live mode.");
   }
   if (index.live_mode_requested === true || index.live_payment_intake_allowed === true) {
@@ -195,6 +200,7 @@ function validateTemplate(index) {
 
 function validateReady(index, gateState) {
   if (!requireReady) return;
+  if (index.status === REVENUE_SETUP_TEMPLATE_STATUS) fail("status must not be template_only for ready evidence.");
   if (!isIsoDate(index.last_updated)) fail("last_updated must be YYYY-MM-DD for ready evidence.");
   if (index.live_mode_requested !== true) fail("live_mode_requested must be true for ready evidence.");
   if (index.live_payment_intake_allowed !== true) fail("live_payment_intake_allowed must be true for ready evidence.");

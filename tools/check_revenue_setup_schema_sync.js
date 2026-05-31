@@ -2,10 +2,14 @@ const fs = require("fs");
 const path = require("path");
 const {
   ALLOWED_STATUSES,
+  PUBLIC_SAFE_RULE_REQUIRED_SNIPPET,
   REQUIRED_CHECKS_BEFORE_LIVE_MODE,
   REQUIRED_GATE_IDS,
   REQUIRED_PUBLIC_CONFIG_DATES,
-  REQUIRED_READY_GATE_FIELDS
+  REQUIRED_READY_GATE_FIELDS,
+  REVENUE_SETUP_OPERATOR,
+  REVENUE_SETUP_SCHEMA_VERSION,
+  REVENUE_SETUP_TEMPLATE_STATUS
 } = require("./revenue_setup_schema");
 
 const root = path.resolve(__dirname, "..");
@@ -49,6 +53,19 @@ function assertHasOwn(object, key, label) {
 
 const template = readTemplate();
 const gates = Array.isArray(template.gates) ? template.gates : [];
+
+if (template.schema_version !== REVENUE_SETUP_SCHEMA_VERSION) {
+  fail(`template.schema_version must be ${REVENUE_SETUP_SCHEMA_VERSION}.`);
+}
+if (template.status !== REVENUE_SETUP_TEMPLATE_STATUS) {
+  fail(`template.status must be ${REVENUE_SETUP_TEMPLATE_STATUS}.`);
+}
+if (template.operator !== REVENUE_SETUP_OPERATOR) {
+  fail(`template.operator must be ${REVENUE_SETUP_OPERATOR}.`);
+}
+if (!String(template.public_safe_rule || "").includes(PUBLIC_SAFE_RULE_REQUIRED_SNIPPET)) {
+  fail(`template.public_safe_rule must include ${PUBLIC_SAFE_RULE_REQUIRED_SNIPPET}.`);
+}
 
 assertArrayEquals(gates.map((gate) => gate.gate_id), REQUIRED_GATE_IDS, "template.gates gate_id order");
 assertArrayEquals(
