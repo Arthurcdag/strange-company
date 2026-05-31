@@ -22,6 +22,7 @@ node --check public-config.js
 node --check public.js
 node --check script.js
 node tools/preflight_public_launch.js
+node tools/validate_revenue_setup_evidence.js
 node tools/audit_company_functionality.js
 node tools/survival_check.js
 python -B -m unittest discover -s tests
@@ -96,9 +97,11 @@ node --check public-config.js
 node --check public.js
 node --check script.js
 node --check tools\preflight_public_launch.js
+node --check tools\validate_revenue_setup_evidence.js
 node --check tools\audit_company_functionality.js
 node --check tools\survival_check.js
 node tools\preflight_public_launch.js
+node tools\validate_revenue_setup_evidence.js
 node tools\audit_company_functionality.js
 node tools\survival_check.js
 python -B -m unittest discover -s tests
@@ -109,6 +112,7 @@ Com Node local:
 
 ```powershell
 & 'C:\Users\Usuario\AppData\Local\OpenAI\Codex\bin\node.exe' tools\preflight_public_launch.js
+& 'C:\Users\Usuario\AppData\Local\OpenAI\Codex\bin\node.exe' tools\validate_revenue_setup_evidence.js
 & 'C:\Users\Usuario\AppData\Local\OpenAI\Codex\bin\node.exe' tools\audit_company_functionality.js
 & 'C:\Users\Usuario\AppData\Local\OpenAI\Codex\bin\node.exe' tools\survival_check.js
 ```
@@ -135,6 +139,7 @@ Este comando deve falhar no estado atual:
 
 ```powershell
 node tools\audit_company_functionality.js --require-live
+node tools\validate_revenue_setup_evidence.js --require-ready
 ```
 
-Isso e correto enquanto faltarem evidencias externas reais. Nao force `liveMode: true` para fazer teste passar.
+Isso e correto enquanto faltarem evidencias externas reais. Nao force `liveMode: true` nem marque evidencias como aprovadas para fazer teste passar.

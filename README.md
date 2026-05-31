@@ -56,6 +56,7 @@ node --check public-config.js
 node --check public.js
 node --check script.js
 node tools/preflight_public_launch.js
+node tools/validate_revenue_setup_evidence.js
 node tools/audit_company_functionality.js
 node tools/survival_check.js
 python -B -m unittest discover -s tests

@@ -224,6 +224,15 @@ proximos_passos:
 
 Record each response outside git first. Then copy only public-safe fields into the evidence index.
 
+Before treating the public-safe index as ready, run:
+
+```powershell
+node tools\validate_revenue_setup_evidence.js
+node tools\validate_revenue_setup_evidence.js --require-ready
+```
+
+The first command should pass for the template. The second must fail until every required human/outside gate is approved.
+
 | Response type | Meaning | Action |
 | --- | --- | --- |
 | approved | Reviewer gave a clear written yes for the narrow pilot scope | Record evidence id and exact reviewed date |

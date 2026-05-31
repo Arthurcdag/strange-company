@@ -73,6 +73,7 @@ function checkJavaScript() {
     "tools/draft_external_live_packet.js",
     "tools/generate_external_live_gap_packet.js",
     "tools/validate_external_live_packet.js",
+    "tools/validate_revenue_setup_evidence.js",
     "tools/check_external_live_packet_gate.js",
     "tools/survival_check.js"
   ].forEach(compileJavaScript);
@@ -88,6 +89,8 @@ function checkCoreDocs() {
     ["SATELLITE_COMPANY.md", "external customer revenue exists"],
     ["TREASURY_OS.md", "own retained surplus only"],
     ["BRAZIL_COMPLIANCE.md", "Keep `public-config.js` at `liveMode: false`"],
+    ["REVENUE_SETUP_EVIDENCE_PACKET.md", "Live payment intake remains blocked"],
+    ["REVENUE_SETUP_OUTREACH_PACKET.md", "Live payment intake remains blocked"],
     ["TERMOS.md", "# Termos de Uso e Contratacao"],
     ["AVISO_DE_PRIVACIDADE.md", "# Aviso de Privacidade"],
     ["SUPPORT.md", "tuiidagnese+strangeworks@gmail.com"],
