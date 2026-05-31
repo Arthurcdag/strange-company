@@ -98,6 +98,7 @@ try {
 if (!failures.length) {
   checkCoreSurvivalSurface();
   checkCommand("external live packet gate regression", ["tools/check_external_live_packet_gate.js"]);
+  checkCommand("revenue setup evidence gate regression", ["tools/check_revenue_setup_evidence_gate.js"]);
   checkCommand("revenue setup evidence template validation", ["tools/validate_revenue_setup_evidence.js"]);
   checkCommand("public launch preflight", ["tools/preflight_public_launch.js"]);
   checkCommand("company functionality audit", ["tools/audit_company_functionality.js"]);

@@ -75,6 +75,7 @@ function checkJavaScript() {
     "tools/validate_external_live_packet.js",
     "tools/validate_revenue_setup_evidence.js",
     "tools/check_external_live_packet_gate.js",
+    "tools/check_revenue_setup_evidence_gate.js",
     "tools/survival_check.js"
   ].forEach(compileJavaScript);
 }

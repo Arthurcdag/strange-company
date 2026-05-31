@@ -74,6 +74,7 @@ function auditRuntimeSurfaces() {
   assertIncludes("tools/validate_external_live_packet.js", "External live packet validation", "external packet validator");
   assertIncludes("tools/validate_revenue_setup_evidence.js", "Revenue setup evidence validation", "revenue setup evidence validator");
   assertIncludes("tools/check_external_live_packet_gate.js", "External live packet gate regression passed", "external packet gate regression");
+  assertIncludes("tools/check_revenue_setup_evidence_gate.js", "Revenue setup evidence gate regression passed", "revenue setup evidence gate regression");
 }
 
 function auditPublicBoundary() {
