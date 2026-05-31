@@ -21,6 +21,7 @@ Testar:
 node --check public-config.js
 node --check public.js
 node --check script.js
+node --check tools/revenue_setup_schema.js
 node tools/preflight_public_launch.js
 node tools/validate_revenue_setup_evidence.js
 node tools/report_revenue_setup_gaps.js
@@ -98,6 +99,7 @@ Use apenas dados falsos de teste, como `REVIEW TEST - no customer`.
 node --check public-config.js
 node --check public.js
 node --check script.js
+node --check tools\revenue_setup_schema.js
 node --check tools\preflight_public_launch.js
 node --check tools\validate_revenue_setup_evidence.js
 node --check tools\report_revenue_setup_gaps.js

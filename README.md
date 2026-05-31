@@ -55,6 +55,7 @@ No `npm install` or submodule is required for the core path.
 node --check public-config.js
 node --check public.js
 node --check script.js
+node --check tools/revenue_setup_schema.js
 node tools/preflight_public_launch.js
 node tools/validate_revenue_setup_evidence.js
 node tools/report_revenue_setup_gaps.js

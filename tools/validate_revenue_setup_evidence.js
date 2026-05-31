@@ -1,5 +1,14 @@
 const fs = require("fs");
 const path = require("path");
+const {
+  ALLOWED_STATUSES,
+  REQUIRED_CHECKS_BEFORE_LIVE_MODE,
+  REQUIRED_GATE_IDS,
+  hasPlaceholder,
+  isBlank,
+  isClosedBlocker,
+  isIsoDate
+} = require("./revenue_setup_schema");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
@@ -10,15 +19,7 @@ const packetPath = packetArg
   ? path.resolve(process.cwd(), packetArg)
   : path.join(root, "REVENUE_SETUP_EVIDENCE_INDEX.template.json");
 
-const requiredGateIds = [
-  "entity",
-  "tax_nfse",
-  "payment",
-  "privacy_lgpd",
-  "support",
-  "terms_offer"
-];
-const allowedStatuses = new Set(["missing", "partial", "approved", "blocked", "unclear"]);
+const allowedStatuses = new Set(ALLOWED_STATUSES);
 const failures = [];
 const warnings = [];
 
@@ -30,18 +31,6 @@ function warn(message) {
   warnings.push(message);
 }
 
-function isBlank(value) {
-  return value === undefined || value === null || String(value).trim() === "";
-}
-
-function isIsoDate(value) {
-  if (isBlank(value)) return false;
-  const text = String(value).trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
-  const date = new Date(`${text}T00:00:00.000Z`);
-  return !Number.isNaN(date.valueOf()) && date.toISOString().startsWith(text);
-}
-
 function readJson(filePath) {
   try {
     return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -49,15 +38,6 @@ function readJson(filePath) {
     fail(`could not read revenue setup evidence index: ${error.message}`);
     return {};
   }
-}
-
-function hasPlaceholder(value) {
-  return /YYYYMMDD|YYYY-MM-DD/.test(String(value || ""));
-}
-
-function isClosedBlocker(value) {
-  if (isBlank(value)) return true;
-  return /^(none|n\/a|closed|no blockers)$/i.test(String(value).trim());
 }
 
 function scanForPrivateData(value, currentPath = "$") {
@@ -165,11 +145,11 @@ function validateGates(index) {
     if (isBlank(gate.next_step)) fail(`${gate.gate_id || `gates[${indexNumber}]`}.next_step is required.`);
   }
 
-  for (const gateId of requiredGateIds) {
+  for (const gateId of REQUIRED_GATE_IDS) {
     if (!gateById.has(gateId)) fail(`missing required gate ${gateId}.`);
   }
 
-  const allApproved = requiredGateIds.every((gateId) => gateById.get(gateId)?.status === "approved");
+  const allApproved = REQUIRED_GATE_IDS.every((gateId) => gateById.get(gateId)?.status === "approved");
   if (!allApproved && index.live_payment_intake_allowed === true) {
     fail("live_payment_intake_allowed cannot be true until all required gates are approved.");
   }
@@ -193,23 +173,12 @@ function validatePublicConfigGate(index) {
 
 function validateRequiredChecks(index) {
   if (!Array.isArray(index.required_checks_before_live_mode)) return;
-  const requiredCommands = [
-    "node tools\\preflight_public_launch.js",
-    "node tools\\validate_revenue_setup_evidence.js",
-    "node tools\\audit_company_functionality.js",
-    "node tools\\check_revenue_setup_evidence_gate.js",
-    "node tools\\validate_revenue_setup_evidence.js --require-ready",
-    "node tools\\audit_company_functionality.js --require-live",
-    "node tools\\survival_check.js",
-    "python -B -m unittest discover -s tests",
-    "git diff --check"
-  ];
-  for (const command of requiredCommands) {
+  for (const command of REQUIRED_CHECKS_BEFORE_LIVE_MODE) {
     if (!index.required_checks_before_live_mode.includes(command)) {
       fail(`required_checks_before_live_mode is missing ${command}.`);
     }
   }
-  if (!Array.isArray(index.stop_rules) || index.stop_rules.length < requiredGateIds.length) {
+  if (!Array.isArray(index.stop_rules) || index.stop_rules.length < REQUIRED_GATE_IDS.length) {
     fail("stop_rules must keep at least one stop rule per required gate.");
   }
 }
@@ -231,7 +200,7 @@ function validateReady(index, gateState) {
   if (index.live_payment_intake_allowed !== true) fail("live_payment_intake_allowed must be true for ready evidence.");
   if (!gateState.allApproved) fail("all required gates must have status approved for ready evidence.");
 
-  for (const gateId of requiredGateIds) {
+  for (const gateId of REQUIRED_GATE_IDS) {
     const gate = gateState.gateById?.get(gateId) || {};
     if (hasPlaceholder(gate.evidence_id)) fail(`${gateId}.evidence_id must replace the placeholder.`);
     if (isBlank(gate.reviewer_role)) fail(`${gateId}.reviewer_role is required for ready evidence.`);
