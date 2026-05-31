@@ -6,6 +6,8 @@ This gate turns Strange Works Studio toward a Brazil-first launch path. It does 
 
 Keep `public-config.js` at `liveMode: false` until every Brazil gate below has outside evidence and the required checks pass.
 
+Use [REVENUE_SETUP_EVIDENCE_PACKET.md](REVENUE_SETUP_EVIDENCE_PACKET.md), [REVENUE_SETUP_OUTREACH_PACKET.md](REVENUE_SETUP_OUTREACH_PACKET.md), and [REVENUE_SETUP_EVIDENCE_INDEX.template.json](REVENUE_SETUP_EVIDENCE_INDEX.template.json) to collect the first public-safe evidence references for entity/CNPJ, tax/NFS-e, payment, LGPD, support, and terms review. Private artifacts must stay outside the public repo.
+
 Required checks:
 
 ```bash

@@ -2,6 +2,8 @@
 
 Status: human operator runbook. This is not legal, tax, accounting, payment-provider, or LGPD approval. It tells a responsible human what must be done before Strange Works Studio can receive real revenue without breaking the Strange Company guardrails.
 
+Use [REVENUE_SETUP_EVIDENCE_PACKET.md](REVENUE_SETUP_EVIDENCE_PACKET.md), [REVENUE_SETUP_OUTREACH_PACKET.md](REVENUE_SETUP_OUTREACH_PACKET.md), and [REVENUE_SETUP_EVIDENCE_INDEX.template.json](REVENUE_SETUP_EVIDENCE_INDEX.template.json) as the first outside-evidence handoff before asking any customer to pay.
+
 ## Core Rule
 
 Strange Company does not receive customer money in v0.

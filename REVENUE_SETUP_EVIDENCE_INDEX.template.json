@@ -1,0 +1,122 @@
+{
+  "schema_version": "2026-05-31-revenue-setup-evidence-index",
+  "status": "template_only",
+  "decision": "revenue setup may proceed as evidence gathering only",
+  "live_mode_requested": false,
+  "live_payment_intake_allowed": false,
+  "last_updated": "YYYY-MM-DD",
+  "operator": "Strange Works Studio",
+  "public_safe_rule": "Do not store customer data, bank data, tax documents, portal screenshots, identity documents, secrets, private invoices, contracts with signatures, or provider dashboard details in this file.",
+  "service_offers": [
+    {
+      "service_id": "compliance-proof-sprint",
+      "label": "Compliance proof sprint",
+      "price_brl": 750,
+      "status": "blocked_until_evidence_closes"
+    },
+    {
+      "service_id": "compliance-template-pack",
+      "label": "Compliance template pack",
+      "price_brl": 79,
+      "status": "blocked_until_evidence_closes"
+    }
+  ],
+  "gates": [
+    {
+      "gate_id": "entity",
+      "evidence_id": "SWS-REVSET-ENTITY-YYYYMMDD-01",
+      "status": "missing",
+      "reviewer_role": "",
+      "reviewed_at": "",
+      "artifact_type": "entity/CNPJ or approved operating-route review",
+      "allowed_scope": "",
+      "blocker_summary": "Entity/CNPJ or approved operating route is unresolved.",
+      "private_location_hint": "",
+      "next_step": "Ask accountant or lawyer to confirm seller identity, authority, address rule, and allowed services."
+    },
+    {
+      "gate_id": "tax_nfse",
+      "evidence_id": "SWS-REVSET-TAX-YYYYMMDD-01",
+      "status": "missing",
+      "reviewer_role": "",
+      "reviewed_at": "",
+      "artifact_type": "tax/CNAE/municipal registration/NFS-e review",
+      "allowed_scope": "",
+      "blocker_summary": "Tax, CNAE, municipal registration, NFS-e, and reconciliation route are unresolved.",
+      "private_location_hint": "",
+      "next_step": "Ask accountant to define tax regime, CNAE, NFS-e route, test/dry-run need, refund/cancellation fiscal handling, and monthly reconciliation."
+    },
+    {
+      "gate_id": "payment",
+      "evidence_id": "SWS-REVSET-PAYMENT-YYYYMMDD-01",
+      "status": "missing",
+      "reviewer_role": "",
+      "reviewed_at": "",
+      "artifact_type": "payment provider, payout, refund, dispute, and reconciliation review",
+      "allowed_scope": "",
+      "blocker_summary": "Payment provider, payout verification, refund route, dispute handling, and reconciliation are unresolved.",
+      "private_location_hint": "",
+      "next_step": "Confirm provider account name, hosted payment URL route, fees, payout timing, refund, dispute, failed payment, test payment, and export/reconciliation process."
+    },
+    {
+      "gate_id": "privacy_lgpd",
+      "evidence_id": "SWS-REVSET-PRIVACY-YYYYMMDD-01",
+      "status": "missing",
+      "reviewer_role": "",
+      "reviewed_at": "",
+      "artifact_type": "LGPD/privacy notice, processor, retention, rights, and incident review",
+      "allowed_scope": "",
+      "blocker_summary": "LGPD contact, rights route, processor list, retention, sensitive-data boundary, or incident owner is unresolved.",
+      "private_location_hint": "",
+      "next_step": "Ask privacy/terms reviewer to confirm data minimization, legal bases, processor list, retention, correction/deletion path, incident owner, and sensitive-data rejection wording."
+    },
+    {
+      "gate_id": "support",
+      "evidence_id": "SWS-REVSET-SUPPORT-YYYYMMDD-01",
+      "status": "partial",
+      "reviewer_role": "",
+      "reviewed_at": "",
+      "artifact_type": "support, refund, complaint, payment issue, privacy request, and incident ownership review",
+      "allowed_scope": "support inbox is drafted, but daily monitoring and owners must be confirmed",
+      "blocker_summary": "Support/refund/privacy/payment/incident ownership is not fully evidenced.",
+      "private_location_hint": "",
+      "next_step": "Send support test, confirm daily check time, refund owner, payment issue owner, privacy request owner, incident owner, and escalation route."
+    },
+    {
+      "gate_id": "terms_offer",
+      "evidence_id": "SWS-REVSET-TERMS-YYYYMMDD-01",
+      "status": "missing",
+      "reviewer_role": "",
+      "reviewed_at": "",
+      "artifact_type": "offer, terms, cancellation, refund, support, and no-advice boundary review",
+      "allowed_scope": "",
+      "blocker_summary": "Customer-facing seller identity, scope, exclusions, cancellation, refund, and no-advice boundary need outside review.",
+      "private_location_hint": "",
+      "next_step": "Ask reviewer to validate TERMOS.md, AVISO_DE_PRIVACIDADE.md, SUPPORT.md, and the first paid offer copy."
+    }
+  ],
+  "public_config_gate": {
+    "termsReviewedAt": "",
+    "privacyReviewedAt": "",
+    "brazilComplianceReviewedAt": "",
+    "aiHandoffReviewedAt": "",
+    "liveMode": false,
+    "status": "keep_live_mode_false_until_all_required_gates_close"
+  },
+  "required_checks_before_live_mode": [
+    "node tools\\preflight_public_launch.js",
+    "node tools\\audit_company_functionality.js",
+    "node tools\\audit_company_functionality.js --require-live",
+    "node tools\\survival_check.js",
+    "python -B -m unittest discover -s tests",
+    "git diff --check"
+  ],
+  "stop_rules": [
+    "Do not request payment if the entity/CNPJ or approved operating route is unresolved.",
+    "Do not mark an invoice sent or paid if the fiscal route is blocked, unreviewed, or unreconciled.",
+    "Do not collect money through a personal, unverified, held, restricted, or unreconciled account.",
+    "Pause intake if the LGPD rights path is not ready, if sensitive data arrives, or if privacy review is AI-only.",
+    "Do not open intake if support, refund, privacy, payment, or complaint messages cannot be answered by a human within the support targets.",
+    "Do not send a paid offer with AI-only terms, unclear refund language, or unclear service limits."
+  ]
+}

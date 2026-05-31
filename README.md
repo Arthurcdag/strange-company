@@ -23,6 +23,9 @@ The company should be hard to corrupt, simple to audit, and useful before it is 
 - [SC_HUMAN_REVIEW_REQUEST.md](SC_HUMAN_REVIEW_REQUEST.md): Portuguese brief for a paid reviewer/tester.
 - [SATELLITE_COMPANY.md](SATELLITE_COMPANY.md): normal service-company lane for external revenue.
 - [HUMAN_REVENUE_INSTRUCTIONS.md](HUMAN_REVENUE_INSTRUCTIONS.md): human operator runbook for receiving revenue through the satellite lane.
+- [REVENUE_SETUP_EVIDENCE_PACKET.md](REVENUE_SETUP_EVIDENCE_PACKET.md): first outside-evidence packet for revenue setup gates.
+- [REVENUE_SETUP_OUTREACH_PACKET.md](REVENUE_SETUP_OUTREACH_PACKET.md): copy/paste outreach messages for accountant, privacy/terms, payment, and support review.
+- [REVENUE_SETUP_EVIDENCE_INDEX.template.json](REVENUE_SETUP_EVIDENCE_INDEX.template.json): public-safe evidence index template for revenue setup receipts.
 - [TREASURY_OS.md](TREASURY_OS.md): own-surplus treasury guardrails.
 - [BRAZIL_COMPLIANCE.md](BRAZIL_COMPLIANCE.md): Brazil-first launch gate and AI/manual split.
 - [TERMOS.md](TERMOS.md): Portuguese customer-facing terms draft.
