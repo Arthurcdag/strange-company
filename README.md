@@ -22,6 +22,7 @@ The company should be hard to corrupt, simple to audit, and useful before it is 
 - [SC_GAME_THEORY_RATIONALE.md](SC_GAME_THEORY_RATIONALE.md): plain-language rationale plus investment/trading/customer-money firewall.
 - [SC_HUMAN_REVIEW_REQUEST.md](SC_HUMAN_REVIEW_REQUEST.md): Portuguese brief for a paid reviewer/tester.
 - [SATELLITE_COMPANY.md](SATELLITE_COMPANY.md): normal service-company lane for external revenue.
+- [HUMAN_REVENUE_INSTRUCTIONS.md](HUMAN_REVENUE_INSTRUCTIONS.md): human operator runbook for receiving revenue through the satellite lane.
 - [TREASURY_OS.md](TREASURY_OS.md): own-surplus treasury guardrails.
 - [BRAZIL_COMPLIANCE.md](BRAZIL_COMPLIANCE.md): Brazil-first launch gate and AI/manual split.
 - [TERMOS.md](TERMOS.md): Portuguese customer-facing terms draft.
