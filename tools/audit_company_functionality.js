@@ -76,6 +76,7 @@ function auditRuntimeSurfaces() {
   assertIncludes("tools/validate_revenue_setup_evidence.js", "Revenue setup evidence validation", "revenue setup evidence validator");
   assertIncludes("tools/report_revenue_setup_gaps.js", "Revenue Setup Gap Report", "revenue setup gap reporter");
   assertIncludes("tools/check_revenue_setup_schema_sync.js", "Revenue setup schema sync passed", "revenue setup schema sync");
+  assertIncludes("tools/check_revenue_setup_schema_sync_gate.js", "Revenue setup schema sync regression passed", "revenue setup schema sync regression");
   assertIncludes("tools/check_external_live_packet_gate.js", "External live packet gate regression passed", "external packet gate regression");
   assertIncludes("tools/check_revenue_setup_evidence_gate.js", "Revenue setup evidence gate regression passed", "revenue setup evidence gate regression");
 }

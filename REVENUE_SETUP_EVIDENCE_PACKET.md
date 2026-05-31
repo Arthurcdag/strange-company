@@ -478,6 +478,7 @@ node tools\validate_revenue_setup_evidence.js
 node tools\report_revenue_setup_gaps.js
 node tools\audit_company_functionality.js
 node tools\check_revenue_setup_schema_sync.js
+node tools\check_revenue_setup_schema_sync_gate.js
 node tools\check_revenue_setup_evidence_gate.js
 node tools\validate_revenue_setup_evidence.js --require-ready
 node tools\audit_company_functionality.js --require-live

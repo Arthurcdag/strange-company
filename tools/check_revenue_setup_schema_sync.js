@@ -13,7 +13,11 @@ const {
 } = require("./revenue_setup_schema");
 
 const root = path.resolve(__dirname, "..");
-const templatePath = path.join(root, "REVENUE_SETUP_EVIDENCE_INDEX.template.json");
+const args = process.argv.slice(2);
+const templateArg = args.find((arg) => !arg.startsWith("--"));
+const templatePath = templateArg
+  ? path.resolve(process.cwd(), templateArg)
+  : path.join(root, "REVENUE_SETUP_EVIDENCE_INDEX.template.json");
 const failures = [];
 
 function fail(message) {

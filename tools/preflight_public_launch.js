@@ -77,6 +77,7 @@ function checkJavaScript() {
     "tools/validate_revenue_setup_evidence.js",
     "tools/report_revenue_setup_gaps.js",
     "tools/check_revenue_setup_schema_sync.js",
+    "tools/check_revenue_setup_schema_sync_gate.js",
     "tools/check_external_live_packet_gate.js",
     "tools/check_revenue_setup_evidence_gate.js",
     "tools/survival_check.js"

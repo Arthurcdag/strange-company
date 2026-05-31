@@ -26,6 +26,7 @@ node tools/preflight_public_launch.js
 node tools/validate_revenue_setup_evidence.js
 node tools/report_revenue_setup_gaps.js
 node tools/check_revenue_setup_schema_sync.js
+node tools/check_revenue_setup_schema_sync_gate.js
 node tools/check_revenue_setup_evidence_gate.js
 node tools/audit_company_functionality.js
 node tools/survival_check.js
@@ -105,6 +106,7 @@ node --check tools\preflight_public_launch.js
 node --check tools\validate_revenue_setup_evidence.js
 node --check tools\report_revenue_setup_gaps.js
 node --check tools\check_revenue_setup_schema_sync.js
+node --check tools\check_revenue_setup_schema_sync_gate.js
 node --check tools\check_revenue_setup_evidence_gate.js
 node --check tools\audit_company_functionality.js
 node --check tools\survival_check.js
@@ -112,6 +114,7 @@ node tools\preflight_public_launch.js
 node tools\validate_revenue_setup_evidence.js
 node tools\report_revenue_setup_gaps.js
 node tools\check_revenue_setup_schema_sync.js
+node tools\check_revenue_setup_schema_sync_gate.js
 node tools\check_revenue_setup_evidence_gate.js
 node tools\audit_company_functionality.js
 node tools\survival_check.js
@@ -126,6 +129,7 @@ Com Node local:
 & 'C:\Users\Usuario\AppData\Local\OpenAI\Codex\bin\node.exe' tools\validate_revenue_setup_evidence.js
 & 'C:\Users\Usuario\AppData\Local\OpenAI\Codex\bin\node.exe' tools\report_revenue_setup_gaps.js
 & 'C:\Users\Usuario\AppData\Local\OpenAI\Codex\bin\node.exe' tools\check_revenue_setup_schema_sync.js
+& 'C:\Users\Usuario\AppData\Local\OpenAI\Codex\bin\node.exe' tools\check_revenue_setup_schema_sync_gate.js
 & 'C:\Users\Usuario\AppData\Local\OpenAI\Codex\bin\node.exe' tools\check_revenue_setup_evidence_gate.js
 & 'C:\Users\Usuario\AppData\Local\OpenAI\Codex\bin\node.exe' tools\audit_company_functionality.js
 & 'C:\Users\Usuario\AppData\Local\OpenAI\Codex\bin\node.exe' tools\survival_check.js

@@ -100,6 +100,7 @@ if (!failures.length) {
   checkCommand("external live packet gate regression", ["tools/check_external_live_packet_gate.js"]);
   checkCommand("revenue setup evidence gate regression", ["tools/check_revenue_setup_evidence_gate.js"]);
   checkCommand("revenue setup schema sync", ["tools/check_revenue_setup_schema_sync.js"]);
+  checkCommand("revenue setup schema sync regression", ["tools/check_revenue_setup_schema_sync_gate.js"]);
   checkCommand("revenue setup evidence template validation", ["tools/validate_revenue_setup_evidence.js"]);
   checkCommand("revenue setup gap report", ["tools/report_revenue_setup_gaps.js"]);
   checkCommand("public launch preflight", ["tools/preflight_public_launch.js"]);
