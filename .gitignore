@@ -8,6 +8,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 node_modules/
+external/
 
 # Local live-operation evidence packets. Keep completed evidence private.
 EXTERNAL_LIVE_PACKET.local.json

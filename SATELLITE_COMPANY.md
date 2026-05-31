@@ -58,6 +58,8 @@ The Strange Company lane confirms the sealed boundary, Online Gate review, treas
 
 The start packet is the handoff between readiness and first revenue work. It lets the satellite begin the manual paid pilot while Strange Company stays sealed and does not invoice customers directly.
 
+The human operator checklist for turning this into real paid intake is [HUMAN_REVENUE_INSTRUCTIONS.md](HUMAN_REVENUE_INSTRUCTIONS.md). Use it before asking any customer to pay.
+
 ## Clean Transaction Controls
 
 The satellite may go online as a paid operator only when these controls are clear:

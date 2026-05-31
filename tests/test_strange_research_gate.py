@@ -53,6 +53,28 @@ class StrangeResearchGateGuardrailTests(unittest.TestCase):
 
         self.assertIn("hard_no_fake_evidence", {issue.code for issue in issues})
 
+    def test_vague_slop_verdict_requires_specifics(self) -> None:
+        issues = detect_strange_guardrails(
+            claim="Verdict: slop",
+            argument="The Strange Company repository is slop.",
+        )
+
+        self.assertIn("critique_requires_specifics", {issue.code for issue in issues})
+        self.assertEqual([issue for issue in issues if issue.severity == "error"], [])
+
+    def test_actionable_repo_critique_routes_to_signal_noise_review(self) -> None:
+        issues = detect_strange_guardrails(
+            claim="The repo has too many docs",
+            argument=(
+                "README.md install steps are unclear, the dashboard value is hard "
+                "to see, and VAU claims too much like a proof engine."
+            ),
+        )
+
+        codes = {issue.code for issue in issues}
+        self.assertIn("repo_signal_to_noise_review", codes)
+        self.assertNotIn("critique_requires_specifics", codes)
+
     def test_allows_human_review_requirement_claim(self) -> None:
         issues = detect_strange_guardrails(
             claim="VAU should not replace human reviewers",
@@ -91,6 +113,32 @@ class StrangeResearchGateGuardrailTests(unittest.TestCase):
         self.assertEqual(guarded["recommendation"], "reject")
         self.assertLessEqual(guarded["effectiveness_score"], 0.25)
         self.assertGreaterEqual(guarded["bogusness_score"], 0.75)
+
+    def test_warning_guardrails_turn_accept_into_accept_with_caveats(self) -> None:
+        accepted_report = {
+            "id": "eval_warning",
+            "recommendation": "accept",
+            "effective_polarity": "effective_yes",
+            "effectiveness_score": 0.7,
+            "bogusness_score": 0.2,
+            "confidence": 0.55,
+            "issues": [],
+            "probes": [],
+        }
+        guarded = apply_strange_guardrails(
+            accepted_report,
+            [
+                StrangeGuardrailIssue(
+                    code="critique_requires_specifics",
+                    severity="warning",
+                    message="Ask for concrete files.",
+                    evidence="slop",
+                )
+            ],
+        )
+
+        self.assertEqual(guarded["reactive_recommendation"], "accept")
+        self.assertEqual(guarded["recommendation"], "accept_with_caveats")
 
 
 if __name__ == "__main__":

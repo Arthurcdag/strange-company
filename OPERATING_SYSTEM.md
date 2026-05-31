@@ -214,7 +214,7 @@ Kill criteria matter. Strange Company should not emotionally attach to products.
 
 The operating system treats roadblocks as evidence, not embarrassment. A failed command, rejected plan, customer objection, missing receipt, legal blocker, fiscal blocker, privacy blocker, or unsafe public/private leak is damage that must change the next action.
 
-Operators and AI agents follow [ADAPTIVE_OPERATOR_PROTOCOL.md](ADAPTIVE_OPERATOR_PROTOCOL.md) when damage occurs:
+Operators and AI agents follow the core damage loop when damage occurs:
 
 1. identify what failed or changed,
 2. explain what the damage revealed,
