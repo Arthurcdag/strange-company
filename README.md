@@ -81,6 +81,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [REVENUE_SETUP_EVIDENCE_PACKET.md](REVENUE_SETUP_EVIDENCE_PACKET.md): AI-prepared handoff packet for the seven revenue-setup gates, with gate map and manual close sheet.
 - [REVENUE_SETUP_OUTREACH_PACKET.md](REVENUE_SETUP_OUTREACH_PACKET.md): AI-prepared outreach scripts (acknowledge, reject/pause, hosted invoice, payment confirmation, delivery, refund, privacy, incident) for the first paid pilot.
 - [REVENUE_SETUP_EVIDENCE_INDEX.template.json](REVENUE_SETUP_EVIDENCE_INDEX.template.json): blank evidence index for the seven revenue-setup gates; completed copies stay local as `REVENUE_SETUP_EVIDENCE_INDEX.local.json`.
+- [REVENUE_SIMULATION.md](REVENUE_SIMULATION.md): simulator usage and boundary; the simulator demonstrates how the first and second services would generate value without closing any real gate.
 - [ORDER_DESK.md](ORDER_DESK.md): how public invoice requests become manual order packets.
 - [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md): the manual order, invoice, payment, delivery, and receipt loop for the first functional operator.
 - [OPERATIONS_START_PACKET.md](OPERATIONS_START_PACKET.md): current start sequence and evidence checklist for opening live intake.
@@ -122,6 +123,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [tools/generate_external_live_gap_packet.js](tools/generate_external_live_gap_packet.js): shell generator for the current `public-config.js` live-evidence gap packet.
 - [tools/validate_external_live_packet.js](tools/validate_external_live_packet.js): local validator for the ignored external live-readiness evidence packet.
 - [tools/check_external_live_packet_gate.js](tools/check_external_live_packet_gate.js): regression guard proving otherwise-complete live packets cannot pass without Brazil compliance and AI handoff review dates.
+- [tools/simulate_revenue_scenarios.js](tools/simulate_revenue_scenarios.js): simulated customer scenarios for the satellite revenue lane; see [REVENUE_SIMULATION.md](REVENUE_SIMULATION.md).
 - [EXTERNAL_LIVE_PACKET.template.json](EXTERNAL_LIVE_PACKET.template.json): safe blank template for live-intake evidence; completed copies stay local and ignored.
 - [index.html](index.html): private/local command center for Operations, Treasury, Decisions, and Research Gate.
 - [styles.css](styles.css): interface design for the prototype.
