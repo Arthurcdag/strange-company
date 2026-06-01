@@ -77,6 +77,10 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [REVENUE_PILOT.md](REVENUE_PILOT.md): how the prototype moves toward the first controlled paid offer.
 - [SATELLITE_COMPANY.md](SATELLITE_COMPANY.md): how a separate for-profit company can net profit without breaking the sealed Strange Company charter.
 - [REVENUE_START.md](REVENUE_START.md): day-one two-company revenue posture and start packet sequence.
+- [HUMAN_REVENUE_INSTRUCTIONS.md](HUMAN_REVENUE_INSTRUCTIONS.md): human operator runbook for the seven revenue-setup gates and the first paid pilot procedure.
+- [REVENUE_SETUP_EVIDENCE_PACKET.md](REVENUE_SETUP_EVIDENCE_PACKET.md): AI-prepared handoff packet for the seven revenue-setup gates, with gate map and manual close sheet.
+- [REVENUE_SETUP_OUTREACH_PACKET.md](REVENUE_SETUP_OUTREACH_PACKET.md): AI-prepared outreach scripts (acknowledge, reject/pause, hosted invoice, payment confirmation, delivery, refund, privacy, incident) for the first paid pilot.
+- [REVENUE_SETUP_EVIDENCE_INDEX.template.json](REVENUE_SETUP_EVIDENCE_INDEX.template.json): blank evidence index for the seven revenue-setup gates; completed copies stay local as `REVENUE_SETUP_EVIDENCE_INDEX.local.json`.
 - [ORDER_DESK.md](ORDER_DESK.md): how public invoice requests become manual order packets.
 - [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md): the manual order, invoice, payment, delivery, and receipt loop for the first functional operator.
 - [OPERATIONS_START_PACKET.md](OPERATIONS_START_PACKET.md): current start sequence and evidence checklist for opening live intake.

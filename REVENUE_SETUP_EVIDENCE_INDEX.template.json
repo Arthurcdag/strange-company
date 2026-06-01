@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "mode": "template",
+  "operator": {
+    "responsibleOperator": "",
+    "legalBusinessName": "",
+    "businessAddressForInvoices": "",
+    "supportOwner": "",
+    "accountingOwner": "",
+    "lgpdPrivacyOwner": "",
+    "paymentReconciliationOwner": "",
+    "refundOwner": "",
+    "dailyInboxCheckTime": ""
+  },
+  "entity": {
+    "entityEvidenceId": "",
+    "cnpjOrRoute": "",
+    "reviewerName": "",
+    "reviewDate": "",
+    "allowedToInvoiceServices": false,
+    "blockers": "",
+    "verified": false
+  },
+  "tax": {
+    "taxEvidenceId": "",
+    "taxRegime": "",
+    "cnae": "",
+    "nfseRoute": "",
+    "municipalRegistrationNeeded": false,
+    "fiscalDocumentOwner": "",
+    "testNfseOrReceiptStatus": "",
+    "accountantReviewedAt": "",
+    "monthlyReconciliationOwner": "",
+    "verified": false
+  },
+  "payment": {
+    "paymentEvidenceId": "",
+    "provider": "",
+    "businessAccountName": "",
+    "payoutDestinationVerified": false,
+    "testPaymentId": "",
+    "testPayoutStatus": "",
+    "refundTestOrProcedure": "",
+    "chargebackOrDisputeProcedure": "",
+    "feesReviewed": false,
+    "reconciliationOwner": "",
+    "dashboardAllowlistHostsConfirmed": false,
+    "verified": false
+  },
+  "support": {
+    "supportEvidenceId": "",
+    "supportEmail": "",
+    "testSentAt": "",
+    "testReceivedAt": "",
+    "dailyCheckTime": "",
+    "incidentOwner": "",
+    "refundOwner": "",
+    "privacyOwner": "",
+    "verified": false
+  },
+  "privacy": {
+    "privacyEvidenceId": "",
+    "privacyReviewedAt": "",
+    "lgpdContact": "",
+    "processorListLocation": "",
+    "retentionDecision": "",
+    "rightsRequestOwner": "",
+    "sensitiveDataBoundaryConfirmed": false,
+    "verified": false
+  },
+  "terms": {
+    "termsEvidenceId": "",
+    "termsReviewedAt": "",
+    "reviewer": "",
+    "refundPath": "",
+    "cancellationPath": "",
+    "customerType": "",
+    "offerScopeConfirmed": false,
+    "verified": false
+  },
+  "ledger": {
+    "ledgerEvidenceId": "",
+    "googleFormUrl": "",
+    "googleSheetUrl": "",
+    "testSubmissionId": "",
+    "tabsVerified": false,
+    "columnNamesVerified": false,
+    "allowedStatusValuesVerified": false,
+    "owner": "",
+    "verified": false
+  },
+  "publicConfig": {
+    "operatorName": "Strange Works Studio",
+    "jurisdiction": "BR",
+    "supportEmail": "",
+    "googleFormUrl": "",
+    "supportInboxVerified": false,
+    "googleFormVerified": false,
+    "termsReviewedAt": "",
+    "privacyReviewedAt": "",
+    "brazilComplianceReviewedAt": "",
+    "aiHandoffReviewedAt": "",
+    "liveMode": false
+  },
+  "attestation": {
+    "operator": "",
+    "reviewedAt": "",
+    "noSecretsInRepo": true,
+    "strangeCompanyRemainsSealed": true,
+    "satelliteIsRevenueOperator": true,
+    "aiDidNotApproveLegalTaxPaymentOrPrivacy": true
+  }
+}
