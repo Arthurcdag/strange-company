@@ -23,6 +23,10 @@ revenue-setup-evidence-index.local.json
 revenue-setup-evidence-index.*.json
 !REVENUE_SETUP_EVIDENCE_INDEX.template.json
 
+# Generated revenue simulation outputs. Do not commit.
+REVENUE_SIMULATION_REPORT.md
+revenue-simulation-report.md
+
 # OS/editor noise
 .DS_Store
 Thumbs.db
