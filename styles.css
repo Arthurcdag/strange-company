@@ -259,6 +259,12 @@ h3 {
 .order-offer-card,
 .order-output,
 .launch-panel,
+.legal-mode-card,
+.legal-procedure-card,
+.legal-draft-card,
+.legal-experiment-card,
+.legal-try-card,
+.legal-procedure-output article,
 .launch-evidence-summary,
 .launch-evidence-row,
 .launch-phase,
@@ -270,6 +276,7 @@ h3 {
 .pilot-lead,
 .satellite-verdict,
 .satellite-profit-card,
+.satellite-reviewer-output article,
 .satellite-service,
 .satellite-control,
 .ops-verdict,
@@ -758,10 +765,86 @@ h3 {
 }
 
 .launch-phase-list,
+.legal-mode-list,
+.legal-procedure-list,
+.legal-draft-list,
+.legal-experiment-panel,
+.legal-try-list,
 .launch-check-list {
   display: grid;
   gap: 12px;
   margin-bottom: 18px;
+}
+
+.legal-mode-card,
+.legal-procedure-card,
+.legal-draft-card,
+.legal-experiment-card,
+.legal-try-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px;
+  gap: 14px;
+  align-items: start;
+  padding: 16px;
+}
+
+.legal-mode-card h4,
+.legal-mode-card p,
+.legal-procedure-card h4,
+.legal-procedure-card p,
+.legal-draft-card h4,
+.legal-draft-card p,
+.legal-experiment-card h4,
+.legal-experiment-card p,
+.legal-try-card h4,
+.legal-try-card p {
+  margin: 0;
+}
+
+.legal-mode-card h4,
+.legal-procedure-card h4,
+.legal-draft-card h4,
+.legal-experiment-card h4,
+.legal-try-card h4 {
+  font-size: 16px;
+}
+
+.legal-mode-card p,
+.legal-procedure-card p,
+.legal-draft-card p,
+.legal-experiment-card p,
+.legal-try-card p {
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.42;
+}
+
+.legal-procedure-card a,
+.legal-draft-card a {
+  color: var(--blue);
+  font-weight: 800;
+}
+
+.legal-procedure-output {
+  display: none;
+  margin-bottom: 18px;
+}
+
+.legal-procedure-output.active {
+  display: block;
+}
+
+.legal-procedure-output article {
+  padding: 16px;
+}
+
+.legal-procedure-output pre {
+  margin: 10px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .launch-phase {
@@ -1139,8 +1222,60 @@ h3 {
   line-height: 1.4;
 }
 
+.control-meta {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 0;
+}
+
+.control-meta div {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.control-meta dt,
+.control-meta dd {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.control-meta dt {
+  color: var(--muted);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.control-meta dd {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
 .satellite-service strong {
   overflow-wrap: anywhere;
+}
+
+.satellite-reviewer-output {
+  display: none;
+  margin-bottom: 18px;
+}
+
+.satellite-reviewer-output.active {
+  display: block;
+}
+
+.satellite-reviewer-output article {
+  padding: 16px;
+}
+
+.satellite-reviewer-output pre {
+  margin: 10px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .satellite-stepper,
@@ -3406,6 +3541,11 @@ input[type="range"] {
   .growth-channel,
   .sales-lead-card,
   .signal-card,
+  .legal-mode-card,
+  .legal-procedure-card,
+  .legal-draft-card,
+  .legal-experiment-card,
+  .legal-try-card,
   .launch-phase,
   .launch-check,
   .cooldown-card,

@@ -63,16 +63,29 @@ The company may operate as a real public business.
 
 Required:
 
-- external legal review,
-- accounting and tax review,
-- privacy and support paths,
-- incident communication process,
+- `LEGAL_PROCEDURE.md` evidence packet generated and reviewed,
+- state legal existence, registered agent, and jurisdiction review confirmed outside the repo,
+- EIN and human responsible party confirmed outside the repo,
+- BOI determination checked against current FinCEN guidance,
+- accounting, tax, invoice, bank, payment, and reconciliation lane reviewed,
+- privacy, data-security, support, and incident communication process reviewed,
+- external legal and accounting signoff recorded,
 - payment blockers cleared,
 - satellite transaction controls closed,
 - operations controls closed,
 - payment and data recovery rehearsal.
 
 The current prototype should not claim this phase by itself.
+
+The Launch Gate can copy a legal procedure packet. That packet is a handoff checklist, not a legal filing, compliance certificate, tax opinion, or proof that live operation is allowed.
+
+The Launch Gate can also copy a draft filing packet from `LEGAL_DRAFT_FILINGS.md`. Draft filing mode is useful preparation, but it must read as `not submitted` and cannot close the Live Operation blockers by itself.
+
+The Launch Gate tracks the legal filing dry run from `LEGAL_FILING_EXPERIMENT.md`. A successful dry run means the packet is ready for review, not that the company is ready for live operation.
+
+The Launch Gate differentiates four modes: `Demand` blocks, `Draft` prepares, `Experiment` measures, and outside `Evidence` can close a blocker only after review.
+
+The Launch Gate also renders a try matrix for formation-state, entity-type, responsible-party, BOI, data-minimization, and reviewer-question branches. These branches are experiments, not selected legal positions.
 
 ## Prototype Behavior
 
