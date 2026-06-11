@@ -20,6 +20,8 @@
           </span>
         </a>
         <nav class="public-links" aria-label="Public documents">
+          <a href="#ama">AMA</a>
+          <a href="PUBLIC_AMA.md" target="_blank" rel="noreferrer">AMA rules</a>
           <a href="TERMOS.md" target="_blank" rel="noreferrer">Termos</a>
           <a href="AVISO_DE_PRIVACIDADE.md" target="_blank" rel="noreferrer">Privacidade</a>
           <a href="SUPPORT.md" target="_blank" rel="noreferrer">Support</a>
@@ -28,6 +30,73 @@
       </header>
 
       <section class="public-readiness" id="publicReadiness" aria-live="polite"></section>
+
+      <section class="public-ama-surface" id="ama" aria-labelledby="public-ama-title">
+        <div class="public-ama-copy">
+          <p class="section-kicker">Online AMA</p>
+          <h1 id="public-ama-title">Ask a public-safe question.</h1>
+          <p class="lead">
+            The AMA channel is open for non-sensitive questions about the prototype, launch
+            gates, and operating boundaries. It does not create an order, legal advice,
+            tax advice, payment request, or customer support ticket.
+          </p>
+          <div class="public-status-grid" aria-label="AMA boundaries">
+            <article>
+              <i data-lucide="messages-square"></i>
+              <span>Public questions</span>
+            </article>
+            <article>
+              <i data-lucide="shield-check"></i>
+              <span>No private data</span>
+            </article>
+            <article>
+              <i data-lucide="mail"></i>
+              <span>Support inbox</span>
+            </article>
+          </div>
+        </div>
+
+        <form class="public-ama-form" id="publicAmaForm">
+          <div class="field-row">
+            <div class="field">
+              <label for="amaName">Name</label>
+              <input id="amaName" name="name" type="text" autocomplete="name" required />
+            </div>
+            <div class="field">
+              <label for="amaContact">Contact email</label>
+              <input id="amaContact" name="contact" type="text" inputmode="email" autocomplete="email" required />
+            </div>
+          </div>
+          <div class="field">
+            <label for="amaTopic">Topic</label>
+            <select id="amaTopic" name="topic">
+              <option value="launch-gates">Launch gates</option>
+              <option value="strange-works-studio">Strange Works Studio</option>
+              <option value="sealed-company">Sealed Strange Company</option>
+              <option value="brazil-compliance">Brazil compliance boundary</option>
+              <option value="other">Other public question</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="amaQuestion">Question</label>
+            <textarea id="amaQuestion" name="question" rows="5" required></textarea>
+          </div>
+          <label class="order-check">
+            <input name="clean" type="checkbox" required />
+            <span>No credentials, payment data, customer records, private evidence, health data, private keys, CPF, CNPJ documents, or regulated source documents are included.</span>
+          </label>
+          <label class="order-check">
+            <input name="boundary" type="checkbox" required />
+            <span>I understand this AMA question can be handled as a public-safe inquiry and does not request legal, tax, accounting, payment, refund, privacy, or launch approval.</span>
+          </label>
+          <button class="primary-action" type="submit">
+            <i data-lucide="messages-square"></i>
+            <span>Create AMA packet</span>
+          </button>
+        </form>
+      </section>
+
+      <section class="public-output" id="publicAmaOutput" aria-live="polite"></section>
 
       <section class="public-order-surface" id="order" aria-labelledby="public-order-title">
         <div class="public-order-copy">

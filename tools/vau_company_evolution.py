@@ -12,6 +12,20 @@ from typing import Any
 SYSTEM_NAME = "VAU_COMPANY_EVOLUTION"
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PUBLIC_CONFIG = ROOT / "public-config.js"
+DEFAULT_REVIEWER_TRACKER = ROOT / "REVIEWER_CANDIDATE_TRACKER.local.json"
+DEFAULT_REVENUE_EVIDENCE_INDEX = ROOT / "REVENUE_SETUP_EVIDENCE_INDEX.local.json"
+
+REVIEWER_REVIEW_STATUSES = {
+    "contacted",
+    "responded",
+    "paid_test_ready",
+}
+REQUIRED_REVIEWER_ROLES = {
+    "terms_consumer_law",
+    "privacy_lgpd",
+    "tax_nfse_accounting",
+    "payment_reconciliation",
+}
 
 
 @dataclass(frozen=True)
@@ -167,12 +181,158 @@ def _read_string_config(text: str, field_name: str, default: str = "") -> str:
     return match.group(1)
 
 
-def build_current_state(public_config: Path = DEFAULT_PUBLIC_CONFIG) -> dict[str, Any]:
+def _normalize(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip().lower()
+
+
+def _is_blank(value: Any) -> bool:
+    return value is None or str(value).strip() == ""
+
+
+def _is_iso_date(value: Any) -> bool:
+    if _is_blank(value):
+        return False
+    text = str(value).strip()
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+        return False
+    parsed = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", text)
+    if not parsed:
+        return False
+    _year, month, day = map(int, parsed.groups())
+    if month < 1 or month > 12 or day < 1 or day > 31:
+        return False
+    return True
+
+
+def infer_reviewer_metrics(tracker_path: Path = DEFAULT_REVIEWER_TRACKER) -> tuple[int, bool]:
+    if not tracker_path.exists():
+        return 0, False
+
+    try:
+        tracker = json.loads(tracker_path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        return 0, False
+
+    records = tracker.get("candidateRecords") if isinstance(tracker, dict) else None
+    if not isinstance(records, list):
+        return 0, False
+
+    found_candidates: set[str] = set()
+    ready_roles: set[str] = set()
+
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        status = _normalize(record.get("contactStatus"))
+        role = _normalize(record.get("reviewRole"))
+        candidate_id = _normalize(record.get("candidateId"))
+        candidate_label = _normalize(record.get("candidateLabel"))
+
+        if status not in REVIEWER_REVIEW_STATUSES or not role:
+            continue
+
+        key = candidate_id or candidate_label
+        if not key:
+            continue
+
+        found_candidates.add(key)
+
+        if (
+            status == "paid_test_ready"
+            and role in REQUIRED_REVIEWER_ROLES
+            and record.get("readyForPaidTest") is True
+        ):
+            ready_roles.add(role)
+
+    is_ready_pool = bool(
+        len(found_candidates) >= len(REQUIRED_REVIEWER_ROLES)
+        and REQUIRED_REVIEWER_ROLES.issubset(ready_roles)
+        and all(role in ready_roles for role in REQUIRED_REVIEWER_ROLES)
+    )
+
+    return len(found_candidates), is_ready_pool
+
+
+def _infer_revenue_evidence(evidence_path: Path) -> tuple[bool, str]:
+    if not evidence_path.exists():
+        return False, ""
+
+    try:
+        data = json.loads(evidence_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False, ""
+
+    if not isinstance(data, dict):
+        return False, ""
+
+    tax = data.get("tax")
+    payment = data.get("payment")
+    if not isinstance(tax, dict) or not isinstance(payment, dict):
+        return False, ""
+
+    required_payment_fields = {
+        "paymentEvidenceId",
+        "provider",
+        "businessAccountName",
+        "testPaymentId",
+        "testPayoutStatus",
+        "reconciliationOwner",
+    }
+    required_tax_fields = {
+        "taxEvidenceId",
+        "nfseRoute",
+        "cnae",
+        "taxRegime",
+        "fiscalDocumentOwner",
+        "testNfseOrReceiptStatus",
+        "accountantReviewedAt",
+        "monthlyReconciliationOwner",
+    }
+
+    for key in required_payment_fields:
+        if _is_blank(payment.get(key)):
+            return False, ""
+    if payment.get("payoutDestinationVerified") is not True:
+        return False, ""
+    if payment.get("feesReviewed") is not True:
+        return False, ""
+    if payment.get("verified") is not True:
+        return False, ""
+
+    for key in required_tax_fields:
+        if _is_blank(tax.get(key)):
+            return False, ""
+    if not _is_iso_date(tax.get("accountantReviewedAt")):
+        return False, ""
+    if tax.get("verified") is not True:
+        return False, ""
+
+    payment_ref = str(payment.get("paymentEvidenceId")).strip()
+    tax_ref = str(tax.get("taxEvidenceId")).strip()
+    return (
+        True,
+        f"payment:{payment_ref}; tax:{tax_ref}"
+        if payment_ref and tax_ref
+        else "revenue-evidence-ready",
+    )
+
+
+def build_current_state(
+    public_config: Path = DEFAULT_PUBLIC_CONFIG,
+    reviewer_tracker: Path = DEFAULT_REVIEWER_TRACKER,
+    revenue_evidence_index: Path = DEFAULT_REVENUE_EVIDENCE_INDEX,
+) -> dict[str, Any]:
     text = public_config.read_text(encoding="utf-8")
     terms_reviewed_at = _read_string_config(text, "termsReviewedAt")
     privacy_reviewed_at = _read_string_config(text, "privacyReviewedAt")
     brazil_reviewed_at = _read_string_config(text, "brazilComplianceReviewedAt")
     ai_handoff_reviewed_at = _read_string_config(text, "aiHandoffReviewedAt")
+    human_reviewers_found, reviewers_ready = infer_reviewer_metrics(reviewer_tracker)
+    payment_fiscal_evidence_ready, payment_fiscal_evidence = _infer_revenue_evidence(
+        revenue_evidence_index
+    )
 
     return {
         "company": "Strange Company",
@@ -189,8 +349,8 @@ def build_current_state(public_config: Path = DEFAULT_PUBLIC_CONFIG) -> dict[str
             "privacyReviewed": bool(privacy_reviewed_at),
             "brazilComplianceReviewed": bool(brazil_reviewed_at),
             "aiHandoffReviewed": bool(ai_handoff_reviewed_at),
-            "privatePaymentFiscalEvidenceReady": False,
-            "humanReviewersReady": False,
+            "privatePaymentFiscalEvidenceReady": payment_fiscal_evidence_ready,
+            "humanReviewersReady": reviewers_ready,
             "deliveryReviewLoopReady": False,
             "liveMode": _read_bool_config(text, "liveMode"),
         },
@@ -199,10 +359,10 @@ def build_current_state(public_config: Path = DEFAULT_PUBLIC_CONFIG) -> dict[str
             "privacyReviewedAt": privacy_reviewed_at,
             "brazilComplianceReviewedAt": brazil_reviewed_at,
             "aiHandoffReviewedAt": ai_handoff_reviewed_at,
-            "privatePaymentFiscalEvidence": "",
+            "privatePaymentFiscalEvidence": payment_fiscal_evidence,
         },
         "metrics": {
-            "human_reviewers_found": 0,
+            "human_reviewers_found": human_reviewers_found,
             "qualified_leads": 0,
             "pilot_requests": 0,
             "paid_pilots": 0,
@@ -311,7 +471,10 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
                 },
                 requires_real_evidence=True,
                 reason="Revenue can start safely only after private payment and fiscal proof is ready.",
-                next_action="Prepare private Stripe/bank/fiscal evidence outside git and mark it in the private tracker.",
+                next_action=(
+                    "Prepare private Stripe/bank/fiscal evidence outside git and mark it in "
+                    "REVENUE_SETUP_EVIDENCE_INDEX.local.json."
+                ),
             )
         )
 
@@ -329,7 +492,12 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
                     },
                     requires_real_evidence=True,
                     reason="The company needs a human review bench before client delivery scales.",
-                    next_action="Contact one reviewer candidate and record scope, rate, availability, and test task.",
+                    next_action=(
+                        "Contact one reviewer candidate, record scope, rate, availability, and test task "
+                        "in REVIEWER_CANDIDATE_TRACKER.local.json, then run "
+                        "node tools/validate_reviewer_candidate_tracker.js "
+                        "REVIEWER_CANDIDATE_TRACKER.local.json --require-one."
+                    ),
                 ),
                 CompanyEvent(
                     name="reviewer_pool_ready",
@@ -343,7 +511,12 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
                     },
                     requires_real_evidence=True,
                     reason="Four reviewers unlock safer delivery and reduce AI-only risk.",
-                    next_action="Confirm four reviewers and their paid-test availability.",
+                    next_action=(
+                        "Confirm four reviewers and their paid-test availability in "
+                        "REVIEWER_CANDIDATE_TRACKER.local.json, then run "
+                        "node tools/validate_reviewer_candidate_tracker.js "
+                        "REVIEWER_CANDIDATE_TRACKER.local.json --require-ready."
+                    ),
                 ),
                 CompanyEvent(
                     name="reviewer_search_stalls",
@@ -680,8 +853,11 @@ def run_cycle(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run VAU across Strange Company as a whole-company evolution model."
+        " Use --revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json."
     )
     parser.add_argument("--public-config", default=str(DEFAULT_PUBLIC_CONFIG))
+    parser.add_argument("--reviewer-tracker", default=str(DEFAULT_REVIEWER_TRACKER))
+    parser.add_argument("--revenue-evidence-index", default=str(DEFAULT_REVENUE_EVIDENCE_INDEX))
     parser.add_argument("--depth", type=int, default=3)
     parser.add_argument("--max-branches-to-keep", type=int, default=8)
     parser.add_argument("--real-event-json")
@@ -691,7 +867,11 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    current_state = build_current_state(Path(args.public_config))
+    current_state = build_current_state(
+        Path(args.public_config),
+        reviewer_tracker=Path(args.reviewer_tracker),
+        revenue_evidence_index=Path(args.revenue_evidence_index),
+    )
     real_event = CompanyEvent.from_dict(json.loads(args.real_event_json)) if args.real_event_json else None
     result = run_cycle(
         current_state=current_state,

@@ -6,6 +6,10 @@ Use `HUMAN_REVIEW_PACKET.md` as the live-intake close sheet for collecting the a
 
 Use `CONKA8_LAW_INSTRUCTIONS.md` when conka8 is working on law-sensitive repo changes, review packets, or live-intake evidence.
 
+Use `REVIEWER_CANDIDATE_PACKET.md`, `REVIEWER_CANDIDATE_TRACKER.template.json`, `tools/draft_reviewer_candidate_tracker.js`, and `tools/validate_reviewer_candidate_tracker.js` when the next action is finding reviewer capacity. The local tracker can prove that a candidate was contacted or that a four-role paid-test-ready pool exists, but it does not approve legal, tax, privacy, payment, delivery, or live-mode decisions.
+
+Use `REVENUE_SETUP_EVIDENCE_PACKET.md` as the canonical checklist for shipping the paid setup evidence gates (entity, tax, payment, support, privacy, terms, and ledger) before approving launch readiness.
+
 ## What AI Prepared
 
 - Brazil-first customer-facing Portuguese `TERMOS.md` draft.
@@ -28,6 +32,7 @@ Use `CONKA8_LAW_INSTRUCTIONS.md` when conka8 is working on law-sensitive repo ch
 | P1 | Confirm payment provider, payout account, refund path, and reconciliation cadence | operator/accountant | payment dashboard and test invoice |
 | P1 | Confirm whether Marco Civil access-log retention duties apply to the real deployment | lawyer/operator | retention decision note |
 | P1 | Review AI-use boundary and prohibit solely automated rights-impacting decisions | operator/lawyer | AI review note |
+| P1 | Contact at least one reviewer candidate and record scope, rate, availability, paid-test task, and non-secret evidence reference | operator | `REVIEWER_CANDIDATE_TRACKER.local.json` validated with `node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-one` |
 
 ## Manual Evidence Checklist
 

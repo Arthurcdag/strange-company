@@ -105,6 +105,10 @@ function checkStaticSurvivalSurface() {
   assert(avisoPrivacidade.includes("Direitos dos Titulares"), "AVISO_DE_PRIVACIDADE.md must include LGPD data-subject rights.", "Portuguese privacy rights", "AVISO_DE_PRIVACIDADE.md");
   assert(publicHtml.includes('href="TERMOS.md"'), "public.html must link the Portuguese terms.", "public Portuguese terms link", "public.html");
   assert(publicHtml.includes('href="AVISO_DE_PRIVACIDADE.md"'), "public.html must link the Portuguese privacy notice.", "public Portuguese privacy link", "public.html");
+  assert(publicHtml.includes('id="publicAmaForm"'), "public.html must include the public AMA form.", "public AMA form", "public.html");
+  assert(publicHtml.includes('href="PUBLIC_AMA.md"'), "public.html must link the public AMA rules.", "public AMA rules link", "public.html");
+  assert(publicJs.includes("amaQuestionPacket"), "public.js must build public-safe AMA packets.", "public AMA packet builder", "public.js");
+  assert(publicJs.includes("if (!readiness.supportReady)"), "public.js must keep AMA behind the verified support inbox.", "public AMA support gate", "public.js");
   assert(publicJs.includes("Public intake is closed"), "public.js must tell users public intake is closed before live readiness.", "public closed-intake copy", "public.js");
   assert(publicJs.includes("if (!readiness.liveReady)"), "public.js must block public submits before live readiness.", "public submit live gate", "public.js");
   assert(publicJs.includes('readiness.liveReady ? `<a href="${mailtoUrl(order)}">Open email draft</a>` : ""'), "public.js must hide email draft action before live readiness.", "public email action live gate", "public.js");

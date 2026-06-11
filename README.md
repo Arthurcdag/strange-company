@@ -84,6 +84,9 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [REVENUE_SETUP_EVIDENCE_PACKET.md](REVENUE_SETUP_EVIDENCE_PACKET.md): AI-prepared handoff packet for the seven revenue-setup gates, with gate map and manual close sheet.
 - [REVENUE_SETUP_OUTREACH_PACKET.md](REVENUE_SETUP_OUTREACH_PACKET.md): AI-prepared outreach scripts (acknowledge, reject/pause, hosted invoice, payment confirmation, delivery, refund, privacy, incident) for the first paid pilot.
 - [REVENUE_SETUP_EVIDENCE_INDEX.template.json](REVENUE_SETUP_EVIDENCE_INDEX.template.json): blank evidence index for the seven revenue-setup gates; completed copies stay local as `REVENUE_SETUP_EVIDENCE_INDEX.local.json`.
+- [REVIEWER_CANDIDATE_PACKET.md](REVIEWER_CANDIDATE_PACKET.md): AI-prepared packet for contacting one human reviewer candidate and building the private reviewer-capacity tracker without closing any live gate.
+- [REVIEWER_CANDIDATE_TRACKER.template.json](REVIEWER_CANDIDATE_TRACKER.template.json): blank reviewer-capacity tracker; completed copies stay local as `REVIEWER_CANDIDATE_TRACKER.local.json`.
+- [PUBLIC_AMA.md](PUBLIC_AMA.md): public-safe AMA workflow for taking online questions without opening payment, private evidence, legal, tax, privacy, or launch approval gates.
 - [REVENUE_SIMULATION.md](REVENUE_SIMULATION.md): simulator usage and boundary; the simulator demonstrates how the first and second services would generate value without closing any real gate.
 - [ORDER_DESK.md](ORDER_DESK.md): how public invoice requests become manual order packets.
 - [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md): the manual order, invoice, payment, delivery, and receipt loop for the first functional operator.
@@ -123,9 +126,13 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [tools/survival_check.js](tools/survival_check.js): survival drill that confirms the charter, resilience model, receipt chain, Brazil/AI gates, public/private boundary, and expected live-gate behavior still hold.
 - [tools/google_apps_script_create_intake_form.gs](tools/google_apps_script_create_intake_form.gs): Apps Script builder for creating the Google Form intake and linking it to the private Sheet ledger.
 - [tools/draft_external_live_packet.js](tools/draft_external_live_packet.js): public-config-to-local-packet draft generator for `EXTERNAL_LIVE_PACKET.local.json`.
+- [tools/draft_reviewer_candidate_tracker.js](tools/draft_reviewer_candidate_tracker.js): local draft generator for `REVIEWER_CANDIDATE_TRACKER.local.json`.
+- [tools/draft_revenue_setup_evidence_index.js](tools/draft_revenue_setup_evidence_index.js): local draft generator for `REVENUE_SETUP_EVIDENCE_INDEX.local.json`.
 - [tools/generate_external_live_gap_packet.js](tools/generate_external_live_gap_packet.js): shell generator for the current `public-config.js` live-evidence gap packet.
 - [tools/validate_external_live_packet.js](tools/validate_external_live_packet.js): local validator for the ignored external live-readiness evidence packet.
 - [tools/check_external_live_packet_gate.js](tools/check_external_live_packet_gate.js): regression guard proving otherwise-complete live packets cannot pass without Brazil compliance and AI handoff review dates.
+- [tools/validate_reviewer_candidate_tracker.js](tools/validate_reviewer_candidate_tracker.js): local validator for the ignored reviewer-candidate tracker; use `--require-one` for the first contacted candidate and `--require-ready` for the four-role paid-test-ready pool.
+- [tools/validate_revenue_setup_evidence_index.js](tools/validate_revenue_setup_evidence_index.js): local validator for the ignored revenue setup evidence index; use `--require-*` gates for each gate and `--require-all` when closing payment/fiscal readiness.
 - [tools/simulate_revenue_scenarios.js](tools/simulate_revenue_scenarios.js): simulated customer scenarios for the satellite revenue lane; see [REVENUE_SIMULATION.md](REVENUE_SIMULATION.md).
 - [EXTERNAL_LIVE_PACKET.template.json](EXTERNAL_LIVE_PACKET.template.json): safe blank template for live-intake evidence; completed copies stay local and ignored.
 - [index.html](index.html): private/local command center for Operations, Treasury, Decisions, and Research Gate.
@@ -139,6 +146,23 @@ Before turning on `liveMode` or merging public config changes, run:
 ```bash
 node tools/preflight_public_launch.js
 node tools/survival_check.js
+```
+
+To burn down the reviewer-capacity blocker without faking evidence, create `REVIEWER_CANDIDATE_TRACKER.local.json` from the template and run:
+
+```bash
+node tools/draft_reviewer_candidate_tracker.js --write-local
+node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-one
+```
+
+To reduce the private payment/fiscal hard blocker, complete `REVENUE_SETUP_EVIDENCE_INDEX.local.json` from `REVENUE_SETUP_EVIDENCE_INDEX.template.json` and then review the evidence by running VAU with the explicit local index path:
+
+```bash
+node tools/draft_revenue_setup_evidence_index.js --write-local
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-payment
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-tax
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all
+python tools/vau_company_evolution.py --revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --depth 1
 ```
 
 Pull requests also run the same syntax and public launch preflight checks through the `Validate static site` workflow.

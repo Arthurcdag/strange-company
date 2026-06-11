@@ -177,6 +177,10 @@ node tools/audit_company_functionality.js --require-live
 node tools/survival_check.js
 node tools/check_external_live_packet_gate.js
 node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live
+node tools/draft_revenue_setup_evidence_index.js --write-local
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-payment
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-tax
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all
 python -B -m unittest discover -s tests
 ```
 

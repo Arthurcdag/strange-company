@@ -68,12 +68,17 @@ function requestId() {
   return `REQ-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Date.now().toString(36).toUpperCase()}`;
 }
 
+function amaId() {
+  return `AMA-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Date.now().toString(36).toUpperCase()}`;
+}
+
 function findSensitiveData(text) {
   const value = String(text || "");
   const checks = [
     ["protected health information", /\b(PHI|patient|diagnosis|medical record|MRN|health record|treatment|prescription)\b/i],
     ["payment card data", /\b(?:\d[ -]*?){13,19}\b/],
     ["social security number", /\b\d{3}-\d{2}-\d{4}\b/],
+    ["Brazil personal or company tax ID", /\b(?:\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})\b/],
     ["password or secret", /\b(password|passcode|secret|private key|api[_ -]?key|access token|bearer token)\b/i],
     ["private key material", /-----BEGIN [A-Z ]*PRIVATE KEY-----/i]
   ];
@@ -162,9 +167,35 @@ function requestPacket(order) {
   ].join("\n");
 }
 
+function amaQuestionPacket(question) {
+  return [
+    `AMA Question ID: ${question.id}`,
+    `Operator: ${PUBLIC_ORDER_CONFIG.operatorName}`,
+    `Jurisdiction: Brazil`,
+    `Name: ${question.name}`,
+    `Contact: ${question.contact}`,
+    `Topic: ${question.topic}`,
+    `Source: Public AMA Desk`,
+    "",
+    "Question:",
+    question.question,
+    "",
+    "Controls:",
+    "Public-safe AMA question only.",
+    "No order, invoice, payment request, customer support ticket, or launch approval is created.",
+    "No protected health information, credentials, private keys, CPF, CNPJ documents, payment data, private evidence, or regulated source documents are accepted.",
+    "AI-generated legal, tax, privacy, accounting, payment, refund, and compliance answers require human review before operational use."
+  ].join("\n");
+}
+
 function mailtoUrl(order) {
   const subject = `Invoice request ${order.id} / ${order.customer}`;
   return `mailto:${encodeURIComponent(PUBLIC_ORDER_CONFIG.supportEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(requestPacket(order))}`;
+}
+
+function amaMailtoUrl(question) {
+  const subject = `AMA question ${question.id} / ${question.topic}`;
+  return `mailto:${encodeURIComponent(PUBLIC_ORDER_CONFIG.supportEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(amaQuestionPacket(question))}`;
 }
 
 function renderBlocked(message) {
@@ -174,6 +205,92 @@ function renderBlocked(message) {
     <span class="metric-label">Request blocked</span>
     <strong>${escapeHtml(message)}</strong>
   `;
+}
+
+function renderAmaBlocked(message) {
+  const output = document.querySelector("#publicAmaOutput");
+  output.classList.add("active");
+  output.innerHTML = `
+    <span class="metric-label">AMA blocked</span>
+    <strong>${escapeHtml(message)}</strong>
+  `;
+}
+
+function renderAmaPacket(question) {
+  const output = document.querySelector("#publicAmaOutput");
+  const packet = amaQuestionPacket(question);
+  const readiness = publicReadinessModel();
+  output.classList.add("active");
+  output.innerHTML = `
+    <span class="metric-label">AMA packet created</span>
+    <strong>${escapeHtml(question.id)} / ${escapeHtml(question.topic)}</strong>
+    <p>${readiness.supportReady ? "Open the email draft or copy the packet for the public AMA queue." : "Copy this packet and send it only after the support route is verified."}</p>
+    <div class="order-output-actions">
+      ${readiness.supportReady ? `<a href="${amaMailtoUrl(question)}">Open AMA email</a>` : ""}
+      <button type="button" id="copyAmaPacket">Copy AMA packet</button>
+    </div>
+    <pre>${escapeHtml(packet)}</pre>
+  `;
+  const copyButton = document.querySelector("#copyAmaPacket");
+  if (copyButton) {
+    copyButton.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(packet);
+        copyButton.textContent = "Copied";
+      } catch {
+        copyButton.textContent = "Copy unavailable";
+      }
+    });
+  }
+}
+
+function setupAmaForm() {
+  const form = document.querySelector("#publicAmaForm");
+  if (!form) {
+    return;
+  }
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const readiness = publicReadinessModel();
+    if (!readiness.supportReady) {
+      renderAmaBlocked("AMA is closed until the public support inbox is verified.");
+      return;
+    }
+    const formData = new FormData(form);
+    const name = String(formData.get("name") || "").trim().slice(0, 120);
+    const contact = String(formData.get("contact") || "").trim().slice(0, 160);
+    const topic = String(formData.get("topic") || "other").trim().slice(0, 80);
+    const question = String(formData.get("question") || "").trim().slice(0, 1200);
+    const clean = Boolean(formData.get("clean"));
+    const boundary = Boolean(formData.get("boundary"));
+
+    if (!name || !contact || !question) {
+      renderAmaBlocked("Name, contact email, and question are required.");
+      return;
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact)) {
+      renderAmaBlocked("Use a valid contact email.");
+      return;
+    }
+    if (!clean || !boundary) {
+      renderAmaBlocked("Confirm the AMA data boundary before creating the packet.");
+      return;
+    }
+    const sensitiveFindings = findSensitiveData([name, contact, topic, question].join("\n"));
+    if (sensitiveFindings.length) {
+      renderAmaBlocked(`Remove ${sensitiveFindings.join(", ")} before submitting.`);
+      return;
+    }
+
+    renderAmaPacket({
+      id: amaId(),
+      name,
+      contact,
+      topic,
+      question
+    });
+    form.reset();
+  });
 }
 
 function renderPacket(order) {
@@ -266,6 +383,7 @@ function setupForm() {
 
 document.addEventListener("DOMContentLoaded", () => {
   renderReadiness();
+  setupAmaForm();
   setupForm();
   if (window.lucide) {
     window.lucide.createIcons();

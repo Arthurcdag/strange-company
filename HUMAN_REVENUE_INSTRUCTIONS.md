@@ -4,6 +4,23 @@ Status: human operator runbook. This is not legal, tax, accounting, payment-prov
 
 Use [REVENUE_SETUP_EVIDENCE_PACKET.md](REVENUE_SETUP_EVIDENCE_PACKET.md), [REVENUE_SETUP_OUTREACH_PACKET.md](REVENUE_SETUP_OUTREACH_PACKET.md), and [REVENUE_SETUP_EVIDENCE_INDEX.template.json](REVENUE_SETUP_EVIDENCE_INDEX.template.json) as the first outside-evidence handoff before asking any customer to pay.
 
+Use `tools/draft_revenue_setup_evidence_index.js` and `tools/validate_revenue_setup_evidence_index.js` for the local evidence index:
+
+```bash
+node tools/draft_revenue_setup_evidence_index.js --write-local
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-payment
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-tax
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-support
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-privacy
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-terms
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-ledger
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all
+```
+
+Use [REVIEWER_CANDIDATE_PACKET.md](REVIEWER_CANDIDATE_PACKET.md), [REVIEWER_CANDIDATE_TRACKER.template.json](REVIEWER_CANDIDATE_TRACKER.template.json), [tools/draft_reviewer_candidate_tracker.js](tools/draft_reviewer_candidate_tracker.js), and [tools/validate_reviewer_candidate_tracker.js](tools/validate_reviewer_candidate_tracker.js) when the next blocker is reviewer capacity. The tracker records private outreach evidence; it does not close legal, tax, privacy, payment, or live-mode gates.
+
+Use `REVENUE_SETUP_EVIDENCE_INDEX.local.json` as the local payment/fiscal control file for evidence outside this repo. After completing tax/payment/fiscal fields, run `tools/vau_company_evolution.py --revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json` to reflect that blocker in VAU output.
+
 ## Core Rule
 
 Strange Company does not receive customer money in v0.

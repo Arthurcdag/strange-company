@@ -82,6 +82,8 @@ function checkPublicSurface() {
   ];
 
   assert(publicHtml.includes('class="public-site"'), "public.html must render the public surface.");
+  assert(publicHtml.includes('id="publicAmaForm"'), "public.html must render the public AMA form.");
+  assert(publicHtml.includes('href="PUBLIC_AMA.md"'), "public.html must link the public AMA rules.");
   assert(publicHtml.includes("public-config.js"), "public.html must load public-config.js.");
   assert(publicHtml.includes("public.js"), "public.html must load public.js.");
   assert(!publicHtml.includes("script.js"), "public.html must not load the private command center script.");
@@ -131,7 +133,14 @@ function checkPublicSurface() {
     "social security number",
     "password or secret",
     "private key material",
+    "Brazil personal or company tax ID",
     "renderBlocked",
+    "renderAmaBlocked",
+    "amaQuestionPacket",
+    "setupAmaForm",
+    "if (!readiness.supportReady)",
+    "Public AMA Desk",
+    "No order, invoice, payment request, customer support ticket, or launch approval is created.",
     "Public intake is closed",
     "if (!readiness.liveReady)",
     "readiness.liveReady ? `<a href=\"${mailtoUrl(order)}\">Open email draft</a>` : \"\""
@@ -836,6 +845,106 @@ function checkBrazilComplianceContract() {
   }
 }
 
+function checkReviewerCandidateContract() {
+  const readme = read("README.md");
+  const aiHandoff = read("AI_LEGAL_HANDOFF.md");
+  const humanRevenue = read("HUMAN_REVENUE_INSTRUCTIONS.md");
+  const packet = read("REVIEWER_CANDIDATE_PACKET.md");
+  const tracker = read("REVIEWER_CANDIDATE_TRACKER.template.json");
+  const validator = read("tools/validate_reviewer_candidate_tracker.js");
+  const vauCompany = read("tools/vau_company_evolution.py");
+  const gitignore = read(".gitignore");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+
+  const required = [
+    ["README reviewer packet link", readme, "REVIEWER_CANDIDATE_PACKET.md"],
+    ["README reviewer tracker link", readme, "REVIEWER_CANDIDATE_TRACKER.template.json"],
+    ["README reviewer draft generator link", readme, "tools/draft_reviewer_candidate_tracker.js"],
+    ["README reviewer validator link", readme, "tools/validate_reviewer_candidate_tracker.js"],
+    ["AI handoff reviewer packet link", aiHandoff, "REVIEWER_CANDIDATE_PACKET.md"],
+    ["AI handoff reviewer require-one command", aiHandoff, "node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-one"],
+    ["human revenue reviewer tracker link", humanRevenue, "REVIEWER_CANDIDATE_TRACKER.template.json"],
+    ["human revenue reviewer draft generator link", humanRevenue, "tools/draft_reviewer_candidate_tracker.js"],
+    ["reviewer packet first-candidate workflow", packet, "First Candidate Workflow"],
+    ["reviewer packet ready-pool workflow", packet, "Ready Pool Workflow"],
+    ["reviewer packet first-candidate command", packet, "node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-one"],
+    ["reviewer packet ready-pool command", packet, "node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready"],
+    ["reviewer tracker schema", tracker, '"schemaVersion": 1'],
+    ["reviewer tracker candidate records", tracker, '"candidateRecords": []'],
+    ["reviewer tracker terms role", tracker, '"terms_consumer_law"'],
+    ["reviewer tracker privacy role", tracker, '"privacy_lgpd"'],
+    ["reviewer tracker tax role", tracker, '"tax_nfse_accounting"'],
+    ["reviewer tracker payment role", tracker, '"payment_reconciliation"'],
+    ["reviewer tracker no-secrets attestation", tracker, '"noSecretsInRepo": true'],
+    ["reviewer tracker sealed attestation", tracker, '"strangeCompanyRemainsSealed": true'],
+    ["reviewer validator failure header", validator, "Reviewer candidate tracker validation failed"],
+    ["reviewer validator one-candidate gate", validator, "--require-one"],
+    ["reviewer validator ready-pool gate", validator, "--require-ready"],
+    ["VAU reviewer tracker next action", vauCompany, "REVIEWER_CANDIDATE_TRACKER.local.json"],
+    ["VAU reviewer tracker validator command", vauCompany, "tools/validate_reviewer_candidate_tracker.js"],
+    ["reviewer local tracker ignored", gitignore, "REVIEWER_CANDIDATE_TRACKER.local.json"],
+    ["reviewer template unignored", gitignore, "!REVIEWER_CANDIDATE_TRACKER.template.json"],
+    ["reviewer validator CI syntax check", validateWorkflow, "node --check tools/validate_reviewer_candidate_tracker.js"],
+    ["reviewer draft generator CI syntax check", validateWorkflow, "node --check tools/draft_reviewer_candidate_tracker.js"],
+    ["reviewer validator CI template check", validateWorkflow, "node tools/validate_reviewer_candidate_tracker.js --template-ok"]
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
+function checkRevenueSetupEvidenceIndexContract() {
+  const readme = read("README.md");
+  const aiHandoff = read("AI_LEGAL_HANDOFF.md");
+  const humanRevenue = read("HUMAN_REVENUE_INSTRUCTIONS.md");
+  const packet = read("REVENUE_SETUP_EVIDENCE_PACKET.md");
+  const template = read("REVENUE_SETUP_EVIDENCE_INDEX.template.json");
+  const draft = read("tools/draft_revenue_setup_evidence_index.js");
+  const validator = read("tools/validate_revenue_setup_evidence_index.js");
+  const gitignore = read(".gitignore");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+  const vauCompany = read("tools/vau_company_evolution.py");
+  const pages = read(".github/workflows/pages.yml");
+
+  const required = [
+    ["README revenue setup packet link", readme, "REVENUE_SETUP_EVIDENCE_PACKET.md"],
+    ["README revenue setup index template", readme, "REVENUE_SETUP_EVIDENCE_INDEX.template.json"],
+    ["README revenue draft generator link", readme, "tools/draft_revenue_setup_evidence_index.js"],
+    ["README revenue validator link", readme, "tools/validate_revenue_setup_evidence_index.js"],
+    ["AI handoff revenue packet reference", aiHandoff, "REVENUE_SETUP_EVIDENCE_PACKET.md"],
+    ["human revenue draft command", humanRevenue, "node tools/draft_revenue_setup_evidence_index.js --write-local"],
+    ["human revenue payment gate command", humanRevenue, "node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-payment"],
+    ["human revenue all-gates command", humanRevenue, "node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all"],
+    ["human revenue packet includes draft command", packet, "tools/draft_revenue_setup_evidence_index.js"],
+    ["human revenue packet includes validate command", packet, "tools/validate_revenue_setup_evidence_index.js"],
+    ["revenue setup index template schema", template, '"schemaVersion": 1'],
+    ["revenue validator failure header", validator, "Revenue setup evidence index validation failed"],
+    ["revenue validator entity gate", validator, "--require-entity"],
+    ["revenue validator tax gate", validator, "--require-tax"],
+    ["revenue validator payment gate", validator, "--require-payment"],
+    ["revenue validator support gate", validator, "--require-support"],
+    ["revenue validator privacy gate", validator, "--require-privacy"],
+    ["revenue validator terms gate", validator, "--require-terms"],
+    ["revenue validator ledger gate", validator, "--require-ledger"],
+    ["revenue validator all gate", validator, "--require-all"],
+    ["revenue validator template check", validator, "--template-ok"],
+    ["revenue index local ignored", gitignore, "REVENUE_SETUP_EVIDENCE_INDEX.local.json"],
+    ["revenue index template unignored", gitignore, "!REVENUE_SETUP_EVIDENCE_INDEX.template.json"],
+    ["revenue validator syntax check", validateWorkflow, "node --check tools/validate_revenue_setup_evidence_index.js"],
+    ["revenue draft syntax check", validateWorkflow, "node --check tools/draft_revenue_setup_evidence_index.js"],
+    ["revenue validator CI template check", validateWorkflow, "node tools/validate_revenue_setup_evidence_index.js --template-ok"],
+    ["revenue pages template copy", pages, "REVENUE_SETUP_EVIDENCE_INDEX.template.json"],
+    ["revenue pages draft copy", pages, "tools/draft_revenue_setup_evidence_index.js"],
+    ["revenue pages validator copy", pages, "tools/validate_revenue_setup_evidence_index.js"],
+    ["VAU revenue evidence path", vauCompany, "--revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json"],
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
 function checkConfig() {
   const config = loadPublicConfig();
   const formUrl = String(config.googleFormUrl || "").trim();
@@ -897,6 +1006,10 @@ compileJavaScript("tools/draft_external_live_packet.js");
 compileJavaScript("tools/generate_external_live_gap_packet.js");
 compileJavaScript("tools/validate_external_live_packet.js");
 compileJavaScript("tools/check_external_live_packet_gate.js");
+compileJavaScript("tools/validate_reviewer_candidate_tracker.js");
+compileJavaScript("tools/draft_reviewer_candidate_tracker.js");
+compileJavaScript("tools/draft_revenue_setup_evidence_index.js");
+compileJavaScript("tools/validate_revenue_setup_evidence_index.js");
 checkExternalLivePacketGate();
 checkPublicSurface();
 checkPrivateUrlAllowlists();
@@ -910,6 +1023,8 @@ checkOperationalV15Contract();
 checkRevenueStartContract();
 checkMainLegalProcedureContract();
 checkBrazilComplianceContract();
+checkReviewerCandidateContract();
+checkRevenueSetupEvidenceIndexContract();
 checkConfig();
 
 if (failures.length) {

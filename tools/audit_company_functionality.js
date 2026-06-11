@@ -115,6 +115,9 @@ function auditDocs() {
   assertIncludes("README.md", "GOOGLE_FORM_INTAKE.md", "Google Form intake README link");
   assertIncludes("README.md", "tools/google_apps_script_create_intake_form.gs", "Google Form Apps Script README link");
   assertIncludes("README.md", "tools/survival_check.js", "survival check README link");
+  assertIncludes("README.md", "REVENUE_SETUP_EVIDENCE_INDEX.template.json", "revenue setup evidence index template README link");
+  assertIncludes("README.md", "tools/draft_revenue_setup_evidence_index.js", "revenue setup evidence index draft README link");
+  assertIncludes("README.md", "tools/validate_revenue_setup_evidence_index.js", "revenue setup evidence index validator README link");
   assertIncludes("README.md", "ADAPTIVE_OPERATOR_PROTOCOL.md", "adaptive operator README link");
   assertIncludes("OPERATIONS_RUNBOOK.md", "Adaptive Operator Protocol", "adaptive operator runbook section");
   assertIncludes("ADAPTIVE_OPERATOR_PROTOCOL.md", "Damage is information", "adaptive damage rule");
@@ -145,6 +148,12 @@ function auditDocs() {
   assertIncludes("README.md", "EXTERNAL_LIVE_PACKET.template.json", "external live packet template README link");
   assertIncludes("README.md", "tools/validate_external_live_packet.js", "external live packet validator README link");
   assertIncludes("README.md", "tools/check_external_live_packet_gate.js", "external live packet gate regression README link");
+  assertIncludes("README.md", "REVIEWER_CANDIDATE_PACKET.md", "reviewer candidate packet README link");
+  assertIncludes("README.md", "REVIEWER_CANDIDATE_TRACKER.template.json", "reviewer candidate tracker template README link");
+  assertIncludes("README.md", "tools/validate_reviewer_candidate_tracker.js", "reviewer candidate validator README link");
+  assertIncludes("README.md", "PUBLIC_AMA.md", "public AMA README link");
+  assertIncludes("PUBLIC_AMA.md", "public-safe question intake", "public AMA operating boundary");
+  assertIncludes("PUBLIC_AMA.md", "must not", "public AMA stop rules");
   assertIncludes("EXTERNAL_LIVE_PACKET.template.json", '"schemaVersion": 1', "external live packet template schema");
   assertIncludes("EXTERNAL_LIVE_PACKET.template.json", '"brazilComplianceReviewedAt": ""', "external packet Brazil compliance review field");
   assertIncludes("EXTERNAL_LIVE_PACKET.template.json", '"aiHandoffReviewedAt": ""', "external packet AI handoff review field");
@@ -152,16 +161,40 @@ function auditDocs() {
   assertIncludes("tools/validate_external_live_packet.js", "public Brazil compliance review date", "external packet Brazil review live requirement");
   assertIncludes("tools/validate_external_live_packet.js", "public AI handoff review date", "external packet AI handoff live requirement");
   assertIncludes("tools/check_external_live_packet_gate.js", "External live packet gate regression passed", "external live packet gate regression tool");
+  assertIncludes("REVIEWER_CANDIDATE_PACKET.md", "--require-one", "reviewer candidate first-candidate validation command");
+  assertIncludes("REVIEWER_CANDIDATE_PACKET.md", "--require-ready", "reviewer candidate ready-pool validation command");
+  assertIncludes("REVIEWER_CANDIDATE_TRACKER.template.json", '"schemaVersion": 1', "reviewer candidate tracker template schema");
+  assertIncludes("REVIEWER_CANDIDATE_TRACKER.template.json", '"terms_consumer_law"', "reviewer candidate terms role");
+  assertIncludes("tools/validate_reviewer_candidate_tracker.js", "Reviewer candidate tracker validation", "reviewer candidate tracker validator");
+  assertIncludes("tools/validate_reviewer_candidate_tracker.js", "--require-one", "reviewer candidate one-candidate gate");
+  assertIncludes("tools/validate_reviewer_candidate_tracker.js", "--require-ready", "reviewer candidate ready-pool gate");
+  assertIncludes("tools/vau_company_evolution.py", "REVIEWER_CANDIDATE_TRACKER.local.json", "VAU reviewer tracker next action");
+  assertIncludes("tools/vau_company_evolution.py", "tools/validate_reviewer_candidate_tracker.js", "VAU reviewer tracker validator command");
+  assertIncludes("REVENUE_SETUP_EVIDENCE_PACKET.md", "tools/draft_revenue_setup_evidence_index.js", "revenue setup draft validator link");
+  assertIncludes("REVENUE_SETUP_EVIDENCE_PACKET.md", "tools/validate_revenue_setup_evidence_index.js", "revenue setup validator link");
+  assertIncludes("REVENUE_SETUP_EVIDENCE_PACKET.md", "node tools/validate_revenue_setup_evidence_index.js", "revenue setup packet validation command");
+  assertIncludes("REVENUE_SETUP_EVIDENCE_PACKET.md", "REVENUE_SETUP_EVIDENCE_INDEX.template.json", "revenue setup packet template link");
+  assertIncludes("REVENUE_SETUP_EVIDENCE_PACKET.md", "--require-all", "revenue setup packet full readiness command");
   assertIncludes("HUMAN_REVIEW_PACKET.md", "Manual Close Sheet", "human review manual close sheet");
   assertIncludes("HUMAN_REVIEW_PACKET.md", "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live", "human review validation command");
   assertIncludes("HUMAN_REVIEW_PACKET.md", "Do not put Sheet URLs, Stripe dashboard URLs, bank metadata, tax IDs, private reviewer notes, or credentials in `public-config.js`.", "human review public config boundary");
   assertIncludes("HUMAN_REVIEW_PACKET.md", "CONKA8_LAW_INSTRUCTIONS.md", "human review packet conka8 link");
+  assertIncludes("HUMAN_REVENUE_INSTRUCTIONS.md", "tools/draft_revenue_setup_evidence_index.js", "human revenue setup draft generator link");
+  assertIncludes("HUMAN_REVENUE_INSTRUCTIONS.md", "tools/validate_revenue_setup_evidence_index.js", "human revenue setup validator link");
+  assertIncludes("HUMAN_REVENUE_INSTRUCTIONS.md", "node tools/draft_revenue_setup_evidence_index.js --write-local", "human revenue setup draft command");
+  assertIncludes("HUMAN_REVENUE_INSTRUCTIONS.md", "node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-payment", "human revenue setup payment command");
+  assertIncludes("HUMAN_REVENUE_INSTRUCTIONS.md", "node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all", "human revenue setup full command");
+  assertIncludes("tools/validate_revenue_setup_evidence_index.js", "Revenue setup evidence index validation failed", "revenue setup evidence index validator");
+  assertIncludes("tools/validate_revenue_setup_evidence_index.js", "--require-all", "revenue setup evidence index full gate");
+  assertIncludes("tools/validate_revenue_setup_evidence_index.js", "--template-ok", "revenue setup evidence index template command");
   assertIncludes("CONKA8_LAW_INSTRUCTIONS.md", "Do not set `liveMode: true`, `googleFormVerified: true`, `brazilComplianceReviewedAt`, or `aiHandoffReviewedAt` unless the evidence is real", "conka8 live gate stop rule");
   assertIncludes("CONKA8_LAW_INSTRUCTIONS.md", "Law-Sensitive Areas", "conka8 law-sensitive matrix");
   assertIncludes("CONKA8_LAW_INSTRUCTIONS.md", "node tools/audit_company_functionality.js --require-live", "conka8 live audit command");
   assertIncludes("CONKA8_LAW_INSTRUCTIONS.md", "Never put private Sheet URLs, Stripe dashboard URLs, bank details, CNPJ documents, tax IDs, reviewer notes, or credentials in `public-config.js`.", "conka8 public config boundary");
   assertIncludes("AI_LEGAL_HANDOFF.md", "HUMAN_REVIEW_PACKET.md", "AI handoff human review packet link");
   assertIncludes("AI_LEGAL_HANDOFF.md", "CONKA8_LAW_INSTRUCTIONS.md", "AI handoff conka8 law instructions link");
+  assertIncludes("AI_LEGAL_HANDOFF.md", "REVIEWER_CANDIDATE_PACKET.md", "AI handoff reviewer candidate packet link");
+  assertIncludes("HUMAN_REVENUE_INSTRUCTIONS.md", "REVIEWER_CANDIDATE_TRACKER.template.json", "human revenue reviewer tracker link");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "termsReviewedAt", "terms review date instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "privacyReviewedAt", "privacy review date instructions");
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "brazilComplianceReviewedAt", "Brazil compliance review date instructions");
@@ -202,6 +235,8 @@ function auditDocs() {
   assertIncludes("AVISO_DE_PRIVACIDADE.md", "A IA nao deve", "Portuguese AI privacy boundary");
   assertIncludes("public.html", 'href="TERMOS.md"', "public Portuguese terms link");
   assertIncludes("public.html", 'href="AVISO_DE_PRIVACIDADE.md"', "public Portuguese privacy link");
+  assertIncludes("public.html", 'id="publicAmaForm"', "public AMA form");
+  assertIncludes("public.html", 'href="PUBLIC_AMA.md"', "public AMA rules link");
   assertIncludes("TERMS.md", "Brazilian operating entity", "Brazil-first terms operator gate");
   assertIncludes("TERMS.md", "NFS-e", "Brazil fiscal terms gate");
   assertIncludes("PRIVACY.md", "LGPD", "LGPD privacy notice");
@@ -209,6 +244,10 @@ function auditDocs() {
 }
 
 function auditPublicBoundary() {
+  assertIncludes("public.js", "amaQuestionPacket", "public AMA packet builder");
+  assertIncludes("public.js", "setupAmaForm", "public AMA form handler");
+  assertIncludes("public.js", "if (!readiness.supportReady)", "public AMA support gate");
+  assertIncludes("public.js", "Public AMA Desk", "public AMA source label");
   assertIncludes("public.js", "Public intake is closed", "public closed-intake copy");
   assertIncludes("public.js", "if (!readiness.liveReady)", "public submit live gate");
   assertIncludes("public.js", 'readiness.liveReady ? `<a href="${mailtoUrl(order)}">Open email draft</a>` : ""', "public email action gated by live readiness");
