@@ -176,6 +176,36 @@ def write_public_ama_queue(screened: bool = False, answer_ready: bool = False, p
     return Path(temp.name)
 
 
+def write_public_ama_answers() -> Path:
+    payload = {
+        "schemaVersion": 1,
+        "mode": "public",
+        "generatedAt": "2026-06-12T00:00:00.000Z",
+        "sourceQueue": "PUBLIC_AMA_QUEUE.local.json",
+        "answers": [
+            {
+                "questionId": "AMA-20260612-001",
+                "topic": "launch-gates",
+                "publicSafeQuestion": "Can public AMA run before paid intake is live?",
+                "publicAnswer": "Yes, public-safe AMA can run while paid intake remains closed.",
+                "answerReviewedAt": "2026-06-12",
+                "publishedAt": "2026-06-13",
+            }
+        ],
+        "attestation": {
+            "publicOnly": True,
+            "noPrivateContactData": True,
+            "noPaymentOrderOrLaunchApprovalCreated": True,
+            "answersWereHumanApprovedBeforeExport": True,
+            "strangeCompanyRemainsSealed": True,
+        },
+    }
+    temp = tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".js", delete=False)
+    temp.write(f"window.PUBLIC_AMA_ANSWERS = Object.freeze({json.dumps(payload, ensure_ascii=False, indent=2)});\n")
+    temp.close()
+    return Path(temp.name)
+
+
 class VAUCompanyEvolutionTests(unittest.TestCase):
     def test_current_config_state_has_hard_blockers(self) -> None:
         path = write_public_config()
@@ -238,6 +268,16 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         self.assertTrue(published_state["gates"]["publicAmaAnswerReady"])
         self.assertEqual(published_state["metrics"]["public_ama_answers_published"], 1)
 
+    def test_public_ama_answer_archive_counts_as_published_answer(self) -> None:
+        path = write_public_config()
+        tracker = write_reviewer_tracker([])
+        state = build_current_state(path, tracker, public_ama_answers=write_public_ama_answers())
+
+        self.assertTrue(state["gates"]["publicAmaQueueActive"])
+        self.assertTrue(state["gates"]["publicAmaAnswerReady"])
+        self.assertEqual(state["metrics"]["public_ama_answers_published"], 1)
+        self.assertIn("published:1", state["evidence"]["publicAmaQueue"])
+
     def test_public_ama_events_progress_from_screening_to_publication(self) -> None:
         path = write_public_config()
         tracker = write_reviewer_tracker([])
@@ -270,6 +310,15 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         published_events = {event.name for event in generate_company_events(create_initial_future(published_state)[0])}
         self.assertNotIn("public_ama_answer_ready", published_events)
         self.assertNotIn("public_ama_answer_published", published_events)
+
+        archived_state = build_current_state(
+            path,
+            tracker,
+            public_ama_answers=write_public_ama_answers(),
+        )
+        archived_events = {event.name for event in generate_company_events(create_initial_future(archived_state)[0])}
+        self.assertNotIn("public_ama_question_screened", archived_events)
+        self.assertNotIn("public_ama_answer_published", archived_events)
 
     def test_default_run_prioritizes_evidence_and_review_actions(self) -> None:
         path = write_public_config()

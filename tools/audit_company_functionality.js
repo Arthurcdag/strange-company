@@ -165,6 +165,7 @@ function auditDocs() {
   assertIncludes("PUBLIC_AMA.md", "tools/export_public_ama_answers.js", "public AMA answer export docs");
   assertIncludes("PUBLIC_AMA.md", "--check-public-js", "public AMA answer archive validation docs");
   assertIncludes("PUBLIC_AMA.md", "--public-ama-queue", "public AMA VAU command docs");
+  assertIncludes("PUBLIC_AMA.md", "--public-ama-answers", "public AMA VAU answer archive docs");
   assertIncludes("PUBLIC_AMA_QUEUE.template.json", '"schemaVersion": 1', "public AMA queue template schema");
   assertIncludes("PUBLIC_AMA_QUEUE.template.json", '"questionRecords": []', "public AMA queue empty template");
   assertIncludes("PUBLIC_AMA_ANSWERS.template.json", '"schemaVersion": 1', "public AMA answers template schema");
@@ -183,7 +184,9 @@ function auditDocs() {
   assertIncludes("tools/validate_public_ama_queue.js", "--require-one", "public AMA one-question gate");
   assertIncludes("tools/validate_public_ama_queue.js", "--require-answer-ready", "public AMA answer-ready gate");
   assertIncludes("tools/vau_company_evolution.py", "PUBLIC_AMA_QUEUE.local.json", "VAU public AMA queue path");
+  assertIncludes("tools/vau_company_evolution.py", "public-ama-answers.js", "VAU public AMA answer archive path");
   assertIncludes("tools/vau_company_evolution.py", "--public-ama-queue", "VAU public AMA queue argument");
+  assertIncludes("tools/vau_company_evolution.py", "--public-ama-answers", "VAU public AMA answer archive argument");
   assertIncludes("EXTERNAL_LIVE_PACKET.template.json", '"schemaVersion": 1', "external live packet template schema");
   assertIncludes("EXTERNAL_LIVE_PACKET.template.json", '"brazilComplianceReviewedAt": ""', "external packet Brazil compliance review field");
   assertIncludes("EXTERNAL_LIVE_PACKET.template.json", '"aiHandoffReviewedAt": ""', "external packet AI handoff review field");

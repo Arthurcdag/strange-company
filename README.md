@@ -171,7 +171,7 @@ node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-on
 node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-answer-ready
 node tools/export_public_ama_answers.js --input PUBLIC_AMA_QUEUE.local.json --output public-ama-answers.js --require-published --force
 node tools/export_public_ama_answers.js --check-public-js
-python tools/vau_company_evolution.py --public-ama-queue PUBLIC_AMA_QUEUE.local.json --depth 1
+python tools/vau_company_evolution.py --public-ama-queue PUBLIC_AMA_QUEUE.local.json --public-ama-answers public-ama-answers.js --depth 1
 ```
 
 To reduce the private payment/fiscal hard blocker, complete `REVENUE_SETUP_EVIDENCE_INDEX.local.json` from `REVENUE_SETUP_EVIDENCE_INDEX.template.json` and then review the evidence by running VAU with the explicit local index path:

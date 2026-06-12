@@ -72,7 +72,7 @@ node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-an
 To include the AMA queue in the VAU company-evolution model:
 
 ```bash
-python tools/vau_company_evolution.py --public-ama-queue PUBLIC_AMA_QUEUE.local.json --depth 1
+python tools/vau_company_evolution.py --public-ama-queue PUBLIC_AMA_QUEUE.local.json --public-ama-answers public-ama-answers.js --depth 1
 ```
 
 To publish only approved public answers to the static site:

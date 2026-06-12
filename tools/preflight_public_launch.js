@@ -931,7 +931,7 @@ function checkPublicAmaQueueContract() {
     ["public AMA answer-ready command", publicAma, "node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-answer-ready"],
     ["public AMA answer export command", publicAma, "node tools/export_public_ama_answers.js --input PUBLIC_AMA_QUEUE.local.json --output public-ama-answers.js --require-published --force"],
     ["public AMA answer archive check command", publicAma, "node tools/export_public_ama_answers.js --check-public-js"],
-    ["public AMA VAU command", publicAma, "python tools/vau_company_evolution.py --public-ama-queue PUBLIC_AMA_QUEUE.local.json --depth 1"],
+    ["public AMA VAU command", publicAma, "python tools/vau_company_evolution.py --public-ama-queue PUBLIC_AMA_QUEUE.local.json --public-ama-answers public-ama-answers.js --depth 1"],
     ["public AMA private-data warning", publicAma, "must not include direct email addresses"],
     ["public AMA queue template schema", template, '"schemaVersion": 1'],
     ["public AMA queue template records", template, '"questionRecords": []'],
@@ -973,7 +973,9 @@ function checkPublicAmaQueueContract() {
     ["public AMA pages exporter copy", builder, "tools/export_public_ama_answers.js"],
     ["public AMA pages validator copy", builder, "tools/validate_public_ama_queue.js"],
     ["public AMA VAU default path", vauCompany, "PUBLIC_AMA_QUEUE.local.json"],
-    ["public AMA VAU argument", vauCompany, "--public-ama-queue"]
+    ["public AMA VAU answer archive path", vauCompany, "public-ama-answers.js"],
+    ["public AMA VAU queue argument", vauCompany, "--public-ama-queue"],
+    ["public AMA VAU answer archive argument", vauCompany, "--public-ama-answers"]
   ];
 
   for (const [label, contents, snippet] of required) {

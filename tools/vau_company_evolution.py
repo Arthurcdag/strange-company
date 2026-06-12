@@ -15,6 +15,7 @@ DEFAULT_PUBLIC_CONFIG = ROOT / "public-config.js"
 DEFAULT_REVIEWER_TRACKER = ROOT / "REVIEWER_CANDIDATE_TRACKER.local.json"
 DEFAULT_REVENUE_EVIDENCE_INDEX = ROOT / "REVENUE_SETUP_EVIDENCE_INDEX.local.json"
 DEFAULT_PUBLIC_AMA_QUEUE = ROOT / "PUBLIC_AMA_QUEUE.local.json"
+DEFAULT_PUBLIC_AMA_ANSWERS = ROOT / "public-ama-answers.js"
 
 REVIEWER_REVIEW_STATUSES = {
     "contacted",
@@ -325,54 +326,88 @@ def _infer_revenue_evidence(evidence_path: Path) -> tuple[bool, str]:
     )
 
 
-def infer_public_ama_metrics(queue_path: Path = DEFAULT_PUBLIC_AMA_QUEUE) -> tuple[int, int, int, str]:
-    if not queue_path.exists():
-        return 0, 0, 0, ""
+def _read_public_ama_answer_records(answers_path: Path) -> list[dict[str, Any]]:
+    if not answers_path.exists():
+        return []
 
     try:
-        queue = json.loads(queue_path.read_text(encoding="utf-8-sig"))
+        text = answers_path.read_text(encoding="utf-8-sig")
+        if answers_path.suffix.lower() == ".json":
+            archive = json.loads(text)
+        else:
+            match = re.search(
+                r"window\.PUBLIC_AMA_ANSWERS\s*=\s*Object\.freeze\((\{.*\})\);\s*$",
+                text,
+                re.DOTALL,
+            )
+            if not match:
+                return []
+            archive = json.loads(match.group(1))
     except (OSError, json.JSONDecodeError):
-        return 0, 0, 0, ""
+        return []
 
-    records = queue.get("questionRecords") if isinstance(queue, dict) else None
-    if not isinstance(records, list):
-        return 0, 0, 0, ""
+    answers = archive.get("answers") if isinstance(archive, dict) else None
+    return [answer for answer in answers if isinstance(answer, dict)] if isinstance(answers, list) else []
 
+
+def infer_public_ama_metrics(
+    queue_path: Path = DEFAULT_PUBLIC_AMA_QUEUE,
+    answers_path: Path = DEFAULT_PUBLIC_AMA_ANSWERS,
+) -> tuple[int, int, int, str]:
     screened_ids: set[str] = set()
     answer_ready_ids: set[str] = set()
     published_ids: set[str] = set()
 
-    for record in records:
-        if not isinstance(record, dict):
-            continue
-        question_id = _normalize(record.get("questionId")) or _normalize(record.get("questionSummary"))
-        if not question_id:
-            continue
+    if queue_path.exists():
+        try:
+            queue = json.loads(queue_path.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError):
+            queue = {}
 
-        status = _normalize(record.get("status"))
-        boundary = _normalize(record.get("boundaryDecision"))
-        human_screened = record.get("humanScreened") is True
+        records = queue.get("questionRecords") if isinstance(queue, dict) else None
+        if isinstance(records, list):
+            for record in records:
+                if not isinstance(record, dict):
+                    continue
+                question_id = _normalize(record.get("questionId")) or _normalize(record.get("questionSummary"))
+                if not question_id:
+                    continue
 
-        if human_screened and boundary in AMA_SCREENED_BOUNDARY_DECISIONS:
-            screened_ids.add(question_id)
+                status = _normalize(record.get("status"))
+                boundary = _normalize(record.get("boundaryDecision"))
+                human_screened = record.get("humanScreened") is True
 
+                if human_screened and boundary in AMA_SCREENED_BOUNDARY_DECISIONS:
+                    screened_ids.add(question_id)
+
+                if (
+                    status == "answer_ready"
+                    and boundary == "public_safe"
+                    and human_screened
+                    and record.get("humanApprovedForPublication") is True
+                    and not _is_blank(record.get("publicAnswer"))
+                    and _is_iso_date(record.get("answerReviewedAt"))
+                ):
+                    answer_ready_ids.add(question_id)
+
+                if (
+                    status == "published"
+                    and boundary == "public_safe"
+                    and human_screened
+                    and record.get("humanApprovedForPublication") is True
+                    and not _is_blank(record.get("publicAnswer"))
+                    and _is_iso_date(record.get("answerReviewedAt"))
+                ):
+                    published_ids.add(question_id)
+
+    for answer in _read_public_ama_answer_records(answers_path):
+        question_id = _normalize(answer.get("questionId")) or _normalize(answer.get("publicSafeQuestion"))
         if (
-            status == "answer_ready"
-            and boundary == "public_safe"
-            and human_screened
-            and record.get("humanApprovedForPublication") is True
-            and not _is_blank(record.get("publicAnswer"))
-            and _is_iso_date(record.get("answerReviewedAt"))
-        ):
-            answer_ready_ids.add(question_id)
-
-        if (
-            status == "published"
-            and boundary == "public_safe"
-            and human_screened
-            and record.get("humanApprovedForPublication") is True
-            and not _is_blank(record.get("publicAnswer"))
-            and _is_iso_date(record.get("answerReviewedAt"))
+            question_id
+            and not _is_blank(answer.get("publicSafeQuestion"))
+            and not _is_blank(answer.get("publicAnswer"))
+            and _is_iso_date(answer.get("answerReviewedAt"))
+            and _is_iso_date(answer.get("publishedAt"))
         ):
             published_ids.add(question_id)
 
@@ -389,6 +424,7 @@ def build_current_state(
     reviewer_tracker: Path = DEFAULT_REVIEWER_TRACKER,
     revenue_evidence_index: Path = DEFAULT_REVENUE_EVIDENCE_INDEX,
     public_ama_queue: Path = DEFAULT_PUBLIC_AMA_QUEUE,
+    public_ama_answers: Path = DEFAULT_PUBLIC_AMA_ANSWERS,
 ) -> dict[str, Any]:
     text = public_config.read_text(encoding="utf-8")
     terms_reviewed_at = _read_string_config(text, "termsReviewedAt")
@@ -400,7 +436,8 @@ def build_current_state(
         revenue_evidence_index
     )
     ama_questions, ama_answers_ready, ama_answers_published, ama_queue_evidence = infer_public_ama_metrics(
-        public_ama_queue
+        public_ama_queue,
+        public_ama_answers,
     )
 
     return {
@@ -420,7 +457,7 @@ def build_current_state(
             "aiHandoffReviewed": bool(ai_handoff_reviewed_at),
             "privatePaymentFiscalEvidenceReady": payment_fiscal_evidence_ready,
             "humanReviewersReady": reviewers_ready,
-            "publicAmaQueueActive": ama_questions > 0,
+            "publicAmaQueueActive": (ama_questions + ama_answers_published) > 0,
             "publicAmaAnswerReady": (ama_answers_ready + ama_answers_published) > 0,
             "deliveryReviewLoopReady": False,
             "liveMode": _read_bool_config(text, "liveMode"),
@@ -615,7 +652,7 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
             ]
         )
 
-    if ama_questions <= 0:
+    if ama_questions + ama_answers_published <= 0:
         events.append(
             CompanyEvent(
                 name="public_ama_question_screened",
@@ -995,6 +1032,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--reviewer-tracker", default=str(DEFAULT_REVIEWER_TRACKER))
     parser.add_argument("--revenue-evidence-index", default=str(DEFAULT_REVENUE_EVIDENCE_INDEX))
     parser.add_argument("--public-ama-queue", default=str(DEFAULT_PUBLIC_AMA_QUEUE))
+    parser.add_argument("--public-ama-answers", default=str(DEFAULT_PUBLIC_AMA_ANSWERS))
     parser.add_argument("--depth", type=int, default=3)
     parser.add_argument("--max-branches-to-keep", type=int, default=8)
     parser.add_argument("--real-event-json")
@@ -1009,6 +1047,7 @@ def main() -> int:
         reviewer_tracker=Path(args.reviewer_tracker),
         revenue_evidence_index=Path(args.revenue_evidence_index),
         public_ama_queue=Path(args.public_ama_queue),
+        public_ama_answers=Path(args.public_ama_answers),
     )
     real_event = CompanyEvent.from_dict(json.loads(args.real_event_json)) if args.real_event_json else None
     result = run_cycle(
