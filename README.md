@@ -168,6 +168,7 @@ node tools/draft_public_ama_queue.js --write-local
 node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-one
 node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-answer-ready
 node tools/export_public_ama_answers.js --input PUBLIC_AMA_QUEUE.local.json --output public-ama-answers.js --require-published --force
+node tools/export_public_ama_answers.js --check-public-js
 python tools/vau_company_evolution.py --public-ama-queue PUBLIC_AMA_QUEUE.local.json --depth 1
 ```
 

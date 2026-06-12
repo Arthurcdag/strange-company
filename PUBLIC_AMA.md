@@ -79,6 +79,7 @@ To publish only approved public answers to the static site:
 
 ```bash
 node tools/export_public_ama_answers.js --input PUBLIC_AMA_QUEUE.local.json --output public-ama-answers.js --require-published --force
+node tools/export_public_ama_answers.js --check-public-js
 ```
 
 The export may include only `questionId`, `topic`, `publicSafeQuestion`, `publicAnswer`, `answerReviewedAt`, and `publishedAt`. It must not include name aliases, direct emails, support-thread text, private evidence IDs, payment records, legal/tax/private advice, or raw customer data.

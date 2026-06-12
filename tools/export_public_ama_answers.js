@@ -1,11 +1,13 @@
 const fs = require("fs");
 const path = require("path");
+const vm = require("vm");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
 const force = args.includes("--force");
 const requirePublished = args.includes("--require-published");
 const templateOk = args.includes("--template-ok");
+const checkPublicJs = args.includes("--check-public-js");
 
 function argValue(name) {
   const index = args.indexOf(name);
@@ -18,6 +20,7 @@ const inputPath = path.resolve(
 );
 const outputArg = argValue("--output");
 const outputPath = outputArg ? path.resolve(process.cwd(), outputArg) : "";
+const publicJsPath = path.resolve(process.cwd(), argValue("--public-js") || path.join(root, "public-ama-answers.js"));
 const failures = [];
 
 function fail(message) {
@@ -81,6 +84,61 @@ function validateTemplate() {
   }
   if (template.attestation?.publicOnly !== true || template.attestation?.noPrivateContactData !== true) {
     fail("PUBLIC_AMA_ANSWERS.template.json must attest public-only output.");
+  }
+}
+
+function validatePublicArchive(archive, label) {
+  if (!archive || typeof archive !== "object") {
+    fail(`${label} must expose an archive object.`);
+    return;
+  }
+  if (archive.schemaVersion !== 1) {
+    fail(`${label} schemaVersion must be 1.`);
+  }
+  if (archive.mode !== "public") {
+    fail(`${label} mode must be public.`);
+  }
+  if (!Array.isArray(archive.answers)) {
+    fail(`${label} answers must be an array.`);
+    return;
+  }
+  if (archive.attestation?.publicOnly !== true || archive.attestation?.noPrivateContactData !== true) {
+    fail(`${label} must attest public-only answers with no private contact data.`);
+  }
+  archive.answers.forEach((answer, index) => {
+    const forbidden = ["nameAlias", "contactRef", "questionSummary", "evidenceRef"];
+    for (const field of forbidden) {
+      if (Object.prototype.hasOwnProperty.call(answer, field)) {
+        fail(`${label}.answers[${index}] must not include ${field}.`);
+      }
+    }
+    for (const field of ["questionId", "topic", "publicSafeQuestion", "publicAnswer", "answerReviewedAt", "publishedAt"]) {
+      if (isBlank(answer[field])) {
+        fail(`${label}.answers[${index}].${field} is required.`);
+      }
+    }
+    if (!isIsoDate(answer.answerReviewedAt)) {
+      fail(`${label}.answers[${index}].answerReviewedAt must be YYYY-MM-DD.`);
+    }
+    if (!isIsoDate(answer.publishedAt)) {
+      fail(`${label}.answers[${index}].publishedAt must be YYYY-MM-DD.`);
+    }
+    for (const field of ["questionId", "topic", "publicSafeQuestion", "publicAnswer"]) {
+      if (hasPrivateDataLikeValue(answer[field])) {
+        fail(`${label}.answers[${index}].${field} contains private-data-like content.`);
+      }
+    }
+  });
+}
+
+function loadPublicJsArchive(filePath) {
+  try {
+    const sandbox = { window: {}, Object };
+    vm.runInNewContext(fs.readFileSync(filePath, "utf8"), sandbox, { filename: filePath });
+    return sandbox.window.PUBLIC_AMA_ANSWERS;
+  } catch (error) {
+    fail(`Could not load ${filePath}: ${error.message}`);
+    return null;
   }
 }
 
@@ -192,6 +250,19 @@ if (templateOk) {
     process.exit(1);
   }
   console.log("Public AMA answers template validation passed.");
+  process.exit(0);
+}
+
+if (checkPublicJs) {
+  validatePublicArchive(loadPublicJsArchive(publicJsPath), "public-ama-answers.js");
+  if (failures.length) {
+    console.error("Public AMA answers archive validation failed:");
+    for (const failure of failures) {
+      console.error(`- ${failure}`);
+    }
+    process.exit(1);
+  }
+  console.log("Public AMA answers archive validation passed.");
   process.exit(0);
 }
 

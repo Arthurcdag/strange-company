@@ -80,6 +80,12 @@ class PublicAmaAnswersTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("template validation passed", result.stdout)
 
+    def test_public_js_archive_check_passes(self) -> None:
+        result = run_exporter("--check-public-js")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("archive validation passed", result.stdout)
+
     def test_exporter_writes_only_public_fields(self) -> None:
         queue = write_payload(published_queue_payload())
         output_handle = tempfile.NamedTemporaryFile(suffix=".js", delete=False)

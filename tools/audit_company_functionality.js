@@ -162,6 +162,7 @@ function auditDocs() {
   assertIncludes("PUBLIC_AMA.md", "PUBLIC_AMA_QUEUE.local.json", "public AMA local queue docs");
   assertIncludes("PUBLIC_AMA.md", "--require-answer-ready", "public AMA answer-ready validation docs");
   assertIncludes("PUBLIC_AMA.md", "tools/export_public_ama_answers.js", "public AMA answer export docs");
+  assertIncludes("PUBLIC_AMA.md", "--check-public-js", "public AMA answer archive validation docs");
   assertIncludes("PUBLIC_AMA.md", "--public-ama-queue", "public AMA VAU command docs");
   assertIncludes("PUBLIC_AMA_QUEUE.template.json", '"schemaVersion": 1', "public AMA queue template schema");
   assertIncludes("PUBLIC_AMA_QUEUE.template.json", '"questionRecords": []', "public AMA queue empty template");
@@ -172,6 +173,7 @@ function auditDocs() {
   assertIncludes("tools/export_public_ama_answers.js", "PUBLIC_AMA_ANSWERS.template.json", "public AMA answer exporter");
   assertIncludes("tools/export_public_ama_answers.js", "humanApprovedForPublication", "public AMA answer human approval gate");
   assertIncludes("tools/export_public_ama_answers.js", "--require-published", "public AMA answer publication gate");
+  assertIncludes("tools/export_public_ama_answers.js", "--check-public-js", "public AMA answer archive check");
   assertIncludes("tools/validate_public_ama_queue.js", "Public AMA queue validation", "public AMA queue validator");
   assertIncludes("tools/validate_public_ama_queue.js", "--require-one", "public AMA one-question gate");
   assertIncludes("tools/validate_public_ama_queue.js", "--require-answer-ready", "public AMA answer-ready gate");
