@@ -17,6 +17,7 @@ REVENUE_SETUP_TEMPLATE = ROOT / "REVENUE_SETUP_EVIDENCE_INDEX.template.json"
 VALIDATOR = ROOT / "tools" / "validate_revenue_setup_evidence_index.js"
 VALIDATE_WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
 PAGES_YML = ROOT / ".github" / "workflows" / "pages.yml"
+BUILD_PUBLIC_SITE = ROOT / "tools" / "build_public_site.js"
 
 
 def run_validator(*args: str) -> subprocess.CompletedProcess[str]:
@@ -215,8 +216,9 @@ class RevenueSetupEvidenceIndexTests(unittest.TestCase):
         self.assertIn("tools/validate_revenue_setup_evidence_index.js", HUMAN_REVENUE.read_text(encoding="utf-8"))
         self.assertIn("REVENUE_SETUP_EVIDENCE_INDEX.template.json", EVIDENCE_PACKET.read_text(encoding="utf-8"))
         self.assertIn("tools/validate_revenue_setup_evidence_index.js --template-ok", VALIDATE_WORKFLOW.read_text(encoding="utf-8"))
-        self.assertIn("tools/draft_revenue_setup_evidence_index.js", PAGES_YML.read_text(encoding="utf-8"))
-        self.assertIn("tools/validate_revenue_setup_evidence_index.js", PAGES_YML.read_text(encoding="utf-8"))
+        self.assertIn("node tools/build_public_site.js --check", PAGES_YML.read_text(encoding="utf-8"))
+        self.assertIn("tools/draft_revenue_setup_evidence_index.js", BUILD_PUBLIC_SITE.read_text(encoding="utf-8"))
+        self.assertIn("tools/validate_revenue_setup_evidence_index.js", BUILD_PUBLIC_SITE.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

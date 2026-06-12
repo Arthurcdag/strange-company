@@ -154,6 +154,7 @@ function auditDocs() {
   assertIncludes("README.md", "PUBLIC_AMA.md", "public AMA README link");
   assertIncludes("README.md", "PUBLIC_AMA_QUEUE.template.json", "public AMA queue template README link");
   assertIncludes("README.md", "PUBLIC_AMA_ANSWERS.template.json", "public AMA answer template README link");
+  assertIncludes("README.md", "tools/build_public_site.js", "public site builder README link");
   assertIncludes("README.md", "tools/draft_public_ama_queue.js", "public AMA draft generator README link");
   assertIncludes("README.md", "tools/export_public_ama_answers.js", "public AMA answer exporter README link");
   assertIncludes("README.md", "tools/validate_public_ama_queue.js", "public AMA validator README link");
@@ -169,6 +170,10 @@ function auditDocs() {
   assertIncludes("PUBLIC_AMA_ANSWERS.template.json", '"schemaVersion": 1', "public AMA answers template schema");
   assertIncludes("PUBLIC_AMA_ANSWERS.template.json", '"answers": []', "public AMA answers empty template");
   assertIncludes("public-ama-answers.js", "window.PUBLIC_AMA_ANSWERS", "public AMA answers static archive");
+  assertIncludes("tools/build_public_site.js", "Public site build check passed", "public site build checker");
+  assertIncludes("tools/build_public_site.js", "PUBLIC_AMA_QUEUE", "public site local evidence exclusion");
+  assertIncludes(".github/workflows/pages.yml", "node tools/build_public_site.js --check --output _site --force", "Pages build uses public site checker");
+  assertIncludes(".github/workflows/validate.yml", "node tools/build_public_site.js --check --output .public-site-build.local --force", "CI validates public site bundle");
   assertIncludes("tools/draft_public_ama_queue.js", "PUBLIC_AMA_QUEUE.local.json", "public AMA draft generator");
   assertIncludes("tools/export_public_ama_answers.js", "PUBLIC_AMA_ANSWERS.template.json", "public AMA answer exporter");
   assertIncludes("tools/export_public_ama_answers.js", "humanApprovedForPublication", "public AMA answer human approval gate");

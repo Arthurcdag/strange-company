@@ -1,6 +1,8 @@
 # Generated verification screenshots
 desktop-*.png
 mobile-*.png
+_site/
+.public-site-build.local/
 
 # Local caches and dependencies
 __pycache__/

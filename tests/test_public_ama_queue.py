@@ -16,6 +16,7 @@ TEMPLATE = ROOT / "PUBLIC_AMA_QUEUE.template.json"
 VALIDATOR = ROOT / "tools" / "validate_public_ama_queue.js"
 DRAFT = ROOT / "tools" / "draft_public_ama_queue.js"
 EXPORT = ROOT / "tools" / "export_public_ama_answers.js"
+BUILD_PUBLIC_SITE = ROOT / "tools" / "build_public_site.js"
 ANSWERS_TEMPLATE = ROOT / "PUBLIC_AMA_ANSWERS.template.json"
 PUBLIC_ANSWERS_JS = ROOT / "public-ama-answers.js"
 GITIGNORE = ROOT / ".gitignore"
@@ -84,7 +85,7 @@ def write_payload(payload: dict[str, object]) -> pathlib.Path:
 
 class PublicAmaQueueTests(unittest.TestCase):
     def test_required_files_exist(self) -> None:
-        for path in (PUBLIC_AMA, TEMPLATE, ANSWERS_TEMPLATE, VALIDATOR, DRAFT, EXPORT, PUBLIC_ANSWERS_JS, VALIDATE_WORKFLOW, PAGES_YML):
+        for path in (PUBLIC_AMA, TEMPLATE, ANSWERS_TEMPLATE, VALIDATOR, DRAFT, EXPORT, BUILD_PUBLIC_SITE, PUBLIC_ANSWERS_JS, VALIDATE_WORKFLOW, PAGES_YML):
             with self.subTest(file=path.name):
                 self.assertTrue(path.exists(), f"missing {path.name}")
 
@@ -152,9 +153,11 @@ class PublicAmaQueueTests(unittest.TestCase):
         self.assertIn("!PUBLIC_AMA_ANSWERS.template.json", GITIGNORE.read_text(encoding="utf-8"))
         self.assertIn("node --check tools/validate_public_ama_queue.js", VALIDATE_WORKFLOW.read_text(encoding="utf-8"))
         self.assertIn("node --check tools/export_public_ama_answers.js", VALIDATE_WORKFLOW.read_text(encoding="utf-8"))
-        self.assertIn("PUBLIC_AMA_QUEUE.template.json", PAGES_YML.read_text(encoding="utf-8"))
-        self.assertIn("PUBLIC_AMA_ANSWERS.template.json", PAGES_YML.read_text(encoding="utf-8"))
-        self.assertIn("public-ama-answers.js", PAGES_YML.read_text(encoding="utf-8"))
+        self.assertIn("node --check tools/build_public_site.js", VALIDATE_WORKFLOW.read_text(encoding="utf-8"))
+        self.assertIn("node tools/build_public_site.js --check", PAGES_YML.read_text(encoding="utf-8"))
+        self.assertIn("PUBLIC_AMA_QUEUE.template.json", BUILD_PUBLIC_SITE.read_text(encoding="utf-8"))
+        self.assertIn("PUBLIC_AMA_ANSWERS.template.json", BUILD_PUBLIC_SITE.read_text(encoding="utf-8"))
+        self.assertIn("public-ama-answers.js", BUILD_PUBLIC_SITE.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

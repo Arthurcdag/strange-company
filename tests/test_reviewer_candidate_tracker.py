@@ -17,6 +17,7 @@ AI_HANDOFF = ROOT / "AI_LEGAL_HANDOFF.md"
 HUMAN_REVENUE = ROOT / "HUMAN_REVENUE_INSTRUCTIONS.md"
 GITIGNORE = ROOT / ".gitignore"
 PAGES_YML = ROOT / ".github" / "workflows" / "pages.yml"
+BUILD_PUBLIC_SITE = ROOT / "tools" / "build_public_site.js"
 
 
 def run_validator(*args: str) -> subprocess.CompletedProcess[str]:
@@ -69,9 +70,11 @@ class ReviewerCandidateTrackerTests(unittest.TestCase):
 
     def test_pages_contract_includes_reviewer_candidate_artifacts(self) -> None:
         workflow = PAGES_YML.read_text(encoding="utf-8")
-        self.assertIn("REVIEWER_CANDIDATE_TRACKER.template.json", workflow)
-        self.assertIn("tools/draft_reviewer_candidate_tracker.js", workflow)
-        self.assertIn("tools/validate_reviewer_candidate_tracker.js", workflow)
+        builder = BUILD_PUBLIC_SITE.read_text(encoding="utf-8")
+        self.assertIn("node tools/build_public_site.js --check", workflow)
+        self.assertIn("REVIEWER_CANDIDATE_TRACKER.template.json", builder)
+        self.assertIn("tools/draft_reviewer_candidate_tracker.js", builder)
+        self.assertIn("tools/validate_reviewer_candidate_tracker.js", builder)
 
     def test_docs_cross_reference_tracker_and_validator(self) -> None:
         for path in (PACKET, README, AI_HANDOFF, HUMAN_REVENUE):

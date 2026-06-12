@@ -22,8 +22,10 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           node --check public-config.js
+          node --check public-ama-answers.js
           node --check public.js
           node --check script.js
+          node --check tools/build_public_site.js
           node --check tools/preflight_public_launch.js
           node --check tools/audit_company_functionality.js
           node --check tools/draft_reviewer_candidate_tracker.js
@@ -47,4 +49,5 @@ jobs:
           node tools/validate_public_ama_queue.js --template-ok
           node tools/validate_reviewer_candidate_tracker.js --template-ok
           node tools/validate_revenue_setup_evidence_index.js --template-ok
+          node tools/build_public_site.js --check --output .public-site-build.local --force
           node tools/preflight_public_launch.js

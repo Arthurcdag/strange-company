@@ -76,6 +76,8 @@ function checkPublicSurface() {
   const publicJs = read("public.js");
   const publicConfig = read("public-config.js");
   const publicAnswers = read("public-ama-answers.js");
+  const pagesWorkflow = read(".github/workflows/pages.yml");
+  const validateWorkflow = read(".github/workflows/validate.yml");
   const publicFiles = [
     ["public.html", publicHtml],
     ["public.js", publicJs],
@@ -91,6 +93,8 @@ function checkPublicSurface() {
   assert(publicHtml.includes("public-ama-answers.js"), "public.html must load public-ama-answers.js.");
   assert(publicHtml.includes("public.js"), "public.html must load public.js.");
   assert(!publicHtml.includes("script.js"), "public.html must not load the private command center script.");
+  assert(pagesWorkflow.includes("node tools/build_public_site.js --check --output _site --force"), "pages workflow must use the public site build checker.");
+  assert(validateWorkflow.includes("node tools/build_public_site.js --check --output .public-site-build.local --force"), "validate workflow must check the public site bundle.");
 
   const forbiddenPublicPatterns = [
     ["localStorage", /\blocalStorage\b/],
@@ -912,6 +916,7 @@ function checkPublicAmaQueueContract() {
   const gitignore = read(".gitignore");
   const validateWorkflow = read(".github/workflows/validate.yml");
   const pages = read(".github/workflows/pages.yml");
+  const builder = read("tools/build_public_site.js");
   const vauCompany = read("tools/vau_company_evolution.py");
 
   const required = [
@@ -936,6 +941,9 @@ function checkPublicAmaQueueContract() {
     ["public AMA answers template public-only attestation", answersTemplate, '"noPrivateContactData": true'],
     ["public AMA answers archive global", publicAnswers, "window.PUBLIC_AMA_ANSWERS"],
     ["public AMA answers archive empty", publicAnswers, '"answers": []'],
+    ["public site build tool", builder, "Public site build check passed"],
+    ["public site build forbidden local queue", builder, "PUBLIC_AMA_QUEUE"],
+    ["public site build forbidden MEI guard", builder, "^MEI_"],
     ["public AMA draft generator", draft, "PUBLIC_AMA_QUEUE.local.json"],
     ["public AMA answer exporter", exporter, "PUBLIC_AMA_ANSWERS.template.json"],
     ["public AMA answer exporter approval gate", exporter, "humanApprovedForPublication"],
@@ -952,15 +960,18 @@ function checkPublicAmaQueueContract() {
     ["public AMA validator syntax check", validateWorkflow, "node --check tools/validate_public_ama_queue.js"],
     ["public AMA draft syntax check", validateWorkflow, "node --check tools/draft_public_ama_queue.js"],
     ["public AMA answer export syntax check", validateWorkflow, "node --check tools/export_public_ama_answers.js"],
+    ["public site build syntax check", validateWorkflow, "node --check tools/build_public_site.js"],
     ["public AMA answer export CI template check", validateWorkflow, "node tools/export_public_ama_answers.js --template-ok"],
     ["public AMA answer archive CI check", validateWorkflow, "node tools/export_public_ama_answers.js --check-public-js"],
+    ["public site build CI check", validateWorkflow, "node tools/build_public_site.js --check --output .public-site-build.local --force"],
     ["public AMA validator CI template check", validateWorkflow, "node tools/validate_public_ama_queue.js --template-ok"],
-    ["public AMA pages template copy", pages, "PUBLIC_AMA_QUEUE.template.json"],
-    ["public AMA answers pages copy", pages, "public-ama-answers.js"],
-    ["public AMA answers template pages copy", pages, "PUBLIC_AMA_ANSWERS.template.json"],
-    ["public AMA pages draft copy", pages, "tools/draft_public_ama_queue.js"],
-    ["public AMA pages exporter copy", pages, "tools/export_public_ama_answers.js"],
-    ["public AMA pages validator copy", pages, "tools/validate_public_ama_queue.js"],
+    ["public site pages workflow builder", pages, "node tools/build_public_site.js --check --output _site --force"],
+    ["public AMA pages template copy", builder, "PUBLIC_AMA_QUEUE.template.json"],
+    ["public AMA answers pages copy", builder, "public-ama-answers.js"],
+    ["public AMA answers template pages copy", builder, "PUBLIC_AMA_ANSWERS.template.json"],
+    ["public AMA pages draft copy", builder, "tools/draft_public_ama_queue.js"],
+    ["public AMA pages exporter copy", builder, "tools/export_public_ama_answers.js"],
+    ["public AMA pages validator copy", builder, "tools/validate_public_ama_queue.js"],
     ["public AMA VAU default path", vauCompany, "PUBLIC_AMA_QUEUE.local.json"],
     ["public AMA VAU argument", vauCompany, "--public-ama-queue"]
   ];
@@ -981,7 +992,7 @@ function checkRevenueSetupEvidenceIndexContract() {
   const gitignore = read(".gitignore");
   const validateWorkflow = read(".github/workflows/validate.yml");
   const vauCompany = read("tools/vau_company_evolution.py");
-  const pages = read(".github/workflows/pages.yml");
+  const builder = read("tools/build_public_site.js");
 
   const required = [
     ["README revenue setup packet link", readme, "REVENUE_SETUP_EVIDENCE_PACKET.md"],
@@ -1010,9 +1021,9 @@ function checkRevenueSetupEvidenceIndexContract() {
     ["revenue validator syntax check", validateWorkflow, "node --check tools/validate_revenue_setup_evidence_index.js"],
     ["revenue draft syntax check", validateWorkflow, "node --check tools/draft_revenue_setup_evidence_index.js"],
     ["revenue validator CI template check", validateWorkflow, "node tools/validate_revenue_setup_evidence_index.js --template-ok"],
-    ["revenue pages template copy", pages, "REVENUE_SETUP_EVIDENCE_INDEX.template.json"],
-    ["revenue pages draft copy", pages, "tools/draft_revenue_setup_evidence_index.js"],
-    ["revenue pages validator copy", pages, "tools/validate_revenue_setup_evidence_index.js"],
+    ["revenue pages template copy", builder, "REVENUE_SETUP_EVIDENCE_INDEX.template.json"],
+    ["revenue pages draft copy", builder, "tools/draft_revenue_setup_evidence_index.js"],
+    ["revenue pages validator copy", builder, "tools/validate_revenue_setup_evidence_index.js"],
     ["VAU revenue evidence path", vauCompany, "--revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json"],
   ];
 
@@ -1079,6 +1090,7 @@ compileJavaScript("public-ama-answers.js");
 compileJavaScript("public.js");
 compileJavaScript("script.js");
 compileJavaScript("tools/audit_company_functionality.js");
+compileJavaScript("tools/build_public_site.js");
 compileJavaScript("tools/draft_external_live_packet.js");
 compileJavaScript("tools/generate_external_live_gap_packet.js");
 compileJavaScript("tools/validate_external_live_packet.js");

@@ -119,6 +119,7 @@ function checkStaticSurvivalSurface() {
   assert(publicAnswers.includes("window.PUBLIC_AMA_ANSWERS"), "public-ama-answers.js must expose only the public answer archive.", "public AMA answer archive", "public-ama-answers.js");
   assert(read("tools/export_public_ama_answers.js").includes("humanApprovedForPublication"), "public AMA answer export must require human publication approval.", "public AMA answer export gate", "tools/export_public_ama_answers.js");
   assert(read("tools/export_public_ama_answers.js").includes("--check-public-js"), "public AMA answer export must validate the public archive.", "public AMA answer archive validation", "tools/export_public_ama_answers.js");
+  assert(read("tools/build_public_site.js").includes("Public site build check passed"), "public site bundle must have an executable build check.", "public site build checker", "tools/build_public_site.js");
   assert(read("tools/validate_public_ama_queue.js").includes("--require-answer-ready"), "public AMA validator must require answer-ready review before publication.", "public AMA answer-ready gate", "tools/validate_public_ama_queue.js");
   assert(publicJs.includes("Public intake is closed"), "public.js must tell users public intake is closed before live readiness.", "public closed-intake copy", "public.js");
   assert(publicJs.includes("if (!readiness.liveReady)"), "public.js must block public submits before live readiness.", "public submit live gate", "public.js");

@@ -1,0 +1,184 @@
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+
+const root = path.resolve(__dirname, "..");
+const args = process.argv.slice(2);
+const force = args.includes("--force");
+const check = args.includes("--check");
+
+function argValue(name) {
+  const index = args.indexOf(name);
+  return index >= 0 && args[index + 1] ? String(args[index + 1]) : "";
+}
+
+const outputPath = path.resolve(process.cwd(), argValue("--output") || path.join(root, ".public-site-build.local"));
+const failures = [];
+
+function fail(message) {
+  failures.push(message);
+}
+
+function isInside(parent, child) {
+  const relative = path.relative(parent, child);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+function assertSafeOutput(target) {
+  const base = path.basename(target);
+  const safeNamedBuild = isInside(root, target) && (base === "_site" || base === ".public-site-build.local");
+  const safeTempBuild = isInside(os.tmpdir(), target);
+  if (!safeNamedBuild && !safeTempBuild) {
+    fail(`Refusing to build into unsafe output path: ${target}`);
+  }
+}
+
+function ensureDir(dir) {
+  fs.mkdirSync(dir, { recursive: true });
+}
+
+function resetDir(dir) {
+  assertSafeOutput(dir);
+  if (failures.length) {
+    return;
+  }
+  if (fs.existsSync(dir)) {
+    if (!force && !check) {
+      fail(`Refusing to overwrite ${dir}. Pass --force to replace it.`);
+      return;
+    }
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  ensureDir(dir);
+}
+
+function copyFile(relativeSource, relativeDest = relativeSource) {
+  const source = path.join(root, relativeSource);
+  const dest = path.join(outputPath, relativeDest);
+  if (!fs.existsSync(source)) {
+    fail(`Missing source file: ${relativeSource}`);
+    return;
+  }
+  ensureDir(path.dirname(dest));
+  fs.copyFileSync(source, dest);
+}
+
+function copyMarkdownDocs() {
+  for (const entry of fs.readdirSync(root)) {
+    if (entry.endsWith(".md") && !/^MEI_/i.test(entry)) {
+      copyFile(entry);
+    }
+  }
+}
+
+function buildSite() {
+  resetDir(outputPath);
+  if (failures.length) {
+    return;
+  }
+
+  copyFile("public.html", "index.html");
+  for (const file of [
+    "public.js",
+    "public-config.js",
+    "public-ama-answers.js",
+    "styles.css",
+    "EXTERNAL_LIVE_PACKET.template.json",
+    "PUBLIC_AMA_QUEUE.template.json",
+    "PUBLIC_AMA_ANSWERS.template.json",
+    "REVIEWER_CANDIDATE_TRACKER.template.json",
+    "REVENUE_SETUP_EVIDENCE_INDEX.template.json"
+  ]) {
+    copyFile(file);
+  }
+  copyMarkdownDocs();
+  for (const file of [
+    "tools/strange_research_gate.py",
+    "tools/reactive_research_tools_cors.patch",
+    "tools/google_apps_script_order_intake.gs",
+    "tools/draft_reviewer_candidate_tracker.js",
+    "tools/draft_revenue_setup_evidence_index.js",
+    "tools/draft_public_ama_queue.js",
+    "tools/export_public_ama_answers.js",
+    "tools/validate_external_live_packet.js",
+    "tools/validate_public_ama_queue.js",
+    "tools/validate_reviewer_candidate_tracker.js",
+    "tools/validate_revenue_setup_evidence_index.js",
+    "tools/build_public_site.js"
+  ]) {
+    copyFile(file);
+  }
+  fs.writeFileSync(path.join(outputPath, ".nojekyll"), "", "utf8");
+}
+
+function walkFiles(dir) {
+  const found = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      found.push(...walkFiles(full));
+    } else {
+      found.push(full);
+    }
+  }
+  return found;
+}
+
+function assertBundle() {
+  for (const file of [
+    "index.html",
+    "public.js",
+    "public-config.js",
+    "public-ama-answers.js",
+    "styles.css",
+    "PUBLIC_AMA.md",
+    "PUBLIC_AMA_QUEUE.template.json",
+    "PUBLIC_AMA_ANSWERS.template.json",
+    "tools/export_public_ama_answers.js",
+    "tools/build_public_site.js",
+    ".nojekyll"
+  ]) {
+    if (!fs.existsSync(path.join(outputPath, file))) {
+      fail(`Public bundle is missing ${file}.`);
+    }
+  }
+
+  const index = fs.existsSync(path.join(outputPath, "index.html"))
+    ? fs.readFileSync(path.join(outputPath, "index.html"), "utf8")
+    : "";
+  if (!index.includes('src="public-ama-answers.js"')) {
+    fail("Public bundle index.html must load public-ama-answers.js.");
+  }
+
+  const forbidden = [
+    /EXTERNAL_LIVE_PACKET\.local\.json/i,
+    /REVENUE_SETUP_EVIDENCE_INDEX\.local\.json/i,
+    /REVIEWER_CANDIDATE_TRACKER\.local\.json/i,
+    /PUBLIC_AMA_QUEUE\.local\.json/i,
+    /PUBLIC_AMA_ANSWERS\.local\.json/i,
+    /^MEI_/i
+  ];
+  for (const filePath of walkFiles(outputPath)) {
+    const relative = path.relative(outputPath, filePath).replace(/\\/g, "/");
+    for (const pattern of forbidden) {
+      if (pattern.test(relative)) {
+        fail(`Public bundle includes forbidden local/private file: ${relative}`);
+      }
+    }
+  }
+}
+
+buildSite();
+if (check) {
+  assertBundle();
+}
+
+if (failures.length) {
+  console.error("Public site build failed:");
+  for (const failure of failures) {
+    console.error(`- ${failure}`);
+  }
+  process.exit(1);
+}
+
+console.log(`${check ? "Public site build check passed" : "Public site built"}: ${outputPath}`);

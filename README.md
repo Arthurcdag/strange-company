@@ -124,6 +124,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [public-config.js](public-config.js): public support inbox, Google Form URL, service names, and prices.
 - [public-ama-answers.js](public-ama-answers.js): public-safe AMA answer archive loaded by the static page; empty until approved answers are exported.
 - [public.js](public.js): payment-safe public request packet builder.
+- [tools/build_public_site.js](tools/build_public_site.js): cross-platform builder/checker for the GitHub Pages public bundle.
 - [tools/preflight_public_launch.js](tools/preflight_public_launch.js): launch preflight for public/private separation, URL allowlists, live-mode config, and sensitive-data guard coverage.
 - [tools/audit_company_functionality.js](tools/audit_company_functionality.js): repo-level audit for Strange Company, the satellite operator, and the external live-operation gate.
 - [tools/survival_check.js](tools/survival_check.js): survival drill that confirms the charter, resilience model, receipt chain, Brazil/AI gates, public/private boundary, and expected live-gate behavior still hold.
@@ -151,6 +152,7 @@ Before turning on `liveMode` or merging public config changes, run:
 
 ```bash
 node tools/preflight_public_launch.js
+node tools/build_public_site.js --check --output .public-site-build.local --force
 node tools/survival_check.js
 ```
 
