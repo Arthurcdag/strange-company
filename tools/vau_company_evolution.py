@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PUBLIC_CONFIG = ROOT / "public-config.js"
 DEFAULT_REVIEWER_TRACKER = ROOT / "REVIEWER_CANDIDATE_TRACKER.local.json"
 DEFAULT_REVENUE_EVIDENCE_INDEX = ROOT / "REVENUE_SETUP_EVIDENCE_INDEX.local.json"
+DEFAULT_PUBLIC_AMA_QUEUE = ROOT / "PUBLIC_AMA_QUEUE.local.json"
 
 REVIEWER_REVIEW_STATUSES = {
     "contacted",
@@ -25,6 +26,11 @@ REQUIRED_REVIEWER_ROLES = {
     "privacy_lgpd",
     "tax_nfse_accounting",
     "payment_reconciliation",
+}
+AMA_SCREENED_BOUNDARY_DECISIONS = {
+    "public_safe",
+    "route_to_human",
+    "reject_sensitive",
 }
 
 
@@ -319,10 +325,70 @@ def _infer_revenue_evidence(evidence_path: Path) -> tuple[bool, str]:
     )
 
 
+def infer_public_ama_metrics(queue_path: Path = DEFAULT_PUBLIC_AMA_QUEUE) -> tuple[int, int, int, str]:
+    if not queue_path.exists():
+        return 0, 0, 0, ""
+
+    try:
+        queue = json.loads(queue_path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        return 0, 0, 0, ""
+
+    records = queue.get("questionRecords") if isinstance(queue, dict) else None
+    if not isinstance(records, list):
+        return 0, 0, 0, ""
+
+    screened_ids: set[str] = set()
+    answer_ready_ids: set[str] = set()
+    published_ids: set[str] = set()
+
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        question_id = _normalize(record.get("questionId")) or _normalize(record.get("questionSummary"))
+        if not question_id:
+            continue
+
+        status = _normalize(record.get("status"))
+        boundary = _normalize(record.get("boundaryDecision"))
+        human_screened = record.get("humanScreened") is True
+
+        if human_screened and boundary in AMA_SCREENED_BOUNDARY_DECISIONS:
+            screened_ids.add(question_id)
+
+        if (
+            status == "answer_ready"
+            and boundary == "public_safe"
+            and human_screened
+            and record.get("humanApprovedForPublication") is True
+            and not _is_blank(record.get("publicAnswer"))
+            and _is_iso_date(record.get("answerReviewedAt"))
+        ):
+            answer_ready_ids.add(question_id)
+
+        if (
+            status == "published"
+            and boundary == "public_safe"
+            and human_screened
+            and record.get("humanApprovedForPublication") is True
+            and not _is_blank(record.get("publicAnswer"))
+            and _is_iso_date(record.get("answerReviewedAt"))
+        ):
+            published_ids.add(question_id)
+
+    evidence = (
+        f"questions:{len(screened_ids)}; answer-ready:{len(answer_ready_ids)}; published:{len(published_ids)}"
+        if screened_ids or answer_ready_ids or published_ids
+        else ""
+    )
+    return len(screened_ids), len(answer_ready_ids), len(published_ids), evidence
+
+
 def build_current_state(
     public_config: Path = DEFAULT_PUBLIC_CONFIG,
     reviewer_tracker: Path = DEFAULT_REVIEWER_TRACKER,
     revenue_evidence_index: Path = DEFAULT_REVENUE_EVIDENCE_INDEX,
+    public_ama_queue: Path = DEFAULT_PUBLIC_AMA_QUEUE,
 ) -> dict[str, Any]:
     text = public_config.read_text(encoding="utf-8")
     terms_reviewed_at = _read_string_config(text, "termsReviewedAt")
@@ -332,6 +398,9 @@ def build_current_state(
     human_reviewers_found, reviewers_ready = infer_reviewer_metrics(reviewer_tracker)
     payment_fiscal_evidence_ready, payment_fiscal_evidence = _infer_revenue_evidence(
         revenue_evidence_index
+    )
+    ama_questions, ama_answers_ready, ama_answers_published, ama_queue_evidence = infer_public_ama_metrics(
+        public_ama_queue
     )
 
     return {
@@ -351,6 +420,8 @@ def build_current_state(
             "aiHandoffReviewed": bool(ai_handoff_reviewed_at),
             "privatePaymentFiscalEvidenceReady": payment_fiscal_evidence_ready,
             "humanReviewersReady": reviewers_ready,
+            "publicAmaQueueActive": ama_questions > 0,
+            "publicAmaAnswerReady": (ama_answers_ready + ama_answers_published) > 0,
             "deliveryReviewLoopReady": False,
             "liveMode": _read_bool_config(text, "liveMode"),
         },
@@ -360,9 +431,13 @@ def build_current_state(
             "brazilComplianceReviewedAt": brazil_reviewed_at,
             "aiHandoffReviewedAt": ai_handoff_reviewed_at,
             "privatePaymentFiscalEvidence": payment_fiscal_evidence,
+            "publicAmaQueue": ama_queue_evidence,
         },
         "metrics": {
             "human_reviewers_found": human_reviewers_found,
+            "public_ama_questions_screened": ama_questions,
+            "public_ama_answers_ready": ama_answers_ready,
+            "public_ama_answers_published": ama_answers_published,
             "qualified_leads": 0,
             "pilot_requests": 0,
             "paid_pilots": 0,
@@ -420,6 +495,9 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
     blockers = operational_blockers(state)
     hard = hard_blockers(state)
     reviewers = int(get_path(state, "metrics.human_reviewers_found", 0))
+    ama_questions = int(get_path(state, "metrics.public_ama_questions_screened", 0))
+    ama_answers_ready = int(get_path(state, "metrics.public_ama_answers_ready", 0))
+    ama_answers_published = int(get_path(state, "metrics.public_ama_answers_published", 0))
     leads = int(get_path(state, "metrics.qualified_leads", 0))
     pilots = int(get_path(state, "metrics.pilot_requests", 0))
     tooling = int(get_path(state, "metrics.tooling_maturity", 2))
@@ -535,6 +613,64 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
                     next_action="Rewrite the reviewer ask with exact scope, rate band, and 30-minute paid test.",
                 ),
             ]
+        )
+
+    if ama_questions <= 0:
+        events.append(
+            CompanyEvent(
+                name="public_ama_question_screened",
+                domain="community",
+                probability_hint=0.36,
+                strategic_value=1.2,
+                tags=("public", "ama", "safe_growth"),
+                state_delta={
+                    "metrics.public_ama_questions_screened": {"op": "increment", "value": 1},
+                    "gates.publicAmaQueueActive": True,
+                    "evidence.publicAmaQueue": "screened-question",
+                },
+                requires_real_evidence=True,
+                reason="The online AMA can create public learning without opening paid intake.",
+                next_action=(
+                    "Create PUBLIC_AMA_QUEUE.local.json, add one redacted public-safe question, then run "
+                    "node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-one."
+                ),
+            )
+        )
+    elif ama_answers_ready + ama_answers_published <= 0:
+        events.append(
+            CompanyEvent(
+                name="public_ama_answer_ready",
+                domain="community",
+                probability_hint=0.3,
+                strategic_value=1.35,
+                tags=("public", "ama", "human_review"),
+                state_delta={
+                    "metrics.public_ama_answers_ready": {"op": "increment", "value": 1},
+                    "gates.publicAmaAnswerReady": True,
+                },
+                requires_real_evidence=True,
+                reason="A screened AMA question should become a human-approved public answer before publication.",
+                next_action=(
+                    "Draft one public-safe AMA answer, get human publication approval, then run "
+                    "node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-answer-ready."
+                ),
+            )
+        )
+    elif ama_answers_published <= 0:
+        events.append(
+            CompanyEvent(
+                name="public_ama_answer_published",
+                domain="community",
+                probability_hint=0.24,
+                strategic_value=1.1,
+                tags=("public", "ama", "publication"),
+                state_delta={
+                    "metrics.public_ama_answers_published": {"op": "increment", "value": 1},
+                },
+                requires_real_evidence=True,
+                reason="Publishing a reviewed AMA answer grows public context while keeping the paid gate closed.",
+                next_action="Publish one answer-ready AMA response and keep private queue evidence out of git.",
+            )
         )
 
     if not get_path(state, "gates.deliveryReviewLoopReady", False):
@@ -858,6 +994,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--public-config", default=str(DEFAULT_PUBLIC_CONFIG))
     parser.add_argument("--reviewer-tracker", default=str(DEFAULT_REVIEWER_TRACKER))
     parser.add_argument("--revenue-evidence-index", default=str(DEFAULT_REVENUE_EVIDENCE_INDEX))
+    parser.add_argument("--public-ama-queue", default=str(DEFAULT_PUBLIC_AMA_QUEUE))
     parser.add_argument("--depth", type=int, default=3)
     parser.add_argument("--max-branches-to-keep", type=int, default=8)
     parser.add_argument("--real-event-json")
@@ -871,6 +1008,7 @@ def main() -> int:
         Path(args.public_config),
         reviewer_tracker=Path(args.reviewer_tracker),
         revenue_evidence_index=Path(args.revenue_evidence_index),
+        public_ama_queue=Path(args.public_ama_queue),
     )
     real_event = CompanyEvent.from_dict(json.loads(args.real_event_json)) if args.real_event_json else None
     result = run_cycle(

@@ -69,6 +69,12 @@ Before publishing any answer:
 node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-answer-ready
 ```
 
+To include the AMA queue in the VAU company-evolution model:
+
+```bash
+python tools/vau_company_evolution.py --public-ama-queue PUBLIC_AMA_QUEUE.local.json --depth 1
+```
+
 The local queue should use aliases, question summaries, public-safe question text, support-thread references, and non-secret evidence IDs. It must not include direct email addresses, CPF, CNPJ documents, credentials, payment data, private evidence, or customer records.
 
 The paid order desk remains governed by `HUMAN_REVIEW_PACKET.md`, `HUMAN_REVENUE_INSTRUCTIONS.md`, `REVENUE_SETUP_EVIDENCE_PACKET.md`, and `EXTERNAL_LIVE_PACKET.template.json`.

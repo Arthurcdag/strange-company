@@ -164,6 +164,7 @@ To operate the online AMA without opening paid intake, create `PUBLIC_AMA_QUEUE.
 node tools/draft_public_ama_queue.js --write-local
 node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-one
 node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-answer-ready
+python tools/vau_company_evolution.py --public-ama-queue PUBLIC_AMA_QUEUE.local.json --depth 1
 ```
 
 To reduce the private payment/fiscal hard blocker, complete `REVENUE_SETUP_EVIDENCE_INDEX.local.json` from `REVENUE_SETUP_EVIDENCE_INDEX.template.json` and then review the evidence by running VAU with the explicit local index path:

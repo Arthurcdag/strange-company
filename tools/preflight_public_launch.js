@@ -903,6 +903,7 @@ function checkPublicAmaQueueContract() {
   const gitignore = read(".gitignore");
   const validateWorkflow = read(".github/workflows/validate.yml");
   const pages = read(".github/workflows/pages.yml");
+  const vauCompany = read("tools/vau_company_evolution.py");
 
   const required = [
     ["README public AMA doc link", readme, "PUBLIC_AMA.md"],
@@ -912,6 +913,7 @@ function checkPublicAmaQueueContract() {
     ["public AMA queue command", publicAma, "node tools/draft_public_ama_queue.js --write-local"],
     ["public AMA one-question command", publicAma, "node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-one"],
     ["public AMA answer-ready command", publicAma, "node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-answer-ready"],
+    ["public AMA VAU command", publicAma, "python tools/vau_company_evolution.py --public-ama-queue PUBLIC_AMA_QUEUE.local.json --depth 1"],
     ["public AMA private-data warning", publicAma, "must not include direct email addresses"],
     ["public AMA queue template schema", template, '"schemaVersion": 1'],
     ["public AMA queue template records", template, '"questionRecords": []'],
@@ -927,7 +929,9 @@ function checkPublicAmaQueueContract() {
     ["public AMA validator CI template check", validateWorkflow, "node tools/validate_public_ama_queue.js --template-ok"],
     ["public AMA pages template copy", pages, "PUBLIC_AMA_QUEUE.template.json"],
     ["public AMA pages draft copy", pages, "tools/draft_public_ama_queue.js"],
-    ["public AMA pages validator copy", pages, "tools/validate_public_ama_queue.js"]
+    ["public AMA pages validator copy", pages, "tools/validate_public_ama_queue.js"],
+    ["public AMA VAU default path", vauCompany, "PUBLIC_AMA_QUEUE.local.json"],
+    ["public AMA VAU argument", vauCompany, "--public-ama-queue"]
   ];
 
   for (const [label, contents, snippet] of required) {

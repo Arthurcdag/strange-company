@@ -14,6 +14,7 @@ from tools.vau_company_evolution import (
     public_live_ready,
     recommended_next_actions,
     run_cycle,
+    generate_company_events,
     simulate_company_futures,
     update_futures_with_real_event,
     create_initial_future,
@@ -75,6 +76,7 @@ TRACKER_TEMPLATE = {
 }
 
 EVIDENCE_INDEX_TEMPLATE = ROOT / "REVENUE_SETUP_EVIDENCE_INDEX.template.json"
+AMA_QUEUE_TEMPLATE = ROOT / "PUBLIC_AMA_QUEUE.template.json"
 
 
 def write_public_config(
@@ -135,6 +137,45 @@ def write_revenue_evidence_index(ready: bool = False) -> Path:
     return Path(temp.name)
 
 
+def write_public_ama_queue(screened: bool = False, answer_ready: bool = False, published: bool = False) -> Path:
+    payload = json.loads(AMA_QUEUE_TEMPLATE.read_text(encoding="utf-8"))
+    payload["mode"] = "local"
+    if screened or answer_ready or published:
+        status = "published" if published else "answer_ready" if answer_ready else "screened"
+        record = {
+            "questionId": "AMA-20260612-001",
+            "receivedAt": "2026-06-12",
+            "topic": "launch-gates",
+            "nameAlias": "Public asker 001",
+            "contactRef": "support-thread-ama-001",
+            "questionSummary": "Asked whether AMA can run before paid intake.",
+            "publicSafeQuestion": "Can public AMA run before paid intake is live?",
+            "status": status,
+            "boundaryDecision": "public_safe",
+            "evidenceRef": "ama-log-001",
+            "humanScreened": True,
+        }
+        if answer_ready or published:
+            record.update(
+                {
+                    "publicAnswer": "Yes, public-safe AMA can run while paid intake remains closed.",
+                    "answerReviewedAt": "2026-06-12",
+                    "humanApprovedForPublication": True,
+                }
+            )
+        payload["questionRecords"] = [record]
+        payload["attestation"].update(
+            {
+                "operator": "operator",
+                "reviewedAt": "2026-06-12",
+            }
+        )
+    temp = tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False)
+    json.dump(payload, temp, ensure_ascii=False, indent=2)
+    temp.close()
+    return Path(temp.name)
+
+
 class VAUCompanyEvolutionTests(unittest.TestCase):
     def test_current_config_state_has_hard_blockers(self) -> None:
         path = write_public_config()
@@ -180,6 +221,55 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
 
         self.assertIn("private payment/fiscal evidence", hard_blockers(state))
         self.assertFalse(state["gates"]["privatePaymentFiscalEvidenceReady"])
+
+    def test_public_ama_queue_metrics_are_read_from_local_queue(self) -> None:
+        path = write_public_config()
+        tracker = write_reviewer_tracker([])
+        ama_queue = write_public_ama_queue(screened=True, answer_ready=True)
+        state = build_current_state(path, tracker, public_ama_queue=ama_queue)
+
+        self.assertTrue(state["gates"]["publicAmaQueueActive"])
+        self.assertTrue(state["gates"]["publicAmaAnswerReady"])
+        self.assertEqual(state["metrics"]["public_ama_questions_screened"], 1)
+        self.assertEqual(state["metrics"]["public_ama_answers_ready"], 1)
+        self.assertIn("answer-ready:1", state["evidence"]["publicAmaQueue"])
+
+        published_state = build_current_state(path, tracker, public_ama_queue=write_public_ama_queue(published=True))
+        self.assertTrue(published_state["gates"]["publicAmaAnswerReady"])
+        self.assertEqual(published_state["metrics"]["public_ama_answers_published"], 1)
+
+    def test_public_ama_events_progress_from_screening_to_publication(self) -> None:
+        path = write_public_config()
+        tracker = write_reviewer_tracker([])
+
+        no_queue_state = build_current_state(path, tracker)
+        no_queue_events = {event.name for event in generate_company_events(create_initial_future(no_queue_state)[0])}
+        self.assertIn("public_ama_question_screened", no_queue_events)
+
+        screened_state = build_current_state(
+            path,
+            tracker,
+            public_ama_queue=write_public_ama_queue(screened=True),
+        )
+        screened_events = {event.name for event in generate_company_events(create_initial_future(screened_state)[0])}
+        self.assertIn("public_ama_answer_ready", screened_events)
+
+        ready_state = build_current_state(
+            path,
+            tracker,
+            public_ama_queue=write_public_ama_queue(screened=True, answer_ready=True),
+        )
+        ready_events = {event.name for event in generate_company_events(create_initial_future(ready_state)[0])}
+        self.assertIn("public_ama_answer_published", ready_events)
+
+        published_state = build_current_state(
+            path,
+            tracker,
+            public_ama_queue=write_public_ama_queue(published=True),
+        )
+        published_events = {event.name for event in generate_company_events(create_initial_future(published_state)[0])}
+        self.assertNotIn("public_ama_answer_ready", published_events)
+        self.assertNotIn("public_ama_answer_published", published_events)
 
     def test_default_run_prioritizes_evidence_and_review_actions(self) -> None:
         path = write_public_config()
