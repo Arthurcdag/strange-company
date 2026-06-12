@@ -109,6 +109,9 @@ function checkStaticSurvivalSurface() {
   assert(publicHtml.includes('href="PUBLIC_AMA.md"'), "public.html must link the public AMA rules.", "public AMA rules link", "public.html");
   assert(publicJs.includes("amaQuestionPacket"), "public.js must build public-safe AMA packets.", "public AMA packet builder", "public.js");
   assert(publicJs.includes("if (!readiness.supportReady)"), "public.js must keep AMA behind the verified support inbox.", "public AMA support gate", "public.js");
+  assert(read("PUBLIC_AMA.md").includes("PUBLIC_AMA_QUEUE.local.json"), "PUBLIC_AMA.md must document the local AMA queue.", "public AMA local queue docs", "PUBLIC_AMA.md");
+  assert(read("PUBLIC_AMA_QUEUE.template.json").includes('"questionRecords": []'), "PUBLIC_AMA_QUEUE.template.json must stay a blank public template.", "public AMA queue template", "PUBLIC_AMA_QUEUE.template.json");
+  assert(read("tools/validate_public_ama_queue.js").includes("--require-answer-ready"), "public AMA validator must require answer-ready review before publication.", "public AMA answer-ready gate", "tools/validate_public_ama_queue.js");
   assert(publicJs.includes("Public intake is closed"), "public.js must tell users public intake is closed before live readiness.", "public closed-intake copy", "public.js");
   assert(publicJs.includes("if (!readiness.liveReady)"), "public.js must block public submits before live readiness.", "public submit live gate", "public.js");
   assert(publicJs.includes('readiness.liveReady ? `<a href="${mailtoUrl(order)}">Open email draft</a>` : ""'), "public.js must hide email draft action before live readiness.", "public email action live gate", "public.js");

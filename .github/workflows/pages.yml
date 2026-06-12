@@ -42,13 +42,15 @@ jobs:
         run: |
           mkdir -p _site/tools
           cp public.html _site/index.html
-          cp public.js public-config.js styles.css EXTERNAL_LIVE_PACKET.template.json REVIEWER_CANDIDATE_TRACKER.template.json REVENUE_SETUP_EVIDENCE_INDEX.template.json _site/
+          cp public.js public-config.js styles.css EXTERNAL_LIVE_PACKET.template.json PUBLIC_AMA_QUEUE.template.json REVIEWER_CANDIDATE_TRACKER.template.json REVENUE_SETUP_EVIDENCE_INDEX.template.json _site/
           cp *.md _site/
           cp tools/strange_research_gate.py tools/reactive_research_tools_cors.patch _site/tools/
           cp tools/google_apps_script_order_intake.gs _site/tools/
           cp tools/draft_reviewer_candidate_tracker.js _site/tools/
           cp tools/draft_revenue_setup_evidence_index.js _site/tools/
+          cp tools/draft_public_ama_queue.js _site/tools/
           cp tools/validate_external_live_packet.js _site/tools/
+          cp tools/validate_public_ama_queue.js _site/tools/
           cp tools/validate_reviewer_candidate_tracker.js _site/tools/
           cp tools/validate_revenue_setup_evidence_index.js _site/tools/
           touch _site/.nojekyll

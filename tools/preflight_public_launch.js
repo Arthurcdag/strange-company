@@ -894,6 +894,47 @@ function checkReviewerCandidateContract() {
   }
 }
 
+function checkPublicAmaQueueContract() {
+  const readme = read("README.md");
+  const publicAma = read("PUBLIC_AMA.md");
+  const template = read("PUBLIC_AMA_QUEUE.template.json");
+  const draft = read("tools/draft_public_ama_queue.js");
+  const validator = read("tools/validate_public_ama_queue.js");
+  const gitignore = read(".gitignore");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+  const pages = read(".github/workflows/pages.yml");
+
+  const required = [
+    ["README public AMA doc link", readme, "PUBLIC_AMA.md"],
+    ["README public AMA queue template link", readme, "PUBLIC_AMA_QUEUE.template.json"],
+    ["README public AMA draft tool link", readme, "tools/draft_public_ama_queue.js"],
+    ["README public AMA validator link", readme, "tools/validate_public_ama_queue.js"],
+    ["public AMA queue command", publicAma, "node tools/draft_public_ama_queue.js --write-local"],
+    ["public AMA one-question command", publicAma, "node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-one"],
+    ["public AMA answer-ready command", publicAma, "node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-answer-ready"],
+    ["public AMA private-data warning", publicAma, "must not include direct email addresses"],
+    ["public AMA queue template schema", template, '"schemaVersion": 1'],
+    ["public AMA queue template records", template, '"questionRecords": []'],
+    ["public AMA queue public-safe decision", template, '"public_safe"'],
+    ["public AMA draft generator", draft, "PUBLIC_AMA_QUEUE.local.json"],
+    ["public AMA validator failure header", validator, "Public AMA queue validation failed"],
+    ["public AMA validator one-question gate", validator, "--require-one"],
+    ["public AMA validator answer-ready gate", validator, "--require-answer-ready"],
+    ["public AMA local queue ignored", gitignore, "PUBLIC_AMA_QUEUE.local.json"],
+    ["public AMA template unignored", gitignore, "!PUBLIC_AMA_QUEUE.template.json"],
+    ["public AMA validator syntax check", validateWorkflow, "node --check tools/validate_public_ama_queue.js"],
+    ["public AMA draft syntax check", validateWorkflow, "node --check tools/draft_public_ama_queue.js"],
+    ["public AMA validator CI template check", validateWorkflow, "node tools/validate_public_ama_queue.js --template-ok"],
+    ["public AMA pages template copy", pages, "PUBLIC_AMA_QUEUE.template.json"],
+    ["public AMA pages draft copy", pages, "tools/draft_public_ama_queue.js"],
+    ["public AMA pages validator copy", pages, "tools/validate_public_ama_queue.js"]
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
 function checkRevenueSetupEvidenceIndexContract() {
   const readme = read("README.md");
   const aiHandoff = read("AI_LEGAL_HANDOFF.md");
@@ -1010,6 +1051,8 @@ compileJavaScript("tools/validate_reviewer_candidate_tracker.js");
 compileJavaScript("tools/draft_reviewer_candidate_tracker.js");
 compileJavaScript("tools/draft_revenue_setup_evidence_index.js");
 compileJavaScript("tools/validate_revenue_setup_evidence_index.js");
+compileJavaScript("tools/draft_public_ama_queue.js");
+compileJavaScript("tools/validate_public_ama_queue.js");
 checkExternalLivePacketGate();
 checkPublicSurface();
 checkPrivateUrlAllowlists();
@@ -1024,6 +1067,7 @@ checkRevenueStartContract();
 checkMainLegalProcedureContract();
 checkBrazilComplianceContract();
 checkReviewerCandidateContract();
+checkPublicAmaQueueContract();
 checkRevenueSetupEvidenceIndexContract();
 checkConfig();
 

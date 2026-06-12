@@ -30,6 +30,13 @@ reviewer-candidate-tracker.local.json
 reviewer-candidate-tracker.*.json
 !REVIEWER_CANDIDATE_TRACKER.template.json
 
+# Local public AMA queue. Keep completed question evidence private.
+PUBLIC_AMA_QUEUE.local.json
+PUBLIC_AMA_QUEUE.*.json
+public-ama-queue.local.json
+public-ama-queue.*.json
+!PUBLIC_AMA_QUEUE.template.json
+
 # Generated revenue simulation outputs. Do not commit.
 REVENUE_SIMULATION_REPORT.md
 revenue-simulation-report.md

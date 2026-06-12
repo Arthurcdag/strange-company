@@ -28,7 +28,9 @@ jobs:
           node --check tools/audit_company_functionality.js
           node --check tools/draft_reviewer_candidate_tracker.js
           node --check tools/draft_revenue_setup_evidence_index.js
+          node --check tools/draft_public_ama_queue.js
           node --check tools/validate_external_live_packet.js
+          node --check tools/validate_public_ama_queue.js
           node --check tools/validate_reviewer_candidate_tracker.js
           node --check tools/validate_revenue_setup_evidence_index.js
 
@@ -39,6 +41,7 @@ jobs:
       - name: Run public launch preflight
         run: |
           node tools/validate_external_live_packet.js --template-ok
+          node tools/validate_public_ama_queue.js --template-ok
           node tools/validate_reviewer_candidate_tracker.js --template-ok
           node tools/validate_revenue_setup_evidence_index.js --template-ok
           node tools/preflight_public_launch.js
