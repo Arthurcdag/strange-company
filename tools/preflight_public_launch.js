@@ -907,6 +907,7 @@ function checkReviewerCandidateContract() {
 function checkPublicAmaQueueContract() {
   const readme = read("README.md");
   const publicAma = read("PUBLIC_AMA.md");
+  const publicationPacket = read("PUBLIC_AMA_PUBLICATION_PACKET.md");
   const template = read("PUBLIC_AMA_QUEUE.template.json");
   const answersTemplate = read("PUBLIC_AMA_ANSWERS.template.json");
   const publicAnswers = read("public-ama-answers.js");
@@ -921,6 +922,7 @@ function checkPublicAmaQueueContract() {
 
   const required = [
     ["README public AMA doc link", readme, "PUBLIC_AMA.md"],
+    ["README public AMA publication packet link", readme, "PUBLIC_AMA_PUBLICATION_PACKET.md"],
     ["README public AMA queue template link", readme, "PUBLIC_AMA_QUEUE.template.json"],
     ["README public AMA answer template link", readme, "PUBLIC_AMA_ANSWERS.template.json"],
     ["README public AMA draft tool link", readme, "tools/draft_public_ama_queue.js"],
@@ -931,7 +933,12 @@ function checkPublicAmaQueueContract() {
     ["public AMA answer-ready command", publicAma, "node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-answer-ready"],
     ["public AMA answer export command", publicAma, "node tools/export_public_ama_answers.js --input PUBLIC_AMA_QUEUE.local.json --output public-ama-answers.js --require-published --force"],
     ["public AMA answer archive check command", publicAma, "node tools/export_public_ama_answers.js --check-public-js"],
+    ["public AMA publication packet link", publicAma, "PUBLIC_AMA_PUBLICATION_PACKET.md"],
     ["public AMA VAU command", publicAma, "python tools/vau_company_evolution.py --public-ama-queue PUBLIC_AMA_QUEUE.local.json --public-ama-answers public-ama-answers.js --depth 1"],
+    ["public AMA publication packet close sheet", publicationPacket, "Manual Close Sheet"],
+    ["public AMA publication packet export command", publicationPacket, "node tools/export_public_ama_answers.js --input PUBLIC_AMA_QUEUE.local.json --output public-ama-answers.js --require-published --force"],
+    ["public AMA publication packet build check", publicationPacket, "node tools/build_public_site.js --check --output .public-site-build.local --force"],
+    ["public AMA publication packet private data stop", publicationPacket, "No direct email, CPF, CNPJ document, payment data, credential"],
     ["public AMA private-data warning", publicAma, "must not include direct email addresses"],
     ["public AMA queue template schema", template, '"schemaVersion": 1'],
     ["public AMA queue template records", template, '"questionRecords": []'],

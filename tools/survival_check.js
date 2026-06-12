@@ -114,6 +114,7 @@ function checkStaticSurvivalSurface() {
   assert(publicJs.includes("renderPublicAmaAnswers"), "public.js must render public-safe AMA answers.", "public AMA answer renderer", "public.js");
   assert(publicJs.includes("if (!readiness.supportReady)"), "public.js must keep AMA behind the verified support inbox.", "public AMA support gate", "public.js");
   assert(read("PUBLIC_AMA.md").includes("PUBLIC_AMA_QUEUE.local.json"), "PUBLIC_AMA.md must document the local AMA queue.", "public AMA local queue docs", "PUBLIC_AMA.md");
+  assert(read("PUBLIC_AMA_PUBLICATION_PACKET.md").includes("Manual Close Sheet"), "PUBLIC_AMA_PUBLICATION_PACKET.md must keep human publication closure.", "public AMA publication close sheet", "PUBLIC_AMA_PUBLICATION_PACKET.md");
   assert(read("PUBLIC_AMA_QUEUE.template.json").includes('"questionRecords": []'), "PUBLIC_AMA_QUEUE.template.json must stay a blank public template.", "public AMA queue template", "PUBLIC_AMA_QUEUE.template.json");
   assert(read("PUBLIC_AMA_ANSWERS.template.json").includes('"answers": []'), "PUBLIC_AMA_ANSWERS.template.json must stay a blank public answer template.", "public AMA answers template", "PUBLIC_AMA_ANSWERS.template.json");
   assert(publicAnswers.includes("window.PUBLIC_AMA_ANSWERS"), "public-ama-answers.js must expose only the public answer archive.", "public AMA answer archive", "public-ama-answers.js");

@@ -152,6 +152,7 @@ function auditDocs() {
   assertIncludes("README.md", "REVIEWER_CANDIDATE_TRACKER.template.json", "reviewer candidate tracker template README link");
   assertIncludes("README.md", "tools/validate_reviewer_candidate_tracker.js", "reviewer candidate validator README link");
   assertIncludes("README.md", "PUBLIC_AMA.md", "public AMA README link");
+  assertIncludes("README.md", "PUBLIC_AMA_PUBLICATION_PACKET.md", "public AMA publication packet README link");
   assertIncludes("README.md", "PUBLIC_AMA_QUEUE.template.json", "public AMA queue template README link");
   assertIncludes("README.md", "PUBLIC_AMA_ANSWERS.template.json", "public AMA answer template README link");
   assertIncludes("README.md", "tools/build_public_site.js", "public site builder README link");
@@ -161,6 +162,7 @@ function auditDocs() {
   assertIncludes("PUBLIC_AMA.md", "public-safe question intake", "public AMA operating boundary");
   assertIncludes("PUBLIC_AMA.md", "must not", "public AMA stop rules");
   assertIncludes("PUBLIC_AMA.md", "PUBLIC_AMA_QUEUE.local.json", "public AMA local queue docs");
+  assertIncludes("PUBLIC_AMA.md", "PUBLIC_AMA_PUBLICATION_PACKET.md", "public AMA publication packet docs");
   assertIncludes("PUBLIC_AMA.md", "--require-answer-ready", "public AMA answer-ready validation docs");
   assertIncludes("PUBLIC_AMA.md", "tools/export_public_ama_answers.js", "public AMA answer export docs");
   assertIncludes("PUBLIC_AMA.md", "--check-public-js", "public AMA answer archive validation docs");
@@ -187,6 +189,9 @@ function auditDocs() {
   assertIncludes("tools/vau_company_evolution.py", "public-ama-answers.js", "VAU public AMA answer archive path");
   assertIncludes("tools/vau_company_evolution.py", "--public-ama-queue", "VAU public AMA queue argument");
   assertIncludes("tools/vau_company_evolution.py", "--public-ama-answers", "VAU public AMA answer archive argument");
+  assertIncludes("PUBLIC_AMA_PUBLICATION_PACKET.md", "Manual Close Sheet", "public AMA publication close sheet");
+  assertIncludes("PUBLIC_AMA_PUBLICATION_PACKET.md", "node tools/export_public_ama_answers.js --input PUBLIC_AMA_QUEUE.local.json --output public-ama-answers.js --require-published --force", "public AMA publication export command");
+  assertIncludes("PUBLIC_AMA_PUBLICATION_PACKET.md", "node tools/build_public_site.js --check --output .public-site-build.local --force", "public AMA publication bundle check");
   assertIncludes("EXTERNAL_LIVE_PACKET.template.json", '"schemaVersion": 1', "external live packet template schema");
   assertIncludes("EXTERNAL_LIVE_PACKET.template.json", '"brazilComplianceReviewedAt": ""', "external packet Brazil compliance review field");
   assertIncludes("EXTERNAL_LIVE_PACKET.template.json", '"aiHandoffReviewedAt": ""', "external packet AI handoff review field");

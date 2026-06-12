@@ -82,6 +82,8 @@ node tools/export_public_ama_answers.js --input PUBLIC_AMA_QUEUE.local.json --ou
 node tools/export_public_ama_answers.js --check-public-js
 ```
 
+Use `PUBLIC_AMA_PUBLICATION_PACKET.md` as the human close sheet before committing any exported answer.
+
 The export may include only `questionId`, `topic`, `publicSafeQuestion`, `publicAnswer`, `answerReviewedAt`, and `publishedAt`. It must not include name aliases, direct emails, support-thread text, private evidence IDs, payment records, legal/tax/private advice, or raw customer data.
 
 The local queue should use aliases, question summaries, public-safe question text, support-thread references, and non-secret evidence IDs. It must not include direct email addresses, CPF, CNPJ documents, credentials, payment data, private evidence, or customer records.

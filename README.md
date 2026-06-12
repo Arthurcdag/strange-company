@@ -87,6 +87,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [REVIEWER_CANDIDATE_PACKET.md](REVIEWER_CANDIDATE_PACKET.md): AI-prepared packet for contacting one human reviewer candidate and building the private reviewer-capacity tracker without closing any live gate.
 - [REVIEWER_CANDIDATE_TRACKER.template.json](REVIEWER_CANDIDATE_TRACKER.template.json): blank reviewer-capacity tracker; completed copies stay local as `REVIEWER_CANDIDATE_TRACKER.local.json`.
 - [PUBLIC_AMA.md](PUBLIC_AMA.md): public-safe AMA workflow for taking online questions without opening payment, private evidence, legal, tax, privacy, or launch approval gates.
+- [PUBLIC_AMA_PUBLICATION_PACKET.md](PUBLIC_AMA_PUBLICATION_PACKET.md): human close sheet and command sequence for exporting one approved public AMA answer.
 - [PUBLIC_AMA_QUEUE.template.json](PUBLIC_AMA_QUEUE.template.json): blank AMA queue tracker; completed question evidence stays local as `PUBLIC_AMA_QUEUE.local.json`.
 - [PUBLIC_AMA_ANSWERS.template.json](PUBLIC_AMA_ANSWERS.template.json): blank public answer archive contract; only human-approved public-safe answers can be exported to `public-ama-answers.js`.
 - [REVENUE_SIMULATION.md](REVENUE_SIMULATION.md): simulator usage and boundary; the simulator demonstrates how the first and second services would generate value without closing any real gate.
