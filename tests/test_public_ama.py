@@ -7,6 +7,7 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PUBLIC_HTML = ROOT / "public.html"
 PUBLIC_JS = ROOT / "public.js"
+PUBLIC_AMA_ANSWERS_JS = ROOT / "public-ama-answers.js"
 PUBLIC_AMA = ROOT / "PUBLIC_AMA.md"
 README = ROOT / "README.md"
 PREFLIGHT = ROOT / "tools" / "preflight_public_launch.js"
@@ -20,6 +21,8 @@ class PublicAmaTests(unittest.TestCase):
 
         self.assertIn('id="publicAmaForm"', html)
         self.assertIn('id="publicAmaOutput"', html)
+        self.assertIn('id="publicAmaAnswers"', html)
+        self.assertIn('src="public-ama-answers.js"', html)
         self.assertIn('href="PUBLIC_AMA.md"', html)
         self.assertIn("Online AMA", html)
 
@@ -28,6 +31,8 @@ class PublicAmaTests(unittest.TestCase):
 
         for snippet in (
             "amaQuestionPacket",
+            "publicAmaAnswersModel",
+            "renderPublicAmaAnswers",
             "setupAmaForm",
             "if (!readiness.supportReady)",
             "Public AMA Desk",
@@ -41,6 +46,7 @@ class PublicAmaTests(unittest.TestCase):
         self.assertNotIn("fetch(", js)
         self.assertNotIn("localStorage", js)
         self.assertIn("if (!readiness.liveReady)", js)
+        self.assertIn("window.PUBLIC_AMA_ANSWERS", PUBLIC_AMA_ANSWERS_JS.read_text(encoding="utf-8"))
 
     def test_public_ama_runbook_and_guards_are_indexed(self) -> None:
         self.assertIn("PUBLIC_AMA.md", README.read_text(encoding="utf-8"))
@@ -52,6 +58,7 @@ class PublicAmaTests(unittest.TestCase):
             with self.subTest(file=path.name):
                 self.assertIn("publicAmaForm", text)
                 self.assertIn("amaQuestionPacket", text)
+                self.assertIn("publicAmaAnswers", text)
 
 
 if __name__ == "__main__":

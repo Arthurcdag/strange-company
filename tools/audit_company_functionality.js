@@ -153,16 +153,25 @@ function auditDocs() {
   assertIncludes("README.md", "tools/validate_reviewer_candidate_tracker.js", "reviewer candidate validator README link");
   assertIncludes("README.md", "PUBLIC_AMA.md", "public AMA README link");
   assertIncludes("README.md", "PUBLIC_AMA_QUEUE.template.json", "public AMA queue template README link");
+  assertIncludes("README.md", "PUBLIC_AMA_ANSWERS.template.json", "public AMA answer template README link");
   assertIncludes("README.md", "tools/draft_public_ama_queue.js", "public AMA draft generator README link");
+  assertIncludes("README.md", "tools/export_public_ama_answers.js", "public AMA answer exporter README link");
   assertIncludes("README.md", "tools/validate_public_ama_queue.js", "public AMA validator README link");
   assertIncludes("PUBLIC_AMA.md", "public-safe question intake", "public AMA operating boundary");
   assertIncludes("PUBLIC_AMA.md", "must not", "public AMA stop rules");
   assertIncludes("PUBLIC_AMA.md", "PUBLIC_AMA_QUEUE.local.json", "public AMA local queue docs");
   assertIncludes("PUBLIC_AMA.md", "--require-answer-ready", "public AMA answer-ready validation docs");
+  assertIncludes("PUBLIC_AMA.md", "tools/export_public_ama_answers.js", "public AMA answer export docs");
   assertIncludes("PUBLIC_AMA.md", "--public-ama-queue", "public AMA VAU command docs");
   assertIncludes("PUBLIC_AMA_QUEUE.template.json", '"schemaVersion": 1', "public AMA queue template schema");
   assertIncludes("PUBLIC_AMA_QUEUE.template.json", '"questionRecords": []', "public AMA queue empty template");
+  assertIncludes("PUBLIC_AMA_ANSWERS.template.json", '"schemaVersion": 1', "public AMA answers template schema");
+  assertIncludes("PUBLIC_AMA_ANSWERS.template.json", '"answers": []', "public AMA answers empty template");
+  assertIncludes("public-ama-answers.js", "window.PUBLIC_AMA_ANSWERS", "public AMA answers static archive");
   assertIncludes("tools/draft_public_ama_queue.js", "PUBLIC_AMA_QUEUE.local.json", "public AMA draft generator");
+  assertIncludes("tools/export_public_ama_answers.js", "PUBLIC_AMA_ANSWERS.template.json", "public AMA answer exporter");
+  assertIncludes("tools/export_public_ama_answers.js", "humanApprovedForPublication", "public AMA answer human approval gate");
+  assertIncludes("tools/export_public_ama_answers.js", "--require-published", "public AMA answer publication gate");
   assertIncludes("tools/validate_public_ama_queue.js", "Public AMA queue validation", "public AMA queue validator");
   assertIncludes("tools/validate_public_ama_queue.js", "--require-one", "public AMA one-question gate");
   assertIncludes("tools/validate_public_ama_queue.js", "--require-answer-ready", "public AMA answer-ready gate");
@@ -251,6 +260,8 @@ function auditDocs() {
   assertIncludes("public.html", 'href="AVISO_DE_PRIVACIDADE.md"', "public Portuguese privacy link");
   assertIncludes("public.html", 'id="publicAmaForm"', "public AMA form");
   assertIncludes("public.html", 'href="PUBLIC_AMA.md"', "public AMA rules link");
+  assertIncludes("public.html", 'id="publicAmaAnswers"', "public AMA published answers panel");
+  assertIncludes("public.html", 'src="public-ama-answers.js"', "public AMA answer archive loader");
   assertIncludes("TERMS.md", "Brazilian operating entity", "Brazil-first terms operator gate");
   assertIncludes("TERMS.md", "NFS-e", "Brazil fiscal terms gate");
   assertIncludes("PRIVACY.md", "LGPD", "LGPD privacy notice");
@@ -259,6 +270,8 @@ function auditDocs() {
 
 function auditPublicBoundary() {
   assertIncludes("public.js", "amaQuestionPacket", "public AMA packet builder");
+  assertIncludes("public.js", "renderPublicAmaAnswers", "public AMA answer renderer");
+  assertIncludes("public.js", "publicAmaAnswersModel", "public AMA answer model");
   assertIncludes("public.js", "setupAmaForm", "public AMA form handler");
   assertIncludes("public.js", "if (!readiness.supportReady)", "public AMA support gate");
   assertIncludes("public.js", "Public AMA Desk", "public AMA source label");

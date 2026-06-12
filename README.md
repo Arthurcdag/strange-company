@@ -88,6 +88,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [REVIEWER_CANDIDATE_TRACKER.template.json](REVIEWER_CANDIDATE_TRACKER.template.json): blank reviewer-capacity tracker; completed copies stay local as `REVIEWER_CANDIDATE_TRACKER.local.json`.
 - [PUBLIC_AMA.md](PUBLIC_AMA.md): public-safe AMA workflow for taking online questions without opening payment, private evidence, legal, tax, privacy, or launch approval gates.
 - [PUBLIC_AMA_QUEUE.template.json](PUBLIC_AMA_QUEUE.template.json): blank AMA queue tracker; completed question evidence stays local as `PUBLIC_AMA_QUEUE.local.json`.
+- [PUBLIC_AMA_ANSWERS.template.json](PUBLIC_AMA_ANSWERS.template.json): blank public answer archive contract; only human-approved public-safe answers can be exported to `public-ama-answers.js`.
 - [REVENUE_SIMULATION.md](REVENUE_SIMULATION.md): simulator usage and boundary; the simulator demonstrates how the first and second services would generate value without closing any real gate.
 - [ORDER_DESK.md](ORDER_DESK.md): how public invoice requests become manual order packets.
 - [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md): the manual order, invoice, payment, delivery, and receipt loop for the first functional operator.
@@ -121,6 +122,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 
 - [public.html](public.html): public GitHub Pages Order Desk and documentation surface.
 - [public-config.js](public-config.js): public support inbox, Google Form URL, service names, and prices.
+- [public-ama-answers.js](public-ama-answers.js): public-safe AMA answer archive loaded by the static page; empty until approved answers are exported.
 - [public.js](public.js): payment-safe public request packet builder.
 - [tools/preflight_public_launch.js](tools/preflight_public_launch.js): launch preflight for public/private separation, URL allowlists, live-mode config, and sensitive-data guard coverage.
 - [tools/audit_company_functionality.js](tools/audit_company_functionality.js): repo-level audit for Strange Company, the satellite operator, and the external live-operation gate.
@@ -130,6 +132,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [tools/draft_reviewer_candidate_tracker.js](tools/draft_reviewer_candidate_tracker.js): local draft generator for `REVIEWER_CANDIDATE_TRACKER.local.json`.
 - [tools/draft_revenue_setup_evidence_index.js](tools/draft_revenue_setup_evidence_index.js): local draft generator for `REVENUE_SETUP_EVIDENCE_INDEX.local.json`.
 - [tools/draft_public_ama_queue.js](tools/draft_public_ama_queue.js): local draft generator for `PUBLIC_AMA_QUEUE.local.json`.
+- [tools/export_public_ama_answers.js](tools/export_public_ama_answers.js): exports only published, human-approved public AMA answers from the ignored local queue into `public-ama-answers.js`.
 - [tools/generate_external_live_gap_packet.js](tools/generate_external_live_gap_packet.js): shell generator for the current `public-config.js` live-evidence gap packet.
 - [tools/validate_external_live_packet.js](tools/validate_external_live_packet.js): local validator for the ignored external live-readiness evidence packet.
 - [tools/check_external_live_packet_gate.js](tools/check_external_live_packet_gate.js): regression guard proving otherwise-complete live packets cannot pass without Brazil compliance and AI handoff review dates.
@@ -164,6 +167,7 @@ To operate the online AMA without opening paid intake, create `PUBLIC_AMA_QUEUE.
 node tools/draft_public_ama_queue.js --write-local
 node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-one
 node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-answer-ready
+node tools/export_public_ama_answers.js --input PUBLIC_AMA_QUEUE.local.json --output public-ama-answers.js --require-published --force
 python tools/vau_company_evolution.py --public-ama-queue PUBLIC_AMA_QUEUE.local.json --depth 1
 ```
 

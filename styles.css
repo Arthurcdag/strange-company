@@ -3998,6 +3998,7 @@ input[type="range"] {
 .public-ama-form,
 .public-order-form,
 .public-output,
+.public-ama-answers,
 .public-band article,
 .public-status-grid article {
   border: 1px solid var(--line);
@@ -4053,6 +4054,56 @@ input[type="range"] {
   background: #101614;
   color: #f5f8f0;
   white-space: pre-wrap;
+}
+
+.public-ama-answers {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  margin: 8px 0 24px;
+}
+
+.public-section-heading h2 {
+  margin: 4px 0 0;
+  font-size: 22px;
+}
+
+.public-ama-answer-list {
+  display: grid;
+  gap: 12px;
+}
+
+.public-ama-answer {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.public-ama-answer h3,
+.public-ama-answer p {
+  margin: 0;
+}
+
+.public-ama-answer h3 {
+  font-size: 18px;
+}
+
+.public-ama-answer p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.public-ama-answer small {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.public-ama-answer.empty {
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.54);
 }
 
 .public-band {

@@ -75,16 +75,20 @@ function checkPublicSurface() {
   const publicHtml = read("public.html");
   const publicJs = read("public.js");
   const publicConfig = read("public-config.js");
+  const publicAnswers = read("public-ama-answers.js");
   const publicFiles = [
     ["public.html", publicHtml],
     ["public.js", publicJs],
+    ["public-ama-answers.js", publicAnswers],
     ["public-config.js", publicConfig]
   ];
 
   assert(publicHtml.includes('class="public-site"'), "public.html must render the public surface.");
   assert(publicHtml.includes('id="publicAmaForm"'), "public.html must render the public AMA form.");
+  assert(publicHtml.includes('id="publicAmaAnswers"'), "public.html must render the public AMA answer archive.");
   assert(publicHtml.includes('href="PUBLIC_AMA.md"'), "public.html must link the public AMA rules.");
   assert(publicHtml.includes("public-config.js"), "public.html must load public-config.js.");
+  assert(publicHtml.includes("public-ama-answers.js"), "public.html must load public-ama-answers.js.");
   assert(publicHtml.includes("public.js"), "public.html must load public.js.");
   assert(!publicHtml.includes("script.js"), "public.html must not load the private command center script.");
 
@@ -137,6 +141,8 @@ function checkPublicSurface() {
     "renderBlocked",
     "renderAmaBlocked",
     "amaQuestionPacket",
+    "publicAmaAnswersModel",
+    "renderPublicAmaAnswers",
     "setupAmaForm",
     "if (!readiness.supportReady)",
     "Public AMA Desk",
@@ -898,7 +904,10 @@ function checkPublicAmaQueueContract() {
   const readme = read("README.md");
   const publicAma = read("PUBLIC_AMA.md");
   const template = read("PUBLIC_AMA_QUEUE.template.json");
+  const answersTemplate = read("PUBLIC_AMA_ANSWERS.template.json");
+  const publicAnswers = read("public-ama-answers.js");
   const draft = read("tools/draft_public_ama_queue.js");
+  const exporter = read("tools/export_public_ama_answers.js");
   const validator = read("tools/validate_public_ama_queue.js");
   const gitignore = read(".gitignore");
   const validateWorkflow = read(".github/workflows/validate.yml");
@@ -908,27 +917,46 @@ function checkPublicAmaQueueContract() {
   const required = [
     ["README public AMA doc link", readme, "PUBLIC_AMA.md"],
     ["README public AMA queue template link", readme, "PUBLIC_AMA_QUEUE.template.json"],
+    ["README public AMA answer template link", readme, "PUBLIC_AMA_ANSWERS.template.json"],
     ["README public AMA draft tool link", readme, "tools/draft_public_ama_queue.js"],
+    ["README public AMA answer export tool link", readme, "tools/export_public_ama_answers.js"],
     ["README public AMA validator link", readme, "tools/validate_public_ama_queue.js"],
     ["public AMA queue command", publicAma, "node tools/draft_public_ama_queue.js --write-local"],
     ["public AMA one-question command", publicAma, "node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-one"],
     ["public AMA answer-ready command", publicAma, "node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-answer-ready"],
+    ["public AMA answer export command", publicAma, "node tools/export_public_ama_answers.js --input PUBLIC_AMA_QUEUE.local.json --output public-ama-answers.js --require-published --force"],
     ["public AMA VAU command", publicAma, "python tools/vau_company_evolution.py --public-ama-queue PUBLIC_AMA_QUEUE.local.json --depth 1"],
     ["public AMA private-data warning", publicAma, "must not include direct email addresses"],
     ["public AMA queue template schema", template, '"schemaVersion": 1'],
     ["public AMA queue template records", template, '"questionRecords": []'],
     ["public AMA queue public-safe decision", template, '"public_safe"'],
+    ["public AMA answers template schema", answersTemplate, '"schemaVersion": 1'],
+    ["public AMA answers template empty archive", answersTemplate, '"answers": []'],
+    ["public AMA answers template public-only attestation", answersTemplate, '"noPrivateContactData": true'],
+    ["public AMA answers archive global", publicAnswers, "window.PUBLIC_AMA_ANSWERS"],
+    ["public AMA answers archive empty", publicAnswers, '"answers": []'],
     ["public AMA draft generator", draft, "PUBLIC_AMA_QUEUE.local.json"],
+    ["public AMA answer exporter", exporter, "PUBLIC_AMA_ANSWERS.template.json"],
+    ["public AMA answer exporter approval gate", exporter, "humanApprovedForPublication"],
+    ["public AMA answer exporter publication gate", exporter, "--require-published"],
+    ["public AMA answer exporter public-only attestation", exporter, "noPrivateContactData"],
     ["public AMA validator failure header", validator, "Public AMA queue validation failed"],
     ["public AMA validator one-question gate", validator, "--require-one"],
     ["public AMA validator answer-ready gate", validator, "--require-answer-ready"],
     ["public AMA local queue ignored", gitignore, "PUBLIC_AMA_QUEUE.local.json"],
     ["public AMA template unignored", gitignore, "!PUBLIC_AMA_QUEUE.template.json"],
+    ["public AMA local answers ignored", gitignore, "PUBLIC_AMA_ANSWERS.local.json"],
+    ["public AMA answers template unignored", gitignore, "!PUBLIC_AMA_ANSWERS.template.json"],
     ["public AMA validator syntax check", validateWorkflow, "node --check tools/validate_public_ama_queue.js"],
     ["public AMA draft syntax check", validateWorkflow, "node --check tools/draft_public_ama_queue.js"],
+    ["public AMA answer export syntax check", validateWorkflow, "node --check tools/export_public_ama_answers.js"],
+    ["public AMA answer export CI template check", validateWorkflow, "node tools/export_public_ama_answers.js --template-ok"],
     ["public AMA validator CI template check", validateWorkflow, "node tools/validate_public_ama_queue.js --template-ok"],
     ["public AMA pages template copy", pages, "PUBLIC_AMA_QUEUE.template.json"],
+    ["public AMA answers pages copy", pages, "public-ama-answers.js"],
+    ["public AMA answers template pages copy", pages, "PUBLIC_AMA_ANSWERS.template.json"],
     ["public AMA pages draft copy", pages, "tools/draft_public_ama_queue.js"],
+    ["public AMA pages exporter copy", pages, "tools/export_public_ama_answers.js"],
     ["public AMA pages validator copy", pages, "tools/validate_public_ama_queue.js"],
     ["public AMA VAU default path", vauCompany, "PUBLIC_AMA_QUEUE.local.json"],
     ["public AMA VAU argument", vauCompany, "--public-ama-queue"]
@@ -1044,6 +1072,7 @@ function checkConfig() {
 }
 
 compileJavaScript("public-config.js");
+compileJavaScript("public-ama-answers.js");
 compileJavaScript("public.js");
 compileJavaScript("script.js");
 compileJavaScript("tools/audit_company_functionality.js");
@@ -1056,6 +1085,7 @@ compileJavaScript("tools/draft_reviewer_candidate_tracker.js");
 compileJavaScript("tools/draft_revenue_setup_evidence_index.js");
 compileJavaScript("tools/validate_revenue_setup_evidence_index.js");
 compileJavaScript("tools/draft_public_ama_queue.js");
+compileJavaScript("tools/export_public_ama_answers.js");
 compileJavaScript("tools/validate_public_ama_queue.js");
 checkExternalLivePacketGate();
 checkPublicSurface();

@@ -36,6 +36,10 @@ PUBLIC_AMA_QUEUE.*.json
 public-ama-queue.local.json
 public-ama-queue.*.json
 !PUBLIC_AMA_QUEUE.template.json
+PUBLIC_AMA_ANSWERS.local.json
+PUBLIC_AMA_ANSWERS.*.json
+public-ama-answers.local.js
+!PUBLIC_AMA_ANSWERS.template.json
 
 # Generated revenue simulation outputs. Do not commit.
 REVENUE_SIMULATION_REPORT.md

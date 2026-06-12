@@ -75,6 +75,14 @@ To include the AMA queue in the VAU company-evolution model:
 python tools/vau_company_evolution.py --public-ama-queue PUBLIC_AMA_QUEUE.local.json --depth 1
 ```
 
+To publish only approved public answers to the static site:
+
+```bash
+node tools/export_public_ama_answers.js --input PUBLIC_AMA_QUEUE.local.json --output public-ama-answers.js --require-published --force
+```
+
+The export may include only `questionId`, `topic`, `publicSafeQuestion`, `publicAnswer`, `answerReviewedAt`, and `publishedAt`. It must not include name aliases, direct emails, support-thread text, private evidence IDs, payment records, legal/tax/private advice, or raw customer data.
+
 The local queue should use aliases, question summaries, public-safe question text, support-thread references, and non-secret evidence IDs. It must not include direct email addresses, CPF, CNPJ documents, credentials, payment data, private evidence, or customer records.
 
 The paid order desk remains governed by `HUMAN_REVIEW_PACKET.md`, `HUMAN_REVENUE_INSTRUCTIONS.md`, `REVENUE_SETUP_EVIDENCE_PACKET.md`, and `EXTERNAL_LIVE_PACKET.template.json`.

@@ -15,6 +15,9 @@ PUBLIC_AMA = ROOT / "PUBLIC_AMA.md"
 TEMPLATE = ROOT / "PUBLIC_AMA_QUEUE.template.json"
 VALIDATOR = ROOT / "tools" / "validate_public_ama_queue.js"
 DRAFT = ROOT / "tools" / "draft_public_ama_queue.js"
+EXPORT = ROOT / "tools" / "export_public_ama_answers.js"
+ANSWERS_TEMPLATE = ROOT / "PUBLIC_AMA_ANSWERS.template.json"
+PUBLIC_ANSWERS_JS = ROOT / "public-ama-answers.js"
 GITIGNORE = ROOT / ".gitignore"
 VALIDATE_WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
 PAGES_YML = ROOT / ".github" / "workflows" / "pages.yml"
@@ -81,7 +84,7 @@ def write_payload(payload: dict[str, object]) -> pathlib.Path:
 
 class PublicAmaQueueTests(unittest.TestCase):
     def test_required_files_exist(self) -> None:
-        for path in (PUBLIC_AMA, TEMPLATE, VALIDATOR, DRAFT, VALIDATE_WORKFLOW, PAGES_YML):
+        for path in (PUBLIC_AMA, TEMPLATE, ANSWERS_TEMPLATE, VALIDATOR, DRAFT, EXPORT, PUBLIC_ANSWERS_JS, VALIDATE_WORKFLOW, PAGES_YML):
             with self.subTest(file=path.name):
                 self.assertTrue(path.exists(), f"missing {path.name}")
 
@@ -145,8 +148,13 @@ class PublicAmaQueueTests(unittest.TestCase):
 
         self.assertIn("PUBLIC_AMA_QUEUE.local.json", GITIGNORE.read_text(encoding="utf-8"))
         self.assertIn("!PUBLIC_AMA_QUEUE.template.json", GITIGNORE.read_text(encoding="utf-8"))
+        self.assertIn("PUBLIC_AMA_ANSWERS.local.json", GITIGNORE.read_text(encoding="utf-8"))
+        self.assertIn("!PUBLIC_AMA_ANSWERS.template.json", GITIGNORE.read_text(encoding="utf-8"))
         self.assertIn("node --check tools/validate_public_ama_queue.js", VALIDATE_WORKFLOW.read_text(encoding="utf-8"))
+        self.assertIn("node --check tools/export_public_ama_answers.js", VALIDATE_WORKFLOW.read_text(encoding="utf-8"))
         self.assertIn("PUBLIC_AMA_QUEUE.template.json", PAGES_YML.read_text(encoding="utf-8"))
+        self.assertIn("PUBLIC_AMA_ANSWERS.template.json", PAGES_YML.read_text(encoding="utf-8"))
+        self.assertIn("public-ama-answers.js", PAGES_YML.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

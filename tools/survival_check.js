@@ -71,6 +71,7 @@ function checkStaticSurvivalSurface() {
   const publicHtml = read("public.html");
   const publicJs = read("public.js");
   const publicConfig = read("public-config.js");
+  const publicAnswers = read("public-ama-answers.js");
 
   assert(charter.includes("lawfully survive, grow, and compound"), "CHARTER.md must preserve the lawful survival objective.", "charter survival objective", "CHARTER.md");
   assert(charter.includes("Does it avoid creating a single point of failure?"), "CHARTER.md must keep the single-point-of-failure test.", "single-point-of-failure test", "CHARTER.md");
@@ -107,10 +108,16 @@ function checkStaticSurvivalSurface() {
   assert(publicHtml.includes('href="AVISO_DE_PRIVACIDADE.md"'), "public.html must link the Portuguese privacy notice.", "public Portuguese privacy link", "public.html");
   assert(publicHtml.includes('id="publicAmaForm"'), "public.html must include the public AMA form.", "public AMA form", "public.html");
   assert(publicHtml.includes('href="PUBLIC_AMA.md"'), "public.html must link the public AMA rules.", "public AMA rules link", "public.html");
+  assert(publicHtml.includes('id="publicAmaAnswers"'), "public.html must include the published AMA answer panel.", "public AMA published answers panel", "public.html");
+  assert(publicHtml.includes('src="public-ama-answers.js"'), "public.html must load the public AMA answer archive.", "public AMA answer archive loader", "public.html");
   assert(publicJs.includes("amaQuestionPacket"), "public.js must build public-safe AMA packets.", "public AMA packet builder", "public.js");
+  assert(publicJs.includes("renderPublicAmaAnswers"), "public.js must render public-safe AMA answers.", "public AMA answer renderer", "public.js");
   assert(publicJs.includes("if (!readiness.supportReady)"), "public.js must keep AMA behind the verified support inbox.", "public AMA support gate", "public.js");
   assert(read("PUBLIC_AMA.md").includes("PUBLIC_AMA_QUEUE.local.json"), "PUBLIC_AMA.md must document the local AMA queue.", "public AMA local queue docs", "PUBLIC_AMA.md");
   assert(read("PUBLIC_AMA_QUEUE.template.json").includes('"questionRecords": []'), "PUBLIC_AMA_QUEUE.template.json must stay a blank public template.", "public AMA queue template", "PUBLIC_AMA_QUEUE.template.json");
+  assert(read("PUBLIC_AMA_ANSWERS.template.json").includes('"answers": []'), "PUBLIC_AMA_ANSWERS.template.json must stay a blank public answer template.", "public AMA answers template", "PUBLIC_AMA_ANSWERS.template.json");
+  assert(publicAnswers.includes("window.PUBLIC_AMA_ANSWERS"), "public-ama-answers.js must expose only the public answer archive.", "public AMA answer archive", "public-ama-answers.js");
+  assert(read("tools/export_public_ama_answers.js").includes("humanApprovedForPublication"), "public AMA answer export must require human publication approval.", "public AMA answer export gate", "tools/export_public_ama_answers.js");
   assert(read("tools/validate_public_ama_queue.js").includes("--require-answer-ready"), "public AMA validator must require answer-ready review before publication.", "public AMA answer-ready gate", "tools/validate_public_ama_queue.js");
   assert(publicJs.includes("Public intake is closed"), "public.js must tell users public intake is closed before live readiness.", "public closed-intake copy", "public.js");
   assert(publicJs.includes("if (!readiness.liveReady)"), "public.js must block public submits before live readiness.", "public submit live gate", "public.js");

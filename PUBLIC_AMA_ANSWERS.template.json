@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "mode": "template",
+  "generatedAt": "",
+  "sourceQueue": "PUBLIC_AMA_QUEUE.local.json",
+  "answers": [],
+  "attestation": {
+    "publicOnly": true,
+    "noPrivateContactData": true,
+    "noPaymentOrderOrLaunchApprovalCreated": true,
+    "answersWereHumanApprovedBeforeExport": true,
+    "strangeCompanyRemainsSealed": true
+  }
+}

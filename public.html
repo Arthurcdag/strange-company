@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="styles.css" />
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
     <script src="public-config.js" defer></script>
+    <script src="public-ama-answers.js" defer></script>
     <script src="public.js" defer></script>
   </head>
   <body class="public-site">
@@ -97,6 +98,14 @@
       </section>
 
       <section class="public-output" id="publicAmaOutput" aria-live="polite"></section>
+
+      <section class="public-ama-answers" id="publicAmaAnswers" aria-labelledby="public-ama-answers-title">
+        <div class="public-section-heading">
+          <p class="section-kicker">Published answers</p>
+          <h2 id="public-ama-answers-title">Human-approved public AMA answers</h2>
+        </div>
+        <div class="public-ama-answer-list" id="publicAmaAnswerList" aria-live="polite"></div>
+      </section>
 
       <section class="public-order-surface" id="order" aria-labelledby="public-order-title">
         <div class="public-order-copy">

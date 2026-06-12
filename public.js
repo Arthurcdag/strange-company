@@ -244,6 +244,47 @@ function renderAmaPacket(question) {
   }
 }
 
+function publicAmaAnswersModel() {
+  const packet = window.PUBLIC_AMA_ANSWERS || {};
+  const answers = Array.isArray(packet.answers) ? packet.answers : [];
+  return answers
+    .filter((answer) => (
+      answer
+      && answer.questionId
+      && answer.publicSafeQuestion
+      && answer.publicAnswer
+      && answer.answerReviewedAt
+    ))
+    .slice(0, 12);
+}
+
+function renderPublicAmaAnswers() {
+  const target = document.querySelector("#publicAmaAnswerList");
+  if (!target) {
+    return;
+  }
+  const answers = publicAmaAnswersModel();
+  if (!answers.length) {
+    target.innerHTML = `
+      <article class="public-ama-answer empty">
+        <span class="metric-label">No answers published</span>
+        <p>Approved answers will appear here after the local AMA queue is exported to the public archive.</p>
+      </article>
+    `;
+    return;
+  }
+  target.innerHTML = answers.map((answer) => `
+    <article class="public-ama-answer">
+      <div>
+        <span class="metric-label">${escapeHtml(answer.topic || "public-ama")} / ${escapeHtml(answer.questionId)}</span>
+        <h3>${escapeHtml(answer.publicSafeQuestion)}</h3>
+      </div>
+      <p>${escapeHtml(answer.publicAnswer)}</p>
+      <small>Reviewed ${escapeHtml(answer.answerReviewedAt)}${answer.publishedAt ? ` / published ${escapeHtml(answer.publishedAt)}` : ""}</small>
+    </article>
+  `).join("");
+}
+
 function setupAmaForm() {
   const form = document.querySelector("#publicAmaForm");
   if (!form) {
@@ -383,6 +424,7 @@ function setupForm() {
 
 document.addEventListener("DOMContentLoaded", () => {
   renderReadiness();
+  renderPublicAmaAnswers();
   setupAmaForm();
   setupForm();
   if (window.lucide) {
