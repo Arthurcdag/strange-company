@@ -66,6 +66,7 @@ function checkCoreSurvivalSurface() {
   assert(read("public.js").includes("if (!readiness.liveReady)"), "public.js must block submit before live readiness.", "public live gate", "public.js");
   assert(read("script.js").includes("function applyLocalStrangeGuardrails"), "script.js must apply browser-side Strange guardrails.", "browser guardrails", "script.js");
   assert(read("tools/strange_research_gate.py").includes("fallback_evaluate_argument"), "strange_research_gate.py must run without the external submodule.", "local research fallback", "tools/strange_research_gate.py");
+  assert(read("tools/vau_company_evolution.py").includes("resource_allocation_plan"), "vau_company_evolution.py must keep a resource allocation plan.", "whole-company resource allocation", "tools/vau_company_evolution.py");
 }
 
 function checkLiveGateBehavior(config) {

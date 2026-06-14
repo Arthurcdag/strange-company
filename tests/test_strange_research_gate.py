@@ -45,6 +45,19 @@ class StrangeResearchGateGuardrailTests(unittest.TestCase):
 
         self.assertIn("hard_simulation_is_not_proof", {issue.code for issue in issues})
 
+    def test_blocks_customer_capital_and_guaranteed_returns(self) -> None:
+        issues = detect_strange_guardrails(
+            claim="Strange Company can guarantee customer returns from AI trading",
+            argument=(
+                "Hard simulation is proof, so customer capital can be accepted "
+                "and liveMode can be enabled before review."
+            ),
+        )
+
+        codes = {issue.code for issue in issues}
+        self.assertIn("hard_simulation_is_not_proof", codes)
+        self.assertIn("hard_customer_capital_return_firewall", codes)
+
     def test_blocks_fake_evidence(self) -> None:
         issues = detect_strange_guardrails(
             claim="Backdate review evidence",
@@ -82,6 +95,14 @@ class StrangeResearchGateGuardrailTests(unittest.TestCase):
                 "VAU can propose futures, but human review remains mandatory before "
                 "client delivery or live-mode decisions."
             ),
+        )
+
+        self.assertEqual([issue for issue in issues if issue.severity == "error"], [])
+
+    def test_allows_customer_money_firewall_statement(self) -> None:
+        issues = detect_strange_guardrails(
+            claim="No guaranteed returns",
+            argument="Do not accept customer capital for trading; use own retained surplus only.",
         )
 
         self.assertEqual([issue for issue in issues if issue.severity == "error"], [])

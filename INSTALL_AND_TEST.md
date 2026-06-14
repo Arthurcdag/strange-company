@@ -32,6 +32,7 @@ node tools/check_revenue_setup_schema_sync_gate.js
 node tools/check_revenue_setup_evidence_gate.js
 node tools/audit_company_functionality.js
 node tools/survival_check.js
+python tools/vau_company_evolution.py --depth 3 --max-branches-to-keep 8
 python -B -m unittest discover -s tests
 
 Resultado esperado:
@@ -124,6 +125,7 @@ node tools\check_revenue_setup_schema_sync_gate.js
 node tools\check_revenue_setup_evidence_gate.js
 node tools\audit_company_functionality.js
 node tools\survival_check.js
+python tools\vau_company_evolution.py --depth 3 --max-branches-to-keep 8
 python -B -m unittest discover -s tests
 git diff --check
 ```

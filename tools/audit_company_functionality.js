@@ -81,6 +81,7 @@ function auditRuntimeSurfaces() {
   assertIncludes("tools/check_revenue_setup_schema_sync_gate.js", "Revenue setup schema sync regression passed", "revenue setup schema sync regression");
   assertIncludes("tools/check_external_live_packet_gate.js", "External live packet gate regression passed", "external packet gate regression");
   assertIncludes("tools/check_revenue_setup_evidence_gate.js", "Revenue setup evidence gate regression passed", "revenue setup evidence gate regression");
+  assertIncludes("tools/vau_company_evolution.py", "resource_allocation_plan", "whole-company resource allocation");
 }
 
 function auditPublicBoundary() {

@@ -12,6 +12,7 @@ from tools.vau_company_evolution import (
     hard_blockers,
     public_live_ready,
     recommended_next_actions,
+    resource_allocation_plan,
     run_cycle,
     simulate_company_futures,
     update_futures_with_real_event,
@@ -83,6 +84,7 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         self.assertIn("Get human review on terms", joined_actions)
         self.assertIn("private Stripe/bank/fiscal evidence", joined_actions)
         self.assertFalse(result["public_live_ready"])
+        self.assertIn("resource_allocation", result)
 
     def test_revenue_future_only_appears_after_gates_and_reviewers(self) -> None:
         path = write_public_config(
@@ -134,6 +136,34 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         self.assertTrue(actions)
         self.assertIsInstance(actions[0]["domains"], list)
         self.assertIsInstance(actions[0]["events"], list)
+
+    def test_resource_allocation_spends_first_on_external_review(self) -> None:
+        path = write_public_config()
+        state = build_current_state(path)
+
+        allocation = resource_allocation_plan(state)
+        lanes = allocation["resource_lanes"]
+
+        self.assertEqual(lanes[0]["lane"], "human_review_dates")
+        self.assertTrue(lanes[0]["requires_real_evidence"])
+        self.assertIn("liveMode false", allocation["live_mode_policy"])
+        self.assertEqual(sum(lane["resource_share_percent"] for lane in lanes), 100)
+        self.assertIn("Do not flip liveMode from simulated futures.", allocation["do_not_spend_on"])
+
+    def test_resource_allocation_moves_to_reviewer_bench_after_hard_evidence(self) -> None:
+        path = write_public_config(
+            terms="2026-05-25",
+            privacy="2026-05-25",
+            brazil="2026-05-25",
+            ai_handoff="2026-05-25",
+        )
+        state = build_current_state(path)
+        state["gates"]["privatePaymentFiscalEvidenceReady"] = True
+
+        allocation = resource_allocation_plan(state)
+
+        self.assertEqual(allocation["resource_lanes"][0]["lane"], "reviewer_bench")
+        self.assertIn("Recruit 4 more human reviewers", allocation["resource_lanes"][0]["action"])
 
 
 if __name__ == "__main__":

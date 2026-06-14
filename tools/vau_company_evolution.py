@@ -646,6 +646,177 @@ def recommended_next_actions(
     ]
 
 
+def _normalize_resource_lanes(lanes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not lanes:
+        return []
+
+    total_weight = sum(float(lane.pop("_weight")) for lane in lanes)
+    allocated = 0
+    for index, lane in enumerate(lanes):
+        if index == len(lanes) - 1:
+            share = 100 - allocated
+        else:
+            share = int(round(float(lane["_raw_weight"]) * 100 / total_weight))
+            allocated += share
+        lane.pop("_raw_weight", None)
+        lane["rank"] = index + 1
+        lane["resource_share_percent"] = share
+    return lanes
+
+
+def resource_allocation_plan(
+    current_state: dict[str, Any],
+    actions: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    hard = hard_blockers(current_state)
+    reviewers_found = int(get_path(current_state, "metrics.human_reviewers_found", 0))
+    delivery_loop_ready = bool(get_path(current_state, "gates.deliveryReviewLoopReady", False))
+    live_mode = bool(get_path(current_state, "gates.liveMode", False))
+    gates = current_state.get("gates", {})
+    lanes: list[dict[str, Any]] = []
+
+    def add_lane(
+        lane: str,
+        weight: float,
+        action: str,
+        reason: str,
+        blockers: list[str],
+        requires_real_evidence: bool,
+    ) -> None:
+        lanes.append(
+            {
+                "lane": lane,
+                "_weight": weight,
+                "_raw_weight": weight,
+                "action": action,
+                "reason": reason,
+                "blocked_by": blockers,
+                "requires_real_evidence": requires_real_evidence,
+            }
+        )
+
+    review_blockers = [
+        blocker
+        for blocker in hard
+        if blocker
+        in {
+            "termsReviewedAt",
+            "privacyReviewedAt",
+            "brazilComplianceReviewedAt",
+            "aiHandoffReviewedAt",
+        }
+    ]
+    if review_blockers:
+        add_lane(
+            lane="human_review_dates",
+            weight=5.0,
+            action=(
+                "Get human review on terms, privacy, Brazil compliance, and AI handoff, "
+                "then record real dates."
+            ),
+            reason="The public gate cannot evolve until the legal/privacy review dates are real.",
+            blockers=review_blockers,
+            requires_real_evidence=True,
+        )
+
+    if "private payment/fiscal evidence" in hard:
+        add_lane(
+            lane="private_payment_fiscal_evidence",
+            weight=4.0,
+            action=(
+                "Prepare private Stripe/bank/fiscal evidence outside git and mark it in the private tracker."
+            ),
+            reason="Revenue should not start until the payment and fiscal route has private proof.",
+            blockers=["private payment/fiscal evidence"],
+            requires_real_evidence=True,
+        )
+
+    public_route_blockers: list[str] = []
+    if not gates.get("supportInboxVerified", False):
+        public_route_blockers.append("support inbox")
+    if not gates.get("googleFormVerified", False):
+        public_route_blockers.append("Google Form route")
+    if public_route_blockers:
+        add_lane(
+            lane="public_route_evidence",
+            weight=3.0,
+            action="Verify the support inbox and Google Form route with fake test data before live intake.",
+            reason="The public surface needs a tested support and intake route before any live request.",
+            blockers=public_route_blockers,
+            requires_real_evidence=True,
+        )
+
+    if reviewers_found < 4:
+        needed = 4 - reviewers_found
+        add_lane(
+            lane="reviewer_bench",
+            weight=3.0,
+            action=(
+                f"Recruit {needed} more human reviewer"
+                f"{'' if needed == 1 else 's'} and record scope, rate, availability, and paid-test fit."
+            ),
+            reason="Human review capacity reduces AI-only delivery and launch risk.",
+            blockers=["4 human reviewers"],
+            requires_real_evidence=True,
+        )
+
+    if not delivery_loop_ready:
+        add_lane(
+            lane="delivery_review_loop",
+            weight=2.0,
+            action="Convert the human review packet into a repeatable delivery checklist.",
+            reason="Client work needs intake, AI draft, human review, revision, and receipt steps.",
+            blockers=["delivery review loop"],
+            requires_real_evidence=False,
+        )
+
+    if company_operational_ready(current_state):
+        add_lane(
+            lane="controlled_pilot",
+            weight=4.0,
+            action=(
+                "Qualify one controlled pilot through the public form and private review checklist."
+                if live_mode
+                else "Run the live audit and have the operator decide whether to flip liveMode."
+            ),
+            reason=(
+                "The company is operationally ready; the next spend is controlled revenue evidence."
+                if live_mode
+                else "The company is operationally ready, but liveMode still needs a human flip."
+            ),
+            blockers=[],
+            requires_real_evidence=True,
+        )
+
+    if not lanes:
+        add_lane(
+            lane="operating_dashboard",
+            weight=1.0,
+            action="Add one measurable VAU dashboard field or audit command.",
+            reason="With no immediate blocker detected, improve the repeatable operating loop.",
+            blockers=[],
+            requires_real_evidence=False,
+        )
+
+    normalized_lanes = _normalize_resource_lanes(lanes)
+    top_actions = actions[:3] if actions else []
+
+    return {
+        "active_goal": "Evolve Strange Company by clearing the highest-value blocker without simulating external proof.",
+        "live_mode_policy": (
+            "Keep liveMode false until support, intake, terms, privacy, Brazil compliance, "
+            "AI handoff, payment/fiscal evidence, and reviewer capacity are real."
+        ),
+        "resource_lanes": normalized_lanes,
+        "top_predicted_actions": top_actions,
+        "do_not_spend_on": [
+            "Do not flip liveMode from simulated futures.",
+            "Do not commit private bank, tax, customer, payment, or reviewer evidence.",
+            "Do not present AI output as legal, tax, privacy, payment, refund, or launch approval.",
+        ],
+    }
+
+
 def run_cycle(
     current_state: dict[str, Any],
     depth: int,
@@ -657,6 +828,7 @@ def run_cycle(
         depth,
         max_branches_to_keep,
     )
+    actions = recommended_next_actions(predicted)
     result: dict[str, Any] = {
         "system": SYSTEM_NAME,
         "current_state": current_state,
@@ -665,7 +837,8 @@ def run_cycle(
         "public_live_ready": public_live_ready(current_state),
         "company_operational_ready": company_operational_ready(current_state),
         "predicted_futures": [future.to_dict() for future in predicted],
-        "recommended_next_actions": recommended_next_actions(predicted),
+        "recommended_next_actions": actions,
+        "resource_allocation": resource_allocation_plan(current_state, actions),
     }
 
     if real_event is not None:
@@ -715,6 +888,16 @@ def main() -> int:
     for action in result["recommended_next_actions"]:
         marker = "requires real evidence" if action["requires_real_evidence"] else "repo/action"
         print(f"- [{marker}] {action['action']} (score={action['score']})")
+    print("")
+    print("Resource focus:")
+    print(f"- {result['resource_allocation']['active_goal']}")
+    print(f"- {result['resource_allocation']['live_mode_policy']}")
+    for lane in result["resource_allocation"]["resource_lanes"]:
+        marker = "requires real evidence" if lane["requires_real_evidence"] else "repo/action"
+        print(
+            f"- #{lane['rank']} {lane['lane']} "
+            f"{lane['resource_share_percent']}% [{marker}] {lane['action']}"
+        )
     print("")
     print("Top futures:")
     for index, future in enumerate(result["predicted_futures"], start=1):

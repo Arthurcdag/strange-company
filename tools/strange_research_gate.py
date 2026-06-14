@@ -39,7 +39,7 @@ def _contains_negated_phrase(text: str, phrase: str) -> bool:
     phrase_pattern = re.escape(phrase).replace(r"\ ", r"\s+")
     return bool(
         re.search(
-            rf"\b(?:do\s+not|don't|should\s+not|must\s+not|cannot|can't|never)\s+"
+            rf"\b(?:no|do\s+not|don't|should\s+not|must\s+not|cannot|can't|never)\s+"
             rf"(?:fully\s+|entirely\s+)?{phrase_pattern}\b",
             text,
             re.I,
@@ -106,14 +106,36 @@ LIVE_WITHOUT_EVIDENCE_PATTERNS = [
 SIMULATION_PROOF_PATTERNS = [
     re.compile(
         r"\b(?:simulation|simulate|simulated|vau)\b.*"
-        r"\b(?:proves?|guarantees?|certifies?|therefore)\b.*"
-        r"\b(?:production|live|client|real[-\s]?world|revenue|safe)\b",
+        r"\b(?:is\s+)?(?:proof|proves?|guarantees?|certifies?|therefore)\b.*"
+        r"\b(?:production|live|client|customer|capital|trading|returns?|real[-\s]?world|revenue|safe)\b",
         re.I,
     ),
     re.compile(
-        r"\b(?:production|live|client|real[-\s]?world|revenue|safe)\b.*"
-        r"\b(?:proves?|guarantees?|certifies?)\b.*"
+        r"\b(?:production|live|client|customer|capital|trading|returns?|real[-\s]?world|revenue|safe)\b.*"
+        r"\b(?:proof|proves?|guarantees?|certifies?)\b.*"
         r"\b(?:simulation|simulate|simulated|vau)\b",
+        re.I,
+    ),
+]
+
+CAPITAL_RETURN_FIREWALL_PATTERNS = [
+    re.compile(
+        r"\b(?:guarantee|guaranteed|guarantees|promise|promised)\b.*"
+        r"\b(?:returns?|profit|yield)\b",
+        re.I,
+    ),
+    re.compile(
+        r"\b(?:fixed|minimum|daily|monthly)\s+(?:returns?|profit|yield)\b",
+        re.I,
+    ),
+    re.compile(
+        r"\b(?:accept|take|use|pool)\s+(?:customer|client|investor)\s+"
+        r"(?:capital|funds?|money)\b.*\b(?:trading|trade|invest|investment|returns?|yield|profit)\b",
+        re.I,
+    ),
+    re.compile(
+        r"\b(?:customer|client|investor)\s+(?:capital|funds?|money)\s+"
+        r"(?:can|should|will|must)\s+be\s+(?:accepted|used|pooled)\b",
         re.I,
     ),
 ]
@@ -225,6 +247,31 @@ def detect_strange_guardrails(
                     "client, revenue, or safety outcomes without external validation."
                 ),
                 evidence=simulation_match,
+            )
+        )
+
+    capital_match = _first_match(text, CAPITAL_RETURN_FIREWALL_PATTERNS)
+    if capital_match and not any(
+        _contains_negated_phrase(lowered, phrase)
+        for phrase in (
+            "guaranteed returns",
+            "guarantee returns",
+            "accept customer capital",
+            "use customer capital",
+            "take customer capital",
+            "pool customer capital",
+            "customer capital can be accepted",
+        )
+    ):
+        issues.append(
+            StrangeGuardrailIssue(
+                code="hard_customer_capital_return_firewall",
+                severity="error",
+                message=(
+                    "Strange Company cannot promise returns or accept customer, "
+                    "client, or investor capital for trading or investment."
+                ),
+                evidence=capital_match,
             )
         )
 
