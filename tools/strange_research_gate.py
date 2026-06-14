@@ -101,6 +101,13 @@ LIVE_WITHOUT_EVIDENCE_PATTERNS = [
         r"\b(?:evidence|verified|verification|gate|review|terms|privacy|compliance|support|form)\b",
         re.I,
     ),
+    re.compile(
+        r"\b(?:open\s+live\s+intake|accept\s+payments?|take\s+payments?|request\s+payments?|"
+        r"receive\s+(?:paid\s+)?orders?|start\s+receiving\s+(?:paid\s+)?orders?)\b.*"
+        r"\b(?:without|before|skip|ignore|no\s+need)\b.*"
+        r"\b(?:nf-?s-?e|nota\s+fiscal|fiscal|tax|payment|reconciliation|lgpd|privacy|support|terms|human\s+review|evidence|review)\b",
+        re.I,
+    ),
 ]
 
 SIMULATION_PROOF_PATTERNS = [
@@ -215,7 +222,26 @@ def detect_strange_guardrails(
         )
 
     live_match = _first_match(text, LIVE_WITHOUT_EVIDENCE_PATTERNS)
-    if live_match:
+    if live_match and not any(
+        _contains_negated_phrase(lowered, phrase)
+        for phrase in (
+            "enable liveMode",
+            "enable live mode",
+            "go live",
+            "start operations",
+            "accept clients",
+            "open intake",
+            "open live intake",
+            "accept payment",
+            "accept payments",
+            "take payment",
+            "take payments",
+            "request payment",
+            "request payments",
+            "receive paid orders",
+            "start receiving paid orders",
+        )
+    ):
         issues.append(
             StrangeGuardrailIssue(
                 code="hard_live_evidence_required",

@@ -16,6 +16,9 @@ EXTERNAL_LIVE_PACKET.*.json
 external-live-packet.local.json
 external-live-packet.*.json
 !EXTERNAL_LIVE_PACKET.template.json
+REVENUE_SETUP_EVIDENCE_INDEX.local.json
+REVENUE_SETUP_EVIDENCE_INDEX.*.local.json
+private-evidence/
 
 # OS/editor noise
 .DS_Store

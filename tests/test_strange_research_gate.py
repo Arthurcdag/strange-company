@@ -37,6 +37,17 @@ class StrangeResearchGateGuardrailTests(unittest.TestCase):
 
         self.assertIn("hard_live_evidence_required", {issue.code for issue in issues})
 
+    def test_blocks_paid_orders_before_remaining_revenue_gates(self) -> None:
+        issues = detect_strange_guardrails(
+            claim="MEI is done so start receiving paid orders now",
+            argument=(
+                "Open live intake and accept payment before NFS-e, payment reconciliation, "
+                "LGPD, support, terms, and human review evidence are ready."
+            ),
+        )
+
+        self.assertIn("hard_live_evidence_required", {issue.code for issue in issues})
+
     def test_blocks_simulation_as_production_proof(self) -> None:
         issues = detect_strange_guardrails(
             claim="VAU proves live launch is safe",
@@ -94,6 +105,17 @@ class StrangeResearchGateGuardrailTests(unittest.TestCase):
             argument=(
                 "VAU can propose futures, but human review remains mandatory before "
                 "client delivery or live-mode decisions."
+            ),
+        )
+
+        self.assertEqual([issue for issue in issues if issue.severity == "error"], [])
+
+    def test_allows_mei_done_with_payment_still_blocked(self) -> None:
+        issues = detect_strange_guardrails(
+            claim="MEI evidence is recorded",
+            argument=(
+                "Do not accept payment before NFS-e, payment reconciliation, LGPD, "
+                "support, terms, and human review evidence are ready."
             ),
         )
 

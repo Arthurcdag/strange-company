@@ -54,6 +54,24 @@ Daily inbox check time:
 
 Do not commit CPF, CNPJ certificates, bank data, customer records, tax portal screenshots, provider secrets, contracts, private invoices, or payment dashboard screenshots to this repo.
 
+## Local Evidence File
+
+When a private artifact exists, such as a CCMEI/MEI certificate, keep the artifact outside git and record only a public-safe pointer in a local ignored file:
+
+```text
+REVENUE_SETUP_EVIDENCE_INDEX.local.json
+```
+
+Use the template as the base, then run:
+
+```powershell
+node tools\validate_revenue_setup_evidence.js REVENUE_SETUP_EVIDENCE_INDEX.local.json
+node tools\revenue_setup_doctor.js REVENUE_SETUP_EVIDENCE_INDEX.local.json
+node tools\report_revenue_setup_gaps.js REVENUE_SETUP_EVIDENCE_INDEX.local.json
+```
+
+A CCMEI can move the entity gate from missing to partial evidence. It does not approve paid intake by itself. Keep `liveMode: false` until the entity scope, tax/NFS-e route, payment/reconciliation route, LGPD/privacy path, support ownership, and terms/offer review all have real outside evidence.
+
 ## Minimum Outside Setup
 
 Complete these gates before asking a customer to pay.
