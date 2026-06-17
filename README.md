@@ -67,6 +67,9 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [ADAPTIVE_OPERATOR_PROTOCOL.md](ADAPTIVE_OPERATOR_PROTOCOL.md): how operators and AI agents convert roadblocks, failed commands, criticism, and missing evidence into safer next actions.
 - [LAUNCH_PLAN.md](LAUNCH_PLAN.md): practical path to version 0.
 - [ONLINE_GATE.md](ONLINE_GATE.md): when the company may move from local prototype to private sandbox, public beta, or live operation.
+- [LEGAL_PROCEDURE.md](LEGAL_PROCEDURE.md): outside evidence procedure for entity, EIN, BOI, tax, payment, privacy, and legal/accounting signoff before live operation.
+- [LEGAL_DRAFT_FILINGS.md](LEGAL_DRAFT_FILINGS.md): draft-only filing worksheets for state formation, EIN, BOI, finance, privacy, and reviewer signoff.
+- [LEGAL_FILING_EXPERIMENT.md](LEGAL_FILING_EXPERIMENT.md): dry-run experiment for evolving the draft filing packet without submission.
 - [LIVE_HANDOFF_CHECKLIST.md](LIVE_HANDOFF_CHECKLIST.md): developer/operator checklist for turning the deployed static prototype into verified live intake.
 - [ONLINE_ASAP.md](ONLINE_ASAP.md): shortest safe path for keeping the main prototype online and switching the satellite to live intake once outside controls are verified.
 - [FIRST_REVENUE_CLOSEOUT.md](FIRST_REVENUE_CLOSEOUT.md): current closeout packet for moving from public prototype to first safe paid intake.

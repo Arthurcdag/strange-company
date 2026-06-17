@@ -18,6 +18,9 @@ It applies to the satellite operator (Strange Works Studio), not to Strange Comp
 
 Complete every line in the **Operational launch** checklist before sending the first invoice:
 
+- [ ] **Main legal procedure reviewed.** Use [LEGAL_PROCEDURE.md](LEGAL_PROCEDURE.md) to assemble the entity, EIN, BOI, tax/bookkeeping/payment, privacy/security/support, and professional-signoff evidence packet. This packet is required before the sealed Strange Company lane can claim live operation.
+- [ ] **Draft filing packet prepared, not submitted.** Use [LEGAL_DRAFT_FILINGS.md](LEGAL_DRAFT_FILINGS.md) to fill draft-only worksheets outside the repo. Keep SSN, ITIN, bank credentials, payment credentials, and signatures out of git.
+- [ ] **Legal filing dry run measured.** Use [LEGAL_FILING_EXPERIMENT.md](LEGAL_FILING_EXPERIMENT.md) to confirm the draft packet is reviewer-ready without submitting, signing, paying, filing, or entering sensitive identifiers.
 - [ ] **Brazilian operator confirmed.** CNPJ or approved operating structure is chosen and recorded.
 - [ ] **Responsible party identified.** A real human is responsible for tax, bank/payment, customer communication, support, privacy, and incident decisions.
 - [ ] **Tax route reviewed.** Accountant confirms tax regime, CNAE, municipal registration needs, and the NFS-e or reviewed fiscal receipt process.

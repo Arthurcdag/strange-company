@@ -125,6 +125,12 @@ Guardian powers should be:
 - time-limited where possible,
 - and subject to replacement.
 
+### Legal Proceeding Boundary
+
+Where law, tax administration, banking, payment processing, privacy duties, or court process requires an accountable human or legally recognized entity, the system must use an external legal procedure before acting.
+
+The repo may produce evidence packets, but it must not claim that legal existence, EIN control, BOI status, tax posture, payment approval, privacy compliance, or counsel signoff exists until the responsible human operator attaches outside artifacts and reviewer signoff.
+
 ## 8. Transparency
 
 The company should keep records sufficient for:

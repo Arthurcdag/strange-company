@@ -243,6 +243,12 @@
               <button class="icon-button" id="draftLaunchPacket" type="button" aria-label="Draft launch packet" title="Draft launch packet">
                 <i data-lucide="package-plus"></i>
               </button>
+              <button class="icon-button" id="copyLegalProcedurePacket" type="button" aria-label="Copy legal procedure packet" title="Copy legal procedure packet">
+                <i data-lucide="clipboard-check"></i>
+              </button>
+              <button class="icon-button" id="copyDraftFilingPacket" type="button" aria-label="Copy draft filing packet" title="Copy draft filing packet">
+                <i data-lucide="file-pen-line"></i>
+              </button>
               <button class="icon-button" id="copyLiveEvidencePacket" type="button" aria-label="Copy live evidence packet" title="Copy live evidence packet">
                 <i data-lucide="clipboard-check"></i>
               </button>
@@ -253,6 +259,47 @@
           <div class="launch-metrics-grid" id="launchMetrics"></div>
           <div class="launch-evidence-panel" id="liveEvidencePanel"></div>
           <div class="launch-evidence-output" id="liveEvidenceOutput" aria-live="polite"></div>
+
+          <div class="view-header compact-header launch-section-header">
+            <div>
+              <p class="section-kicker">Mode map</p>
+              <h3>Demand, draft, experiment, evidence</h3>
+            </div>
+          </div>
+          <div class="legal-mode-list" id="legalModeDistinctions"></div>
+
+          <div class="view-header compact-header launch-section-header">
+            <div>
+              <p class="section-kicker">Legal procedure</p>
+              <h3>Main company evidence demands</h3>
+            </div>
+          </div>
+          <div class="legal-procedure-list" id="legalProcedureList"></div>
+          <div class="view-header compact-header launch-section-header">
+            <div>
+              <p class="section-kicker">Draft filing</p>
+              <h3>Prepared, not submitted</h3>
+            </div>
+          </div>
+          <div class="legal-draft-list" id="legalDraftFilingList"></div>
+          <div class="view-header compact-header launch-section-header">
+            <div>
+              <p class="section-kicker">Experiment</p>
+              <h3>Legal filing dry run</h3>
+            </div>
+            <button class="icon-button" id="copyLegalFilingExperiment" type="button" aria-label="Copy legal filing experiment" title="Copy legal filing experiment">
+              <i data-lucide="flask-conical"></i>
+            </button>
+          </div>
+          <div class="legal-experiment-panel" id="legalFilingExperimentPanel"></div>
+          <div class="view-header compact-header launch-section-header">
+            <div>
+              <p class="section-kicker">Try matrix</p>
+              <h3>More dry-run branches</h3>
+            </div>
+          </div>
+          <div class="legal-try-list" id="legalTryMatrix"></div>
+          <div class="legal-procedure-output" id="legalProcedureOutput" aria-live="polite"></div>
 
           <div class="view-header compact-header launch-section-header">
             <div>
@@ -340,15 +387,22 @@
               <p class="section-kicker">Clean profit layer</p>
               <h2 id="satellite-title">Satellite company</h2>
             </div>
-            <button class="primary-action" id="resetSatelliteCompany" type="button">
-              <i data-lucide="rotate-ccw"></i>
-              <span>Reset model</span>
-            </button>
+            <div class="topbar-actions">
+              <button class="primary-action" id="copySatelliteReviewerResponse" type="button">
+                <i data-lucide="copy"></i>
+                <span>Copy reviewer answer</span>
+              </button>
+              <button class="primary-action" id="resetSatelliteCompany" type="button">
+                <i data-lucide="rotate-ccw"></i>
+                <span>Reset model</span>
+              </button>
+            </div>
           </div>
 
           <div class="satellite-verdict" id="satelliteVerdict"></div>
           <div class="satellite-metrics-grid" id="satelliteMetrics"></div>
           <div class="satellite-profit-tracker" id="satelliteProfitTracker"></div>
+          <div class="satellite-reviewer-output" id="satelliteReviewerOutput" aria-live="polite"></div>
 
           <div class="view-header compact-header satellite-section-header">
             <div>
