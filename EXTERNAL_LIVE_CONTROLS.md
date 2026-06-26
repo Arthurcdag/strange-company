@@ -276,12 +276,17 @@ Only after all checks above are real:
 ```js
 window.PUBLIC_ORDER_CONFIG = {
   operatorName: "Strange Works Studio",
-  supportEmail: "ops@strangeworks.studio",
+  jurisdiction: "BR",
+  complianceMode: "brazil-draft",
+  aiGeneratedLegalDocsRequireHumanReview: true,
+  supportEmail: "tuiidagnese+strangeworks@gmail.com",
   googleFormUrl: "https://docs.google.com/forms/...",
   supportInboxVerified: true,
   googleFormVerified: true,
   termsReviewedAt: "YYYY-MM-DD",
   privacyReviewedAt: "YYYY-MM-DD",
+  brazilComplianceReviewedAt: "YYYY-MM-DD",
+  aiHandoffReviewedAt: "YYYY-MM-DD",
   liveMode: true,
   services: [
     {
@@ -299,6 +304,8 @@ window.PUBLIC_ORDER_CONFIG = {
   ]
 };
 ```
+
+Keep `supportEmail` set to the verified pilot inbox (`tuiidagnese+strangeworks@gmail.com`) until the branded `ops@strangeworks.studio` domain/MX/mailbox passes the checks in §1. Do not switch the public `supportEmail` to the branded address until that verification is recorded in `SUPPORT_INBOX_EVIDENCE.md`.
 
 Run:
 
