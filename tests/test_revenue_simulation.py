@@ -10,6 +10,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SIMULATOR = ROOT / "tools" / "simulate_revenue_scenarios.js"
+VALIDATOR = ROOT / "tools" / "validate_revenue_setup_evidence_index.js"
 README = ROOT / "README.md"
 GITIGNORE = ROOT / ".gitignore"
 SIMULATION_DOC = ROOT / "REVENUE_SIMULATION.md"
@@ -80,6 +81,40 @@ class RevenueSimulationTests(unittest.TestCase):
         self.assertFalse(data["publicConfig"]["supportInboxVerified"])
         self.assertFalse(data["publicConfig"]["googleFormVerified"])
         self.assertEqual(data["publicConfig"]["operatorName"], "Strange Works Studio")
+
+    def test_simulation_evidence_is_structurally_valid(self) -> None:
+        result = self._run_simulator("--write-evidence")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        evidence_path = self.cwd / "REVENUE_SETUP_EVIDENCE_INDEX.simulation.json"
+        validation = subprocess.run(
+            [NODE, str(VALIDATOR), str(evidence_path)],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(validation.returncode, 0, validation.stderr)
+        self.assertIn("template validation passed", validation.stdout)
+        self.assertIn("mode is not template", validation.stdout)
+
+    def test_simulation_evidence_cannot_pass_full_readiness(self) -> None:
+        result = self._run_simulator("--write-evidence")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        evidence_path = self.cwd / "REVENUE_SETUP_EVIDENCE_INDEX.simulation.json"
+        validation = subprocess.run(
+            [NODE, str(VALIDATOR), str(evidence_path), "--require-all"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(validation.returncode, 0)
+        self.assertIn("must be true to pass this readiness gate", validation.stderr)
+        self.assertNotIn("is required", validation.stderr)
 
     def test_simulation_evidence_keeps_every_gate_unverified(self) -> None:
         result = self._run_simulator("--write-evidence")

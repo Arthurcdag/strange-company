@@ -87,7 +87,9 @@ function buildSite() {
     "PUBLIC_AMA_QUEUE.template.json",
     "PUBLIC_AMA_ANSWERS.template.json",
     "REVIEWER_CANDIDATE_TRACKER.template.json",
-    "REVENUE_SETUP_EVIDENCE_INDEX.template.json"
+    "REVENUE_SETUP_EVIDENCE_INDEX.template.json",
+    "LIVE_REVIEW_CLOSURE.template.json",
+    "DELIVERY_REVIEW_CHECKLIST.template.json"
   ]) {
     copyFile(file);
   }
@@ -96,14 +98,23 @@ function buildSite() {
     "tools/strange_research_gate.py",
     "tools/reactive_research_tools_cors.patch",
     "tools/google_apps_script_order_intake.gs",
+    "tools/audit_evolution_log.js",
+    "tools/evolution_goal_status.js",
+    "tools/generate_evolution_next_packet.js",
+    "tools/local_evidence_status.js",
+    "tools/draft_live_review_closure.js",
+    "tools/render_live_review_public_config_patch.js",
     "tools/draft_reviewer_candidate_tracker.js",
     "tools/draft_revenue_setup_evidence_index.js",
+    "tools/draft_delivery_review_checklist.js",
     "tools/draft_public_ama_queue.js",
     "tools/export_public_ama_answers.js",
     "tools/validate_external_live_packet.js",
+    "tools/validate_live_review_closure.js",
     "tools/validate_public_ama_queue.js",
     "tools/validate_reviewer_candidate_tracker.js",
     "tools/validate_revenue_setup_evidence_index.js",
+    "tools/validate_delivery_review_checklist.js",
     "tools/build_public_site.js"
   ]) {
     copyFile(file);
@@ -134,6 +145,17 @@ function assertBundle() {
     "PUBLIC_AMA.md",
     "PUBLIC_AMA_QUEUE.template.json",
     "PUBLIC_AMA_ANSWERS.template.json",
+    "DELIVERY_REVIEW_LOOP.md",
+    "DELIVERY_REVIEW_CHECKLIST.template.json",
+    "LIVE_REVIEW_CLOSURE.template.json",
+    "EVOLUTION_LOG.md",
+    "tools/audit_evolution_log.js",
+    "tools/evolution_goal_status.js",
+    "tools/generate_evolution_next_packet.js",
+    "tools/local_evidence_status.js",
+    "tools/validate_live_review_closure.js",
+    "tools/render_live_review_public_config_patch.js",
+    "tools/validate_delivery_review_checklist.js",
     "tools/export_public_ama_answers.js",
     "tools/build_public_site.js",
     ".nojekyll"
@@ -156,6 +178,9 @@ function assertBundle() {
     /REVIEWER_CANDIDATE_TRACKER\.local\.json/i,
     /PUBLIC_AMA_QUEUE\.local\.json/i,
     /PUBLIC_AMA_ANSWERS\.local\.json/i,
+    /DELIVERY_REVIEW_CHECKLIST\.local\.json/i,
+    /EVOLUTION_NEXT_ACTION\.local\.md/i,
+    /LIVE_REVIEW_CLOSURE\.local\.json/i,
     /^MEI_/i
   ];
   for (const filePath of walkFiles(outputPath)) {

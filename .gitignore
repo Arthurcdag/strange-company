@@ -43,6 +43,26 @@ PUBLIC_AMA_ANSWERS.*.json
 public-ama-answers.local.js
 !PUBLIC_AMA_ANSWERS.template.json
 
+# Local delivery-review checklist. Keep completed customer delivery evidence private.
+DELIVERY_REVIEW_CHECKLIST.local.json
+DELIVERY_REVIEW_CHECKLIST.*.json
+delivery-review-checklist.local.json
+delivery-review-checklist.*.json
+!DELIVERY_REVIEW_CHECKLIST.template.json
+
+# Local next-action packet. Keep operator working copies private.
+EVOLUTION_NEXT_ACTION.local.md
+EVOLUTION_NEXT_ACTION.*.md
+evolution-next-action.local.md
+evolution-next-action.*.md
+
+# Local live-review closure packet. Keep completed reviewer evidence private.
+LIVE_REVIEW_CLOSURE.local.json
+LIVE_REVIEW_CLOSURE.*.json
+live-review-closure.local.json
+live-review-closure.*.json
+!LIVE_REVIEW_CLOSURE.template.json
+
 # Generated revenue simulation outputs. Do not commit.
 REVENUE_SIMULATION_REPORT.md
 revenue-simulation-report.md

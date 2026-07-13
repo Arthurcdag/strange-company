@@ -40,6 +40,17 @@ class PublicSiteBundleTests(unittest.TestCase):
                 "PUBLIC_AMA.md",
                 "PUBLIC_AMA_QUEUE.template.json",
                 "PUBLIC_AMA_ANSWERS.template.json",
+                "DELIVERY_REVIEW_LOOP.md",
+                "DELIVERY_REVIEW_CHECKLIST.template.json",
+                "LIVE_REVIEW_CLOSURE.template.json",
+                "EVOLUTION_LOG.md",
+                "tools/audit_evolution_log.js",
+                "tools/evolution_goal_status.js",
+                "tools/generate_evolution_next_packet.js",
+                "tools/local_evidence_status.js",
+                "tools/validate_live_review_closure.js",
+                "tools/render_live_review_public_config_patch.js",
+                "tools/validate_delivery_review_checklist.js",
                 "tools/export_public_ama_answers.js",
                 "tools/build_public_site.js",
                 ".nojekyll",
@@ -50,6 +61,9 @@ class PublicSiteBundleTests(unittest.TestCase):
             bundled_names = {path.name for path in output.rglob("*")}
             self.assertNotIn("PUBLIC_AMA_QUEUE.local.json", bundled_names)
             self.assertNotIn("PUBLIC_AMA_ANSWERS.local.json", bundled_names)
+            self.assertNotIn("DELIVERY_REVIEW_CHECKLIST.local.json", bundled_names)
+            self.assertNotIn("EVOLUTION_NEXT_ACTION.local.md", bundled_names)
+            self.assertNotIn("LIVE_REVIEW_CLOSURE.local.json", bundled_names)
 
 
 if __name__ == "__main__":

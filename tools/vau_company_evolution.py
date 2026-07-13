@@ -10,12 +10,19 @@ from typing import Any
 
 
 SYSTEM_NAME = "VAU_COMPANY_EVOLUTION"
+CONTINUOUS_EVOLUTION_OBJECTIVE = (
+    "Continuously evolve Strange Company through the next smallest verified "
+    "improvement while preserving launch gates, public/private separation, "
+    "and the sealed-company boundary."
+)
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PUBLIC_CONFIG = ROOT / "public-config.js"
 DEFAULT_REVIEWER_TRACKER = ROOT / "REVIEWER_CANDIDATE_TRACKER.local.json"
 DEFAULT_REVENUE_EVIDENCE_INDEX = ROOT / "REVENUE_SETUP_EVIDENCE_INDEX.local.json"
 DEFAULT_PUBLIC_AMA_QUEUE = ROOT / "PUBLIC_AMA_QUEUE.local.json"
 DEFAULT_PUBLIC_AMA_ANSWERS = ROOT / "public-ama-answers.js"
+DEFAULT_DELIVERY_REVIEW_CHECKLIST = ROOT / "DELIVERY_REVIEW_CHECKLIST.local.json"
+DEFAULT_LIVE_REVIEW_CLOSURE = ROOT / "LIVE_REVIEW_CLOSURE.local.json"
 
 REVIEWER_REVIEW_STATUSES = {
     "contacted",
@@ -32,6 +39,50 @@ AMA_SCREENED_BOUNDARY_DECISIONS = {
     "public_safe",
     "route_to_human",
     "reject_sensitive",
+}
+LIVE_REVIEW_FIELDS = {
+    "terms": "termsReviewedAt",
+    "privacy": "privacyReviewedAt",
+    "brazilCompliance": "brazilComplianceReviewedAt",
+    "aiHandoff": "aiHandoffReviewedAt",
+}
+LIVE_REVIEW_REQUIRED_DOCUMENTS = {
+    "terms": {"TERMOS.md", "TERMS.md"},
+    "privacy": {"AVISO_DE_PRIVACIDADE.md", "PRIVACY.md"},
+    "brazilCompliance": {
+        "BRAZIL_COMPLIANCE.md",
+        "BRAZIL_COMPLIANCE_AGENTS.md",
+        "CONKA8_LAW_INSTRUCTIONS.md",
+    },
+    "aiHandoff": {"AI_LEGAL_HANDOFF.md", "HUMAN_REVIEW_PACKET.md"},
+}
+LIVE_REVIEW_REQUIRED_FLAGS = {
+    "terms": {
+        "offerFlowReviewed",
+        "refundCancellationReviewed",
+        "supportFlowReviewed",
+        "humanApprovedForPublicConfig",
+    },
+    "privacy": {
+        "lgpdContactReviewed",
+        "retentionReviewed",
+        "processorsReviewed",
+        "dataSubjectRightsReviewed",
+        "humanApprovedForPublicConfig",
+    },
+    "brazilCompliance": {
+        "cnpjOrEntityRouteReviewed",
+        "fiscalReceiptRouteReviewed",
+        "paymentSupportReviewed",
+        "lgpdRouteReviewed",
+        "humanApprovedForPublicConfig",
+    },
+    "aiHandoff": {
+        "aiPreparedTextReviewed",
+        "acceptedChangedOrRejected",
+        "automatedDecisionStopRuleConfirmed",
+        "humanApprovedForPublicConfig",
+    },
 }
 
 
@@ -419,12 +470,89 @@ def infer_public_ama_metrics(
     return len(screened_ids), len(answer_ready_ids), len(published_ids), evidence
 
 
+def infer_delivery_review_loop(
+    checklist_path: Path = DEFAULT_DELIVERY_REVIEW_CHECKLIST,
+) -> tuple[bool, str]:
+    if not checklist_path.exists():
+        return False, ""
+
+    try:
+        data = json.loads(checklist_path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        return False, ""
+
+    if not isinstance(data, dict):
+        return False, ""
+
+    loop = data.get("deliveryLoop")
+    evidence = data.get("evidence")
+    attestation = data.get("attestation")
+    if not isinstance(loop, dict) or not isinstance(evidence, dict) or not isinstance(attestation, dict):
+        return False, ""
+
+    required_loop_fields = {
+        "serviceName",
+        "orderId",
+        "scopeEvidenceRef",
+        "humanReviewer",
+        "humanReviewDate",
+        "deliveryArtifactUrl",
+    }
+    required_evidence_fields = {
+        "intakePacketRef",
+        "sourceOrderRef",
+        "draftArtifactRef",
+        "reviewNotesRef",
+        "finalArtifactRef",
+        "receiptRoot",
+    }
+    required_loop_flags = {
+        "intakeAccepted",
+        "dataBoundaryConfirmed",
+        "aiDraftCreated",
+        "humanReviewCompleted",
+        "revisionsCompleted",
+        "acceptanceCriteriaMet",
+        "receiptChainUpdated",
+        "incidentReviewCompleted",
+        "readyForDelivery",
+    }
+    required_attestation_flags = {
+        "noSecretsInRepo",
+        "noCustomerPrivateDataInRepo",
+        "aiDidNotApproveFinalDelivery",
+        "strangeCompanyRemainsSealed",
+        "satelliteIsDeliveryOperator",
+    }
+
+    if any(_is_blank(loop.get(key)) for key in required_loop_fields):
+        return False, ""
+    if not _is_iso_date(loop.get("humanReviewDate")):
+        return False, ""
+    if not str(loop.get("deliveryArtifactUrl", "")).strip().startswith("https://"):
+        return False, ""
+    if any(loop.get(key) is not True for key in required_loop_flags):
+        return False, ""
+    if any(_is_blank(evidence.get(key)) for key in required_evidence_fields):
+        return False, ""
+    if _is_blank(attestation.get("operator")) or not _is_iso_date(attestation.get("reviewedAt")):
+        return False, ""
+    if any(attestation.get(key) is not True for key in required_attestation_flags):
+        return False, ""
+
+    return (
+        True,
+        f"order:{str(loop.get('orderId')).strip()}; artifact:{str(evidence.get('finalArtifactRef')).strip()}",
+    )
+
+
 def build_current_state(
     public_config: Path = DEFAULT_PUBLIC_CONFIG,
     reviewer_tracker: Path = DEFAULT_REVIEWER_TRACKER,
     revenue_evidence_index: Path = DEFAULT_REVENUE_EVIDENCE_INDEX,
     public_ama_queue: Path = DEFAULT_PUBLIC_AMA_QUEUE,
     public_ama_answers: Path = DEFAULT_PUBLIC_AMA_ANSWERS,
+    delivery_review_checklist: Path = DEFAULT_DELIVERY_REVIEW_CHECKLIST,
 ) -> dict[str, Any]:
     text = public_config.read_text(encoding="utf-8")
     terms_reviewed_at = _read_string_config(text, "termsReviewedAt")
@@ -438,6 +566,9 @@ def build_current_state(
     ama_questions, ama_answers_ready, ama_answers_published, ama_queue_evidence = infer_public_ama_metrics(
         public_ama_queue,
         public_ama_answers,
+    )
+    delivery_review_loop_ready, delivery_review_loop_evidence = infer_delivery_review_loop(
+        delivery_review_checklist
     )
 
     return {
@@ -459,7 +590,7 @@ def build_current_state(
             "humanReviewersReady": reviewers_ready,
             "publicAmaQueueActive": (ama_questions + ama_answers_published) > 0,
             "publicAmaAnswerReady": (ama_answers_ready + ama_answers_published) > 0,
-            "deliveryReviewLoopReady": False,
+            "deliveryReviewLoopReady": delivery_review_loop_ready,
             "liveMode": _read_bool_config(text, "liveMode"),
         },
         "evidence": {
@@ -469,6 +600,7 @@ def build_current_state(
             "aiHandoffReviewedAt": ai_handoff_reviewed_at,
             "privatePaymentFiscalEvidence": payment_fiscal_evidence,
             "publicAmaQueue": ama_queue_evidence,
+            "deliveryReviewLoop": delivery_review_loop_evidence,
         },
         "metrics": {
             "human_reviewers_found": human_reviewers_found,
@@ -505,10 +637,11 @@ def hard_blockers(state: dict[str, Any]) -> list[str]:
 
 
 def operational_blockers(state: dict[str, Any]) -> list[str]:
+    gates = state.get("gates", {})
     blockers = list(hard_blockers(state))
-    if int(get_path(state, "metrics.human_reviewers_found", 0)) < 4:
+    if not gates.get("humanReviewersReady", False):
         blockers.append("4 human reviewers")
-    if not get_path(state, "gates.deliveryReviewLoopReady", False):
+    if not gates.get("deliveryReviewLoopReady", False):
         blockers.append("delivery review loop")
     return blockers
 
@@ -524,6 +657,43 @@ def public_live_ready(state: dict[str, Any]) -> bool:
 
 def company_operational_ready(state: dict[str, Any]) -> bool:
     return public_live_ready(state) and not operational_blockers(state)
+
+
+def continuous_evolution_goal(state: dict[str, Any]) -> dict[str, Any]:
+    hard = hard_blockers(state)
+    operational = operational_blockers(state)
+    gates = state.get("gates", {})
+    public_routes_ready = bool(
+        gates.get("supportInboxVerified", False)
+        and gates.get("googleFormVerified", False)
+    )
+    live_mode = bool(get_path(state, "gates.liveMode", False))
+
+    if hard:
+        mode = "burn_down_hard_blockers"
+        next_loop = "Close one real evidence gate, rerun VAU, and keep liveMode false."
+    elif not public_routes_ready or operational:
+        mode = "harden_operations"
+        next_loop = "Improve public route verification, reviewer capacity, delivery review, or support receipts before scaling."
+    elif live_mode:
+        mode = "operate_measure_adapt"
+        next_loop = "Convert each live outcome into a reviewed receipt, then scale, revise, or kill the lane."
+    else:
+        mode = "ready_for_human_live_decision"
+        next_loop = "Run the live audit and require a human operator decision before flipping liveMode."
+
+    return {
+        "objective": CONTINUOUS_EVOLUTION_OBJECTIVE,
+        "cadence": "Run after each repo change, real-world receipt, blocker, or completed operator action.",
+        "current_mode": mode,
+        "next_loop": next_loop,
+        "guardrails": [
+            "Do not set liveMode true until all hard blockers are closed with real evidence.",
+            "Do not let simulations, templates, or AI outputs claim legal, tax, payment, privacy, or launch approval.",
+            "Keep local evidence, credentials, private reviewer notes, and sealed-company material out of the public repo.",
+            "Every evolution should leave an executable check, receipt, report, or documented next action.",
+        ],
+    }
 
 
 def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
@@ -723,7 +893,11 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
                     "metrics.delivery_capacity": {"op": "increment", "value": 1},
                 },
                 reason="Client work needs intake, AI draft, human review, revision, and receipt steps.",
-                next_action="Convert the human review packet into a repeatable delivery checklist.",
+                next_action=(
+                    "Create DELIVERY_REVIEW_CHECKLIST.local.json, complete one reviewed delivery loop, "
+                    "then run node tools/validate_delivery_review_checklist.js "
+                    "DELIVERY_REVIEW_CHECKLIST.local.json --require-ready."
+                ),
             )
         )
 
@@ -1005,6 +1179,7 @@ def run_cycle(
     )
     result: dict[str, Any] = {
         "system": SYSTEM_NAME,
+        "continuous_evolution_goal": continuous_evolution_goal(current_state),
         "current_state": current_state,
         "hard_blockers": hard_blockers(current_state),
         "operational_blockers": operational_blockers(current_state),
@@ -1026,13 +1201,15 @@ def run_cycle(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run VAU across Strange Company as a whole-company evolution model."
-        " Use --revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json."
+        " Use --revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json and"
+        " --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json."
     )
     parser.add_argument("--public-config", default=str(DEFAULT_PUBLIC_CONFIG))
     parser.add_argument("--reviewer-tracker", default=str(DEFAULT_REVIEWER_TRACKER))
     parser.add_argument("--revenue-evidence-index", default=str(DEFAULT_REVENUE_EVIDENCE_INDEX))
     parser.add_argument("--public-ama-queue", default=str(DEFAULT_PUBLIC_AMA_QUEUE))
     parser.add_argument("--public-ama-answers", default=str(DEFAULT_PUBLIC_AMA_ANSWERS))
+    parser.add_argument("--delivery-review-checklist", default=str(DEFAULT_DELIVERY_REVIEW_CHECKLIST))
     parser.add_argument("--depth", type=int, default=3)
     parser.add_argument("--max-branches-to-keep", type=int, default=8)
     parser.add_argument("--real-event-json")
@@ -1048,6 +1225,7 @@ def main() -> int:
         revenue_evidence_index=Path(args.revenue_evidence_index),
         public_ama_queue=Path(args.public_ama_queue),
         public_ama_answers=Path(args.public_ama_answers),
+        delivery_review_checklist=Path(args.delivery_review_checklist),
     )
     real_event = CompanyEvent.from_dict(json.loads(args.real_event_json)) if args.real_event_json else None
     result = run_cycle(
@@ -1062,6 +1240,15 @@ def main() -> int:
         return 0
 
     print(f"{SYSTEM_NAME}")
+    goal = result["continuous_evolution_goal"]
+    print("Continuous evolution goal:")
+    print(f"- Objective: {goal['objective']}")
+    print(f"- Mode: {goal['current_mode']}")
+    print(f"- Next loop: {goal['next_loop']}")
+    print("- Guardrails:")
+    for guardrail in goal["guardrails"]:
+        print(f"  - {guardrail}")
+    print("")
     print(f"Public live ready: {result['public_live_ready']}")
     print(f"Company operational ready: {result['company_operational_ready']}")
     print("Hard blockers:")

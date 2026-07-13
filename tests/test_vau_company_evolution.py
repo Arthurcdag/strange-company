@@ -10,7 +10,9 @@ from tools.vau_company_evolution import (
     CompanyEvent,
     build_current_state,
     company_operational_ready,
+    continuous_evolution_goal,
     hard_blockers,
+    operational_blockers,
     public_live_ready,
     recommended_next_actions,
     run_cycle,
@@ -77,6 +79,7 @@ TRACKER_TEMPLATE = {
 
 EVIDENCE_INDEX_TEMPLATE = ROOT / "REVENUE_SETUP_EVIDENCE_INDEX.template.json"
 AMA_QUEUE_TEMPLATE = ROOT / "PUBLIC_AMA_QUEUE.template.json"
+DELIVERY_CHECKLIST_TEMPLATE = ROOT / "DELIVERY_REVIEW_CHECKLIST.template.json"
 
 
 def write_public_config(
@@ -206,6 +209,52 @@ def write_public_ama_answers() -> Path:
     return Path(temp.name)
 
 
+def write_delivery_review_checklist(ready: bool = False) -> Path:
+    payload = json.loads(DELIVERY_CHECKLIST_TEMPLATE.read_text(encoding="utf-8"))
+    if ready:
+        payload["mode"] = "local"
+        payload["deliveryLoop"] = {
+            "serviceName": "Compliance proof sprint",
+            "orderId": "order-001",
+            "customerRef": "customer-redacted-001",
+            "scopeEvidenceRef": "scope-001",
+            "intakeAccepted": True,
+            "dataBoundaryConfirmed": True,
+            "aiDraftCreated": True,
+            "humanReviewCompleted": True,
+            "humanReviewer": "Reviewer",
+            "humanReviewDate": "2026-06-12",
+            "revisionsCompleted": True,
+            "acceptanceCriteriaMet": True,
+            "deliveryArtifactUrl": "https://example.com/delivery-artifact",
+            "receiptChainUpdated": True,
+            "incidentReviewCompleted": True,
+            "readyForDelivery": True,
+        }
+        payload["evidence"] = {
+            "intakePacketRef": "intake-001",
+            "sourceOrderRef": "order-001",
+            "draftArtifactRef": "draft-001",
+            "reviewNotesRef": "review-001",
+            "finalArtifactRef": "artifact-001",
+            "receiptRoot": "receipt-root-001",
+            "incidentIds": [],
+        }
+        payload["attestation"] = {
+            "operator": "Operator",
+            "reviewedAt": "2026-06-12",
+            "noSecretsInRepo": True,
+            "noCustomerPrivateDataInRepo": True,
+            "aiDidNotApproveFinalDelivery": True,
+            "strangeCompanyRemainsSealed": True,
+            "satelliteIsDeliveryOperator": True,
+        }
+    temp = tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False)
+    json.dump(payload, temp, ensure_ascii=False, indent=2)
+    temp.close()
+    return Path(temp.name)
+
+
 class VAUCompanyEvolutionTests(unittest.TestCase):
     def test_current_config_state_has_hard_blockers(self) -> None:
         path = write_public_config()
@@ -278,6 +327,31 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         self.assertEqual(state["metrics"]["public_ama_answers_published"], 1)
         self.assertIn("published:1", state["evidence"]["publicAmaQueue"])
 
+    def test_delivery_review_checklist_can_close_delivery_loop_blocker(self) -> None:
+        path = write_public_config()
+        tracker = write_reviewer_tracker([])
+        state = build_current_state(
+            path,
+            tracker,
+            delivery_review_checklist=write_delivery_review_checklist(ready=True),
+        )
+
+        self.assertTrue(state["gates"]["deliveryReviewLoopReady"])
+        self.assertIn("artifact:artifact-001", state["evidence"]["deliveryReviewLoop"])
+        self.assertNotIn("delivery review loop", operational_blockers(state))
+
+    def test_incomplete_delivery_review_checklist_keeps_delivery_loop_blocker(self) -> None:
+        path = write_public_config()
+        tracker = write_reviewer_tracker([])
+        state = build_current_state(
+            path,
+            tracker,
+            delivery_review_checklist=write_delivery_review_checklist(ready=False),
+        )
+
+        self.assertFalse(state["gates"]["deliveryReviewLoopReady"])
+        self.assertIn("delivery review loop", operational_blockers(state))
+
     def test_public_ama_events_progress_from_screening_to_publication(self) -> None:
         path = write_public_config()
         tracker = write_reviewer_tracker([])
@@ -337,6 +411,57 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         self.assertIn("private Stripe/bank/fiscal evidence", joined_actions)
         self.assertFalse(result["public_live_ready"])
 
+    def test_continuous_evolution_goal_keeps_guardrails_visible(self) -> None:
+        path = write_public_config()
+        tracker = write_reviewer_tracker([])
+        state = build_current_state(path, tracker)
+
+        goal = continuous_evolution_goal(state)
+
+        self.assertIn("Continuously evolve Strange Company", goal["objective"])
+        self.assertEqual(goal["current_mode"], "burn_down_hard_blockers")
+        self.assertIn("keep liveMode false", goal["next_loop"])
+        joined_guardrails = "\n".join(goal["guardrails"])
+        self.assertIn("Do not set liveMode true", joined_guardrails)
+        self.assertIn("simulations, templates, or AI outputs", joined_guardrails)
+        self.assertIn("sealed-company material out of the public repo", joined_guardrails)
+        self.assertIn("executable check, receipt, report, or documented next action", joined_guardrails)
+
+    def test_run_cycle_includes_continuous_evolution_goal(self) -> None:
+        path = write_public_config()
+        tracker = write_reviewer_tracker([])
+
+        result = run_cycle(
+            build_current_state(path, tracker),
+            depth=1,
+            max_branches_to_keep=4,
+        )
+
+        self.assertIn("continuous_evolution_goal", result)
+        self.assertEqual(
+            result["continuous_evolution_goal"]["current_mode"],
+            "burn_down_hard_blockers",
+        )
+
+    def test_goal_mode_changes_after_hard_blockers_are_closed(self) -> None:
+        path = write_public_config(
+            terms="2026-05-25",
+            privacy="2026-05-25",
+            brazil="2026-05-25",
+            ai_handoff="2026-05-25",
+        )
+        tracker = write_reviewer_tracker([])
+        state = build_current_state(
+            path,
+            tracker,
+            revenue_evidence_index=write_revenue_evidence_index(ready=True),
+        )
+
+        goal = continuous_evolution_goal(state)
+
+        self.assertEqual(goal["current_mode"], "harden_operations")
+        self.assertIn("reviewer capacity", goal["next_loop"])
+
     def test_local_tracker_increases_reviewer_metric(self) -> None:
         path = write_public_config()
         tracker = write_reviewer_tracker(
@@ -391,6 +516,54 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
 
         self.assertEqual(state["metrics"]["human_reviewers_found"], 4)
         self.assertTrue(state["gates"]["humanReviewersReady"])
+
+    def test_four_contacted_reviewers_do_not_close_ready_pool(self) -> None:
+        roles = [
+            "terms_consumer_law",
+            "privacy_lgpd",
+            "tax_nfse_accounting",
+            "payment_reconciliation",
+        ]
+        tracker = write_reviewer_tracker(
+            [
+                {
+                    "candidateId": f"r{index}",
+                    "candidateLabel": f"Reviewer {index}",
+                    "reviewRole": role,
+                    "contactStatus": "contacted",
+                    "readyForPaidTest": False,
+                }
+                for index, role in enumerate(roles, start=1)
+            ]
+        )
+        state = build_current_state(write_public_config(), tracker)
+
+        self.assertEqual(state["metrics"]["human_reviewers_found"], 4)
+        self.assertFalse(state["gates"]["humanReviewersReady"])
+        self.assertIn("4 human reviewers", operational_blockers(state))
+
+    def test_missing_public_route_stays_in_harden_operations_mode(self) -> None:
+        state = build_current_state(write_public_config(), write_reviewer_tracker([]))
+        state["gates"].update(
+            {
+                "termsReviewed": True,
+                "privacyReviewed": True,
+                "brazilComplianceReviewed": True,
+                "aiHandoffReviewed": True,
+                "privatePaymentFiscalEvidenceReady": True,
+                "humanReviewersReady": True,
+                "deliveryReviewLoopReady": True,
+                "supportInboxVerified": False,
+                "googleFormVerified": True,
+            }
+        )
+        state["metrics"]["human_reviewers_found"] = 4
+
+        goal = continuous_evolution_goal(state)
+
+        self.assertEqual(goal["current_mode"], "harden_operations")
+        self.assertIn("public route verification", goal["next_loop"])
+        self.assertFalse(public_live_ready(state))
 
     def test_revenue_future_only_appears_after_gates_and_reviewers(self) -> None:
         path = write_public_config(

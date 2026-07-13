@@ -76,6 +76,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [REVIEW_READY_PACKET.md](REVIEW_READY_PACKET.md): AI-prepared review brief for the remaining human/legal/compliance sign-off fields.
 - [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md): developer/operator instructions for creating the support inbox, Google Form, Sheet ledger, review dates, Stripe invoice route, and bank evidence.
 - [HUMAN_REVIEW_PACKET.md](HUMAN_REVIEW_PACKET.md): AI-prepared packet for the manual human/legal/accounting/payment evidence needed before live intake.
+- [LIVE_REVIEW_CLOSURE.template.json](LIVE_REVIEW_CLOSURE.template.json): blank local packet for closing the four public review-date blockers while keeping `liveMode` false.
 - [CONKA8_LAW_INSTRUCTIONS.md](CONKA8_LAW_INSTRUCTIONS.md): law-sensitive operating instructions for conka8, including AI/human boundaries and launch stop rules.
 - [REVENUE_PILOT.md](REVENUE_PILOT.md): how the prototype moves toward the first controlled paid offer.
 - [SATELLITE_COMPANY.md](SATELLITE_COMPANY.md): how a separate for-profit company can net profit without breaking the sealed Strange Company charter.
@@ -93,6 +94,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [REVENUE_SIMULATION.md](REVENUE_SIMULATION.md): simulator usage and boundary; the simulator demonstrates how the first and second services would generate value without closing any real gate.
 - [ORDER_DESK.md](ORDER_DESK.md): how public invoice requests become manual order packets.
 - [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md): the manual order, invoice, payment, delivery, and receipt loop for the first functional operator.
+- [DELIVERY_REVIEW_LOOP.md](DELIVERY_REVIEW_LOOP.md): repeatable local checklist for moving one scoped delivery through AI draft, human review, artifact, incident review, and receipt update.
 - [OPERATIONS_START_PACKET.md](OPERATIONS_START_PACKET.md): current start sequence and evidence checklist for opening live intake.
 - [RUN_LIVE_PILOT.md](RUN_LIVE_PILOT.md): operational v1 daily loop for the Brazil-first manual paid pilot (CNPJ/operator, NFS-e, payment route, Sheet ledger).
 - [BRAZIL_COMPLIANCE.md](BRAZIL_COMPLIANCE.md): Brazil legal, LGPD, consumer-law, tax, payment, and AI-use gate for launch.
@@ -117,6 +119,8 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [OUTCOME_REVIEW.md](OUTCOME_REVIEW.md): how outcome evidence must be reviewed before routing into Treasury or cooldown lanes.
 - [CAPITAL_ROUTER.md](CAPITAL_ROUTER.md): how outcomes draft follow-on proposals or cool down weak spend lanes.
 - [RECEIPT_CHAIN.md](RECEIPT_CHAIN.md): how material state changes become a local tamper-evident proof chain.
+- [EVOLUTION_LOG.md](EVOLUTION_LOG.md): public-safe log of repo evolution passes and validation evidence.
+- [VAU_COMPANY_EVOLUTION.md](VAU_COMPANY_EVOLUTION.md): the standing continuous-evolution goal, guardrails, modes, and VAU commands for choosing the next verified improvement.
 - [VAU_SIM_TO_REAL_RATIONALE.md](VAU_SIM_TO_REAL_RATIONALE.md): why VAU uses many imperfect futures, how sim-to-real transfer is gated, and when evolutionary search is preferred over RL.
 
 ## Prototype
@@ -128,9 +132,16 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [tools/build_public_site.js](tools/build_public_site.js): cross-platform builder/checker for the GitHub Pages public bundle.
 - [tools/preflight_public_launch.js](tools/preflight_public_launch.js): launch preflight for public/private separation, URL allowlists, live-mode config, and sensitive-data guard coverage.
 - [tools/audit_company_functionality.js](tools/audit_company_functionality.js): repo-level audit for Strange Company, the satellite operator, and the external live-operation gate.
+- [tools/audit_evolution_log.js](tools/audit_evolution_log.js): public-safe audit for `EVOLUTION_LOG.md`, requiring objective, changed artifacts, verification commands, and a result for each evolution pass.
+- [tools/evolution_goal_status.js](tools/evolution_goal_status.js): public-safe active-goal status report for current mode, live/revenue blockers, local evidence matrix, review-closure workflow, latest logged pass, and next actions.
+- [tools/generate_evolution_next_packet.js](tools/generate_evolution_next_packet.js): local packet generator for `EVOLUTION_NEXT_ACTION.local.md`, translating current status into a hard-blocker burn-down checklist.
+- [tools/local_evidence_status.js](tools/local_evidence_status.js): public-safe status report for ignored local evidence lanes; it reports missing, partial, ready, or invalid packets without printing private packet contents.
 - [tools/survival_check.js](tools/survival_check.js): survival drill that confirms the charter, resilience model, receipt chain, Brazil/AI gates, public/private boundary, and expected live-gate behavior still hold.
 - [tools/google_apps_script_create_intake_form.gs](tools/google_apps_script_create_intake_form.gs): Apps Script builder for creating the Google Form intake and linking it to the private Sheet ledger.
 - [tools/draft_external_live_packet.js](tools/draft_external_live_packet.js): public-config-to-local-packet draft generator for `EXTERNAL_LIVE_PACKET.local.json`.
+- [tools/draft_live_review_closure.js](tools/draft_live_review_closure.js): local draft generator for `LIVE_REVIEW_CLOSURE.local.json`, covering only the four public review-date blockers.
+- [tools/validate_live_review_closure.js](tools/validate_live_review_closure.js): local validator for the ignored live-review closure packet; use `--require-ready` before copying review dates into `public-config.js`.
+- [tools/render_live_review_public_config_patch.js](tools/render_live_review_public_config_patch.js): renders the public-safe review-date patch from a ready `LIVE_REVIEW_CLOSURE.local.json` while keeping `liveMode` false.
 - [tools/draft_reviewer_candidate_tracker.js](tools/draft_reviewer_candidate_tracker.js): local draft generator for `REVIEWER_CANDIDATE_TRACKER.local.json`.
 - [tools/draft_revenue_setup_evidence_index.js](tools/draft_revenue_setup_evidence_index.js): local draft generator for `REVENUE_SETUP_EVIDENCE_INDEX.local.json`.
 - [tools/draft_public_ama_queue.js](tools/draft_public_ama_queue.js): local draft generator for `PUBLIC_AMA_QUEUE.local.json`.
@@ -140,6 +151,8 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [tools/check_external_live_packet_gate.js](tools/check_external_live_packet_gate.js): regression guard proving otherwise-complete live packets cannot pass without Brazil compliance and AI handoff review dates.
 - [tools/validate_reviewer_candidate_tracker.js](tools/validate_reviewer_candidate_tracker.js): local validator for the ignored reviewer-candidate tracker; use `--require-one` for the first contacted candidate and `--require-ready` for the four-role paid-test-ready pool.
 - [tools/validate_revenue_setup_evidence_index.js](tools/validate_revenue_setup_evidence_index.js): local validator for the ignored revenue setup evidence index; use `--require-*` gates for each gate and `--require-all` when closing payment/fiscal readiness.
+- [tools/draft_delivery_review_checklist.js](tools/draft_delivery_review_checklist.js): local draft generator for `DELIVERY_REVIEW_CHECKLIST.local.json`.
+- [tools/validate_delivery_review_checklist.js](tools/validate_delivery_review_checklist.js): local validator for the ignored delivery review checklist; use `--require-ready` after one reviewed delivery loop is complete.
 - [tools/validate_public_ama_queue.js](tools/validate_public_ama_queue.js): local validator for the ignored AMA queue; use `--require-one` for the first screened question and `--require-answer-ready` before publishing an answer.
 - [tools/simulate_revenue_scenarios.js](tools/simulate_revenue_scenarios.js): simulated customer scenarios for the satellite revenue lane; see [REVENUE_SIMULATION.md](REVENUE_SIMULATION.md).
 - [EXTERNAL_LIVE_PACKET.template.json](EXTERNAL_LIVE_PACKET.template.json): safe blank template for live-intake evidence; completed copies stay local and ignored.
@@ -153,8 +166,18 @@ Before turning on `liveMode` or merging public config changes, run:
 
 ```bash
 node tools/preflight_public_launch.js
+node tools/audit_evolution_log.js
+node tools/evolution_goal_status.js --json
+node tools/local_evidence_status.js --json
+node tools/generate_evolution_next_packet.js
 node tools/build_public_site.js --check --output .public-site-build.local --force
 node tools/survival_check.js
+```
+
+To see which ignored local evidence lanes are missing, partial, ready, or invalid without printing private packet contents, run:
+
+```bash
+node tools/local_evidence_status.js --json
 ```
 
 To burn down the reviewer-capacity blocker without faking evidence, create `REVIEWER_CANDIDATE_TRACKER.local.json` from the template and run:
@@ -183,6 +206,14 @@ node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-tax
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all
 python tools/vau_company_evolution.py --revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --depth 1
+```
+
+To close the repeatable delivery-review loop without exposing customer evidence, complete `DELIVERY_REVIEW_CHECKLIST.local.json` from `DELIVERY_REVIEW_CHECKLIST.template.json`:
+
+```bash
+node tools/draft_delivery_review_checklist.js --write-local
+node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+python tools/vau_company_evolution.py --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --depth 1
 ```
 
 Pull requests also run the same syntax and public launch preflight checks through the `Validate static site` workflow.

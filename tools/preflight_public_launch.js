@@ -1041,6 +1041,246 @@ function checkRevenueSetupEvidenceIndexContract() {
   }
 }
 
+function checkDeliveryReviewChecklistContract() {
+  const readme = read("README.md");
+  const runbook = read("OPERATIONS_RUNBOOK.md");
+  const deliveryLoop = read("DELIVERY_REVIEW_LOOP.md");
+  const template = read("DELIVERY_REVIEW_CHECKLIST.template.json");
+  const draft = read("tools/draft_delivery_review_checklist.js");
+  const validator = read("tools/validate_delivery_review_checklist.js");
+  const gitignore = read(".gitignore");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+  const pagesWorkflow = read(".github/workflows/pages.yml");
+  const builder = read("tools/build_public_site.js");
+  const vauCompany = read("tools/vau_company_evolution.py");
+
+  const required = [
+    ["README delivery loop doc link", readme, "DELIVERY_REVIEW_LOOP.md"],
+    ["README delivery checklist template", readme, "DELIVERY_REVIEW_CHECKLIST.template.json"],
+    ["README delivery draft tool", readme, "tools/draft_delivery_review_checklist.js"],
+    ["README delivery validator", readme, "tools/validate_delivery_review_checklist.js"],
+    ["runbook delivery checklist section", runbook, "Delivery Review Checklist"],
+    ["runbook delivery validator command", runbook, "node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready"],
+    ["delivery loop local checklist command", deliveryLoop, "node tools/draft_delivery_review_checklist.js --write-local"],
+    ["delivery loop ready validator command", deliveryLoop, "node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready"],
+    ["delivery loop VAU command", deliveryLoop, "--delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json"],
+    ["delivery template schema", template, '"schemaVersion": 1'],
+    ["delivery template loop section", template, '"deliveryLoop"'],
+    ["delivery template evidence section", template, '"evidence"'],
+    ["delivery template attestation", template, '"noCustomerPrivateDataInRepo": true'],
+    ["delivery draft local target", draft, "DELIVERY_REVIEW_CHECKLIST.local.json"],
+    ["delivery draft no secrets instruction", draft, "Do not store customer-private documents"],
+    ["delivery validator failure header", validator, "Delivery review checklist validation failed"],
+    ["delivery validator ready gate", validator, "--require-ready"],
+    ["delivery validator artifact URL gate", validator, "deliveryArtifactUrl must be an https:// URL"],
+    ["delivery local checklist ignored", gitignore, "DELIVERY_REVIEW_CHECKLIST.local.json"],
+    ["delivery template unignored", gitignore, "!DELIVERY_REVIEW_CHECKLIST.template.json"],
+    ["delivery draft syntax check", validateWorkflow, "node --check tools/draft_delivery_review_checklist.js"],
+    ["delivery validator syntax check", validateWorkflow, "node --check tools/validate_delivery_review_checklist.js"],
+    ["delivery validator CI template check", validateWorkflow, "node tools/validate_delivery_review_checklist.js --template-ok"],
+    ["delivery pages template check", pagesWorkflow, "node tools/validate_delivery_review_checklist.js --template-ok"],
+    ["delivery pages template copy", builder, "DELIVERY_REVIEW_CHECKLIST.template.json"],
+    ["delivery pages validator copy", builder, "tools/validate_delivery_review_checklist.js"],
+    ["delivery local file forbidden from bundle", builder, "DELIVERY_REVIEW_CHECKLIST\\.local\\.json"],
+    ["VAU delivery checklist default", vauCompany, "DEFAULT_DELIVERY_REVIEW_CHECKLIST"],
+    ["VAU delivery checklist argument", vauCompany, "--delivery-review-checklist"],
+    ["VAU delivery loop evidence", vauCompany, "deliveryReviewLoopReady"],
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
+function checkEvolutionLogAuditContract() {
+  const readme = read("README.md");
+  const evolutionLog = read("EVOLUTION_LOG.md");
+  const audit = read("tools/audit_evolution_log.js");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+  const pagesWorkflow = read(".github/workflows/pages.yml");
+  const builder = read("tools/build_public_site.js");
+  const survival = read("tools/survival_check.js");
+
+  const required = [
+    ["README evolution log link", readme, "EVOLUTION_LOG.md"],
+    ["README evolution audit tool", readme, "tools/audit_evolution_log.js"],
+    ["evolution log public-safe boundary", evolutionLog, "public-safe repo evolution passes"],
+    ["evolution log continuous goal entry", evolutionLog, "Continuous VAU Goal"],
+    ["evolution log delivery entry", evolutionLog, "Delivery Review Loop"],
+    ["evolution log audit entry", evolutionLog, "Evolution Pass Audit"],
+    ["audit failure header", audit, "Evolution log audit failed"],
+    ["audit required objective", audit, "Objective"],
+    ["audit required changed artifacts", audit, "Changed"],
+    ["audit required verified commands", audit, "Verified with"],
+    ["audit required result", audit, "Result"],
+    ["audit private data guard", audit, "forbidden approval or private-data claim"],
+    ["audit syntax workflow", validateWorkflow, "node --check tools/audit_evolution_log.js"],
+    ["audit execution workflow", validateWorkflow, "node tools/audit_evolution_log.js"],
+    ["audit pages workflow", pagesWorkflow, "node tools/audit_evolution_log.js"],
+    ["audit public bundle copy", builder, "tools/audit_evolution_log.js"],
+    ["audit public bundle log copy", builder, "EVOLUTION_LOG.md"],
+    ["audit survival check", survival, "Evolution Pass Audit"],
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
+function checkEvolutionGoalStatusContract() {
+  const readme = read("README.md");
+  const evolutionLog = read("EVOLUTION_LOG.md");
+  const statusTool = read("tools/evolution_goal_status.js");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+  const pagesWorkflow = read(".github/workflows/pages.yml");
+  const builder = read("tools/build_public_site.js");
+  const survival = read("tools/survival_check.js");
+
+  const required = [
+    ["README evolution status tool", readme, "tools/evolution_goal_status.js"],
+    ["README evolution status command", readme, "node tools/evolution_goal_status.js --json"],
+    ["evolution log status entry", evolutionLog, "Evolution Status Report"],
+    ["status system name", statusTool, "STRANGE_COMPANY_EVOLUTION_STATUS"],
+    ["status active goal", statusTool, 'goalStatus: "active"'],
+    ["status hard blocker mode", statusTool, "burn_down_hard_blockers"],
+    ["status revenue blocker", statusTool, "privatePaymentFiscalEvidence"],
+    ["status review closure actions", statusTool, "reviewClosureActions"],
+    ["status review closure local packet", statusTool, "LIVE_REVIEW_CLOSURE.local.json"],
+    ["status review closure renderer", statusTool, "render_live_review_public_config_patch.js"],
+    ["status local evidence command", statusTool, "tools/local_evidence_status.js"],
+    ["status local evidence summary", statusTool, "localEvidence"],
+    ["status local evidence dir override", statusTool, "--local-evidence-dir"],
+    ["status latest pass parsing", statusTool, "latestPass"],
+    ["status syntax workflow", validateWorkflow, "node --check tools/evolution_goal_status.js"],
+    ["status execution workflow", validateWorkflow, "node tools/evolution_goal_status.js --json"],
+    ["status pages workflow", pagesWorkflow, "node tools/evolution_goal_status.js --json"],
+    ["status public bundle copy", builder, "tools/evolution_goal_status.js"],
+    ["status survival check", survival, "STRANGE_COMPANY_EVOLUTION_STATUS"],
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
+function checkEvolutionNextPacketContract() {
+  const readme = read("README.md");
+  const evolutionLog = read("EVOLUTION_LOG.md");
+  const generator = read("tools/generate_evolution_next_packet.js");
+  const gitignore = read(".gitignore");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+  const pagesWorkflow = read(".github/workflows/pages.yml");
+  const builder = read("tools/build_public_site.js");
+  const survival = read("tools/survival_check.js");
+
+  const required = [
+    ["README next packet tool", readme, "tools/generate_evolution_next_packet.js"],
+    ["README next packet command", readme, "node tools/generate_evolution_next_packet.js"],
+    ["evolution log next packet entry", evolutionLog, "Evolution Next Action Packet"],
+    ["next packet local target", generator, "EVOLUTION_NEXT_ACTION.local.md"],
+    ["next packet status source", generator, "tools/evolution_goal_status.js"],
+    ["next packet review closure section", generator, "Review Closure Workflow"],
+    ["next packet review closure source", generator, "reviewClosureActions"],
+    ["next packet local evidence section", generator, "Local Evidence Matrix"],
+    ["next packet local evidence validation command", generator, "node tools/local_evidence_status.js --json"],
+    ["next packet stop liveMode", generator, "Do not set `liveMode: true`"],
+    ["next packet no private data", generator, "Do not put CPF, CNPJ, bank data"],
+    ["next packet local ignored", gitignore, "EVOLUTION_NEXT_ACTION.local.md"],
+    ["next packet syntax workflow", validateWorkflow, "node --check tools/generate_evolution_next_packet.js"],
+    ["next packet execution workflow", validateWorkflow, "node tools/generate_evolution_next_packet.js"],
+    ["next packet pages workflow", pagesWorkflow, "node tools/generate_evolution_next_packet.js"],
+    ["next packet public bundle copy", builder, "tools/generate_evolution_next_packet.js"],
+    ["next packet local file forbidden from bundle", builder, "EVOLUTION_NEXT_ACTION\\.local\\.md"],
+    ["next packet survival check", survival, "Evolution Next Action Packet"],
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
+function checkLocalEvidenceStatusContract() {
+  const readme = read("README.md");
+  const evolutionLog = read("EVOLUTION_LOG.md");
+  const statusTool = read("tools/local_evidence_status.js");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+  const pagesWorkflow = read(".github/workflows/pages.yml");
+  const builder = read("tools/build_public_site.js");
+  const survival = read("tools/survival_check.js");
+
+  const required = [
+    ["README local evidence status tool", readme, "tools/local_evidence_status.js"],
+    ["README local evidence status command", readme, "node tools/local_evidence_status.js --json"],
+    ["evolution log local evidence entry", evolutionLog, "Local Evidence Status Matrix"],
+    ["local evidence status system name", statusTool, "STRANGE_COMPANY_LOCAL_EVIDENCE_STATUS"],
+    ["local evidence status local dir override", statusTool, "--local-dir"],
+    ["local evidence status live review lane", statusTool, "LIVE_REVIEW_CLOSURE.local.json"],
+    ["local evidence status revenue lane", statusTool, "REVENUE_SETUP_EVIDENCE_INDEX.local.json"],
+    ["local evidence status validator stderr guard", statusTool, "without printing ignored packet contents or validator stderr"],
+    ["local evidence status syntax workflow", validateWorkflow, "node --check tools/local_evidence_status.js"],
+    ["local evidence status execution workflow", validateWorkflow, "node tools/local_evidence_status.js --json"],
+    ["local evidence status pages workflow", pagesWorkflow, "node tools/local_evidence_status.js --json"],
+    ["local evidence status public bundle copy", builder, "tools/local_evidence_status.js"],
+    ["local evidence status survival check", survival, "STRANGE_COMPANY_LOCAL_EVIDENCE_STATUS"],
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
+function checkLiveReviewClosureContract() {
+  const readme = read("README.md");
+  const humanReview = read("HUMAN_REVIEW_PACKET.md");
+  const evolutionLog = read("EVOLUTION_LOG.md");
+  const template = read("LIVE_REVIEW_CLOSURE.template.json");
+  const draft = read("tools/draft_live_review_closure.js");
+  const renderer = read("tools/render_live_review_public_config_patch.js");
+  const validator = read("tools/validate_live_review_closure.js");
+  const gitignore = read(".gitignore");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+  const pagesWorkflow = read(".github/workflows/pages.yml");
+  const builder = read("tools/build_public_site.js");
+  const survival = read("tools/survival_check.js");
+
+  const required = [
+    ["README live review template", readme, "LIVE_REVIEW_CLOSURE.template.json"],
+    ["README live review draft tool", readme, "tools/draft_live_review_closure.js"],
+    ["README live review validator", readme, "tools/validate_live_review_closure.js"],
+    ["README live review renderer", readme, "tools/render_live_review_public_config_patch.js"],
+    ["human review live closure local packet", humanReview, "LIVE_REVIEW_CLOSURE.local.json"],
+    ["human review live closure ready command", humanReview, "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready"],
+    ["human review live closure render command", humanReview, "node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json"],
+    ["evolution log live review entry", evolutionLog, "Live Review Closure Packet"],
+    ["live review template schema", template, '"schemaVersion": 1'],
+    ["live review template gates", template, '"reviewGates"'],
+    ["live review template keeps liveMode false", template, '"liveMode": false'],
+    ["live review draft local target", draft, "LIVE_REVIEW_CLOSURE.local.json"],
+    ["live review draft stop liveMode", draft, "Do not use this packet to set liveMode true."],
+    ["live review renderer system name", renderer, "LIVE_REVIEW_PUBLIC_CONFIG_PATCH"],
+    ["live review renderer validates ready packet", renderer, "validate_live_review_closure.js"],
+    ["live review renderer keeps liveMode false", renderer, "liveModeRemainsFalse"],
+    ["live review validator ready gate", validator, "--require-ready"],
+    ["live review validator keeps liveMode false", validator, "liveMode must remain false"],
+    ["live review local ignored", gitignore, "LIVE_REVIEW_CLOSURE.local.json"],
+    ["live review template unignored", gitignore, "!LIVE_REVIEW_CLOSURE.template.json"],
+    ["live review draft syntax workflow", validateWorkflow, "node --check tools/draft_live_review_closure.js"],
+    ["live review renderer syntax workflow", validateWorkflow, "node --check tools/render_live_review_public_config_patch.js"],
+    ["live review validator syntax workflow", validateWorkflow, "node --check tools/validate_live_review_closure.js"],
+    ["live review validator CI template check", validateWorkflow, "node tools/validate_live_review_closure.js --template-ok"],
+    ["live review pages template check", pagesWorkflow, "node tools/validate_live_review_closure.js --template-ok"],
+    ["live review public bundle copy", builder, "LIVE_REVIEW_CLOSURE.template.json"],
+    ["live review validator public bundle copy", builder, "tools/validate_live_review_closure.js"],
+    ["live review renderer public bundle copy", builder, "tools/render_live_review_public_config_patch.js"],
+    ["live review local file forbidden from bundle", builder, "LIVE_REVIEW_CLOSURE\\.local\\.json"],
+    ["live review survival check", survival, "Live Review Closure Packet"],
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
 function checkConfig() {
   const config = loadPublicConfig();
   const formUrl = String(config.googleFormUrl || "").trim();
@@ -1099,10 +1339,17 @@ compileJavaScript("public-ama-answers.js");
 compileJavaScript("public.js");
 compileJavaScript("script.js");
 compileJavaScript("tools/audit_company_functionality.js");
+compileJavaScript("tools/audit_evolution_log.js");
+compileJavaScript("tools/evolution_goal_status.js");
+compileJavaScript("tools/generate_evolution_next_packet.js");
+compileJavaScript("tools/local_evidence_status.js");
+compileJavaScript("tools/draft_live_review_closure.js");
+compileJavaScript("tools/render_live_review_public_config_patch.js");
 compileJavaScript("tools/build_public_site.js");
 compileJavaScript("tools/draft_external_live_packet.js");
 compileJavaScript("tools/generate_external_live_gap_packet.js");
 compileJavaScript("tools/validate_external_live_packet.js");
+compileJavaScript("tools/validate_live_review_closure.js");
 compileJavaScript("tools/check_external_live_packet_gate.js");
 compileJavaScript("tools/validate_reviewer_candidate_tracker.js");
 compileJavaScript("tools/draft_reviewer_candidate_tracker.js");
@@ -1111,6 +1358,8 @@ compileJavaScript("tools/validate_revenue_setup_evidence_index.js");
 compileJavaScript("tools/draft_public_ama_queue.js");
 compileJavaScript("tools/export_public_ama_answers.js");
 compileJavaScript("tools/validate_public_ama_queue.js");
+compileJavaScript("tools/draft_delivery_review_checklist.js");
+compileJavaScript("tools/validate_delivery_review_checklist.js");
 checkExternalLivePacketGate();
 checkPublicSurface();
 checkPrivateUrlAllowlists();
@@ -1127,6 +1376,12 @@ checkBrazilComplianceContract();
 checkReviewerCandidateContract();
 checkPublicAmaQueueContract();
 checkRevenueSetupEvidenceIndexContract();
+checkDeliveryReviewChecklistContract();
+checkEvolutionLogAuditContract();
+checkEvolutionGoalStatusContract();
+checkEvolutionNextPacketContract();
+checkLocalEvidenceStatusContract();
+checkLiveReviewClosureContract();
 checkConfig();
 
 if (failures.length) {

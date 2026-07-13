@@ -171,6 +171,22 @@ The order card shows the timeline (`Sent / Paid / Delivered` with dates), the ar
 
 The receipt-chain canonical form now carries `invoiceSentAt`, `paidAt`, `deliveredAt`, `deliveryArtifactUrl`, `acceptanceNote`, and `incidentIds` on every Order receipt. Sealing the chain after a transition preserves the proof that the gate was satisfied.
 
+## Delivery Review Checklist
+
+The repeatable delivery loop is tracked by [DELIVERY_REVIEW_LOOP.md](DELIVERY_REVIEW_LOOP.md) and the blank [DELIVERY_REVIEW_CHECKLIST.template.json](DELIVERY_REVIEW_CHECKLIST.template.json).
+
+Completed delivery evidence stays local as `DELIVERY_REVIEW_CHECKLIST.local.json`. The checklist is ready only after one scoped delivery has accepted intake, confirmed the data boundary, produced an AI draft, passed human review, completed revisions, met acceptance criteria, attached an `https://` delivery artifact, reviewed incidents, updated the receipt chain, and attested that no customer-private data or secrets were committed.
+
+Validate the local loop before letting VAU count it:
+
+```bash
+node tools/draft_delivery_review_checklist.js --write-local
+node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+python tools/vau_company_evolution.py --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --depth 1
+```
+
+This checklist proves repeatability of one manual delivery loop. It does not close payment, tax, legal, privacy, Brazil compliance, or live-intake gates.
+
 ### Receipt Chain Timeline Panel
 
 Every order card includes a collapsed `Receipt chain timeline` panel under the action buttons. Expanding it reveals every state transition recorded for that order in chronological order. Each event shows:

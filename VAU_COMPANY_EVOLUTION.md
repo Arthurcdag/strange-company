@@ -13,6 +13,26 @@ The company-level loop models:
 - revenue pilot flow
 - support, tooling, and risk pressure
 
+## Standing Goal
+
+VAU has one persistent company-evolution objective:
+
+```text
+Continuously evolve Strange Company through the next smallest verified improvement while preserving launch gates, public/private separation, and the sealed-company boundary.
+```
+
+Each run prints the current evolution mode, the next loop, and the guardrails.
+The current mode changes with evidence:
+
+- `burn_down_hard_blockers`: real legal, tax, payment, privacy, Brazil, or AI handoff evidence is still missing.
+- `harden_operations`: hard blockers are closed, but reviewer capacity, delivery review, or support receipts still need hardening.
+- `ready_for_human_live_decision`: the system looks ready, but a human still has to decide before `liveMode` changes.
+- `operate_measure_adapt`: live operation is already on, so every outcome must become a reviewed receipt before scaling.
+
+Constant evolution does not mean constant launch. If evidence is missing, the
+correct evolution is to preserve `liveMode: false`, make one verified
+improvement, and rerun the loop.
+
 ## Run
 
 Use the local Python available on this machine:
@@ -25,6 +45,14 @@ JSON output:
 
 ```powershell
 & 'C:\Program Files\LibreOffice\program\python.exe' tools\vau_company_evolution.py --format json
+```
+
+When a reviewed delivery loop exists locally, pass it explicitly:
+
+```powershell
+& 'C:\Program Files\LibreOffice\program\python.exe' tools\vau_company_evolution.py `
+  --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json `
+  --depth 1
 ```
 
 ## Rules
@@ -42,7 +70,7 @@ Hard blockers remain hard:
 Operational blockers also matter before scaling:
 
 - 4 human reviewers
-- repeatable delivery review loop
+- repeatable delivery review loop, validated with `node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready`
 
 If these are not complete, the correct VAU evolution is to keep `liveMode`
 closed and burn down blockers.

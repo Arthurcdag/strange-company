@@ -50,6 +50,9 @@ const ASSUMED_PROVIDER_FEE = {
   notes:
     "Placeholder Stripe Brazil hosted-invoice rate for simulation only. Verify with the accountant and the provider dashboard before live launch."
 };
+const SIMULATION_REVIEW_DATE = "2026-06-12";
+const SIMULATION_GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/simulated/viewform";
+const SIMULATION_GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/simulated";
 
 const SCENARIOS = [
   {
@@ -363,9 +366,9 @@ function buildSimulatedEvidenceIndex(byService, totalsSummary) {
       entityEvidenceId: "sim-entity-001",
       cnpjOrRoute: "sim-cnpj-route",
       reviewerName: "sim-lawyer",
-      reviewDate: "sim-YYYY-MM-DD",
+      reviewDate: SIMULATION_REVIEW_DATE,
       allowedToInvoiceServices: true,
-      blockers: "",
+      blockers: "simulated-only-not-real-evidence",
       verified: false
     },
     tax: {
@@ -376,7 +379,7 @@ function buildSimulatedEvidenceIndex(byService, totalsSummary) {
       municipalRegistrationNeeded: false,
       fiscalDocumentOwner: "sim-fiscal-owner",
       testNfseOrReceiptStatus: "sim-test-receipt-issued",
-      accountantReviewedAt: "sim-YYYY-MM-DD",
+      accountantReviewedAt: SIMULATION_REVIEW_DATE,
       monthlyReconciliationOwner: "sim-reconciliation-owner",
       verified: false
     },
@@ -397,8 +400,8 @@ function buildSimulatedEvidenceIndex(byService, totalsSummary) {
     support: {
       supportEvidenceId: "sim-support-001",
       supportEmail: "sim-support@example.invalid",
-      testSentAt: "sim-YYYY-MM-DD",
-      testReceivedAt: "sim-YYYY-MM-DD",
+      testSentAt: SIMULATION_REVIEW_DATE,
+      testReceivedAt: SIMULATION_REVIEW_DATE,
       dailyCheckTime: "sim-09:00 BRT",
       incidentOwner: "sim-incident-owner",
       refundOwner: "sim-refund-owner",
@@ -407,7 +410,7 @@ function buildSimulatedEvidenceIndex(byService, totalsSummary) {
     },
     privacy: {
       privacyEvidenceId: "sim-privacy-001",
-      privacyReviewedAt: "sim-YYYY-MM-DD",
+      privacyReviewedAt: SIMULATION_REVIEW_DATE,
       lgpdContact: "sim-lgpd-contact",
       processorListLocation: "sim-processor-list",
       retentionDecision: "sim-retention-30d",
@@ -417,7 +420,7 @@ function buildSimulatedEvidenceIndex(byService, totalsSummary) {
     },
     terms: {
       termsEvidenceId: "sim-terms-001",
-      termsReviewedAt: "sim-YYYY-MM-DD",
+      termsReviewedAt: SIMULATION_REVIEW_DATE,
       reviewer: "sim-lawyer",
       refundPath: "sim-refund-path",
       cancellationPath: "sim-cancellation-path",
@@ -427,8 +430,8 @@ function buildSimulatedEvidenceIndex(byService, totalsSummary) {
     },
     ledger: {
       ledgerEvidenceId: "sim-ledger-001",
-      googleFormUrl: "sim-google-form-url",
-      googleSheetUrl: "sim-google-sheet-url",
+      googleFormUrl: SIMULATION_GOOGLE_FORM_URL,
+      googleSheetUrl: SIMULATION_GOOGLE_SHEET_URL,
       testSubmissionId: "sim-submission-001",
       tabsVerified: true,
       columnNamesVerified: true,
@@ -440,7 +443,7 @@ function buildSimulatedEvidenceIndex(byService, totalsSummary) {
       operatorName: "Strange Works Studio",
       jurisdiction: "BR",
       supportEmail: "sim-support@example.invalid",
-      googleFormUrl: "sim-google-form-url",
+      googleFormUrl: SIMULATION_GOOGLE_FORM_URL,
       supportInboxVerified: false,
       googleFormVerified: false,
       termsReviewedAt: "",
@@ -451,7 +454,7 @@ function buildSimulatedEvidenceIndex(byService, totalsSummary) {
     },
     attestation: {
       operator: "sim-operator",
-      reviewedAt: "sim-YYYY-MM-DD",
+      reviewedAt: SIMULATION_REVIEW_DATE,
       noSecretsInRepo: true,
       strangeCompanyRemainsSealed: true,
       satelliteIsRevenueOperator: true,

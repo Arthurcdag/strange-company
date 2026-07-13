@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "mode": "template",
+  "generatedAt": "",
+  "sourceTemplate": "DELIVERY_REVIEW_CHECKLIST.template.json",
+  "deliveryLoop": {
+    "serviceName": "",
+    "orderId": "",
+    "customerRef": "",
+    "scopeEvidenceRef": "",
+    "intakeAccepted": false,
+    "dataBoundaryConfirmed": false,
+    "aiDraftCreated": false,
+    "humanReviewCompleted": false,
+    "humanReviewer": "",
+    "humanReviewDate": "",
+    "revisionsCompleted": false,
+    "acceptanceCriteriaMet": false,
+    "deliveryArtifactUrl": "",
+    "receiptChainUpdated": false,
+    "incidentReviewCompleted": false,
+    "readyForDelivery": false
+  },
+  "evidence": {
+    "intakePacketRef": "",
+    "sourceOrderRef": "",
+    "draftArtifactRef": "",
+    "reviewNotesRef": "",
+    "finalArtifactRef": "",
+    "receiptRoot": "",
+    "incidentIds": []
+  },
+  "attestation": {
+    "operator": "",
+    "reviewedAt": "",
+    "noSecretsInRepo": true,
+    "noCustomerPrivateDataInRepo": true,
+    "aiDidNotApproveFinalDelivery": true,
+    "strangeCompanyRemainsSealed": true,
+    "satelliteIsDeliveryOperator": true
+  }
+}

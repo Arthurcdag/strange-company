@@ -35,6 +35,12 @@ jobs:
       - name: Run public launch preflight
         run: |
           node tools/validate_external_live_packet.js --template-ok
+          node tools/validate_live_review_closure.js --template-ok
+          node tools/validate_delivery_review_checklist.js --template-ok
+          node tools/audit_evolution_log.js
+          node tools/evolution_goal_status.js --json
+          node tools/local_evidence_status.js --json
+          node tools/generate_evolution_next_packet.js
           node tools/preflight_public_launch.js
 
       - name: Build static bundle

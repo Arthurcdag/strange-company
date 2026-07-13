@@ -8,10 +8,12 @@ Use this packet with:
 
 ```bash
 node tools/generate_external_live_gap_packet.js
+node tools/draft_live_review_closure.js --write-local
 node tools/draft_external_live_packet.js --write-local
 ```
 
 Keep `EXTERNAL_LIVE_PACKET.local.json` local and uncommitted.
+Keep `LIVE_REVIEW_CLOSURE.local.json` local and uncommitted.
 
 ## Current Gate Shape
 
@@ -134,18 +136,22 @@ Use this section every time the project advances one review gate:
 
 1. Run `node tools/generate_external_live_gap_packet.js`.
 2. Copy the produced field names into the manual close sheet.
-3. Validate what was completed:
+3. For the four public review-date fields only, update `LIVE_REVIEW_CLOSURE.local.json` and run:
+   - `node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready`
+   - `node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json`
+   - if both pass, copy only `termsReviewedAt`, `privacyReviewedAt`, `brazilComplianceReviewedAt`, and `aiHandoffReviewedAt` into `public-config.js`; keep `liveMode: false`.
+4. Validate final live readiness only after payment, bank, support, Google, and attestation evidence also exists:
    - `node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live`
      (expecting `--require-live` only when all blockers are closed)
    - `node tools/check_external_live_packet_gate.js`
-4. For reviewer capacity, always keep the lane private:
+5. For reviewer capacity, always keep the lane private:
    - update `REVIEWER_CANDIDATE_TRACKER.local.json` for new contacts,
    - run `node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-one` after first contact,
    - run `node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready` once roles are filled.
-5. Re-run the full local launch checks:
+6. Re-run the full local launch checks:
    - `node tools/preflight_public_launch.js`
    - `node tools/audit_company_functionality.js`
-6. Only when all checked items are complete and reviewed, set `liveMode: true` in `public-config.js`.
+7. Only when all checked items are complete and reviewed, set `liveMode: true` in `public-config.js`.
 
 If any item fails, keep `liveMode: false`, record the failure, and repeat the same checklist.
 
