@@ -45,6 +45,11 @@ jobs:
           node --check tools/validate_reviewer_candidate_tracker.js
           node --check tools/validate_revenue_setup_evidence_index.js
           node --check tools/validate_delivery_review_checklist.js
+          node --check tools/check_external_live_packet_gate.js
+          node --check tools/draft_external_live_packet.js
+          node --check tools/generate_external_live_gap_packet.js
+          node --check tools/simulate_revenue_scenarios.js
+          node --check tools/survival_check.js
 
       - name: Run Python tool tests
         run: |
@@ -66,3 +71,6 @@ jobs:
           node tools/generate_evolution_next_packet.js
           node tools/build_public_site.js --check --output .public-site-build.local --force
           node tools/preflight_public_launch.js
+          node tools/audit_company_functionality.js
+          node tools/check_external_live_packet_gate.js
+          node tools/survival_check.js
