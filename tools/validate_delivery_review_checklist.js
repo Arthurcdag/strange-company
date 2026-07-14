@@ -118,6 +118,10 @@ function validateTemplate(packet) {
 }
 
 function validateReady(packet) {
+  if (packet.mode !== "local") {
+    fail("mode must be local before the delivery checklist can be treated as real evidence.");
+  }
+
   const loop = packet.deliveryLoop || {};
   const evidence = packet.evidence || {};
   const attestation = packet.attestation || {};

@@ -145,17 +145,26 @@ Edit `public-config.js` only after sections 1-5 are done.
 - [ ] Set `aiHandoffReviewedAt`.
 - [ ] Confirm service titles, descriptions, and prices.
 - [ ] Confirm `jurisdiction: "BR"` remains set.
-- [ ] Set `liveMode: true` last.
+- [ ] Keep `liveMode: false` through evidence validation, receipt export, preflight, and status review.
 
 Required checks:
 
 ```bash
-node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
+node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
+node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --check-public-js --require-issued
 node tools/preflight_public_launch.js
-node tools/audit_company_functionality.js --require-live
+node tools/evolution_goal_status.js --json
 ```
 
-Both must pass before publishing.
+Every command must pass with external Form responses disabled, and status must
+show no hard, public-route, or operational blockers. A human may then make the
+separate `liveMode: true` change and rerun `node tools/preflight_public_launch.js
+--deployment`. Publish the issued receipt and live config together, verify
+Pages, and only then enable Form responses.
 
 ### 7. Publish And Smoke Test
 
@@ -190,6 +199,14 @@ Pause intake and set `liveMode: false` if any of these happen:
 - Delivery artifact or acceptance receipt is missing.
 
 Record the event as an incident before resuming.
+
+Disable Google Form response collection before the rollback. Clear
+`googleFormUrl`, set `googleFormVerified: false`, run
+`node tools/export_public_live_receipt.js --revoke --public-config
+public-config.js --output public-live-receipt.js`, run
+`node tools/preflight_public_launch.js --deployment`, and publish the closed
+config plus placeholder together. The static receipt cannot close a direct
+external Form link by itself.
 
 ## Next Action
 

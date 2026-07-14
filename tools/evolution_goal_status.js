@@ -15,6 +15,9 @@ function argValue(name, fallback) {
 const publicConfigPath = argValue("--public-config", path.join(root, "public-config.js"));
 const evolutionLogPath = argValue("--evolution-log", path.join(root, "EVOLUTION_LOG.md"));
 const localEvidenceDir = argValue("--local-evidence-dir", root);
+const publicLiveReceiptPath = argValue("--public-live-receipt", path.join(root, "public-live-receipt.js"));
+const termsDocumentPath = argValue("--terms-doc", path.join(root, "TERMOS.md"));
+const privacyDocumentPath = argValue("--privacy-doc", path.join(root, "AVISO_DE_PRIVACIDADE.md"));
 const REVIEW_CLOSURE_FIELDS = ["termsReviewedAt", "privacyReviewedAt", "brazilComplianceReviewedAt", "aiHandoffReviewedAt"];
 
 function readText(filePath) {
@@ -33,7 +36,9 @@ function isIsoDate(value) {
     return false;
   }
   const date = new Date(`${text}T00:00:00.000Z`);
-  return !Number.isNaN(date.valueOf()) && date.toISOString().startsWith(text);
+  return !Number.isNaN(date.valueOf())
+    && date.toISOString().startsWith(text)
+    && text <= new Date().toISOString().slice(0, 10);
 }
 
 function isGoogleFormUrl(value) {
@@ -75,12 +80,14 @@ function summarizeLatestPass(pass) {
   };
 }
 
-function loadLocalEvidenceStatus(dir) {
+function loadLocalEvidenceStatus(dir, configPath) {
   const result = spawnSync(process.execPath, [
     "tools/local_evidence_status.js",
     "--json",
     "--local-dir",
     dir,
+    "--public-config",
+    configPath,
   ], {
     cwd: root,
     encoding: "utf8",
@@ -124,7 +131,7 @@ function liveGateRows(config) {
       id: "googleFormVerified",
       label: "Google Form route verified",
       passed: Boolean(isGoogleFormUrl(config.googleFormUrl) && config.googleFormVerified === true),
-      nextAction: "Keep the public Form URL and private Sheet route current.",
+      nextAction: "Keep the verified Form URL and private Sheet route in local evidence; the tracked closed config stays blank until the final live release.",
     },
     {
       id: "termsReviewedAt",
@@ -180,6 +187,181 @@ function blockerFromLane(localEvidence, id, blocker) {
   return lane && lane.ready ? [] : [{ ...blocker, laneId: id }];
 }
 
+function issuedPublicLiveReceiptReady(configPath, receiptPath, termsPath, privacyPath) {
+  const result = spawnSync(process.execPath, [
+    "tools/export_public_live_receipt.js",
+    "--check-public-js",
+    "--require-issued",
+    "--public-config",
+    configPath,
+    "--public-js",
+    receiptPath,
+    "--terms-doc",
+    termsPath,
+    "--privacy-doc",
+    privacyPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  return result.status === 0;
+}
+
+function laneHandoff(localEvidence, options) {
+  const lane = evidenceLane(localEvidence, options.laneId);
+  const laneStatus = lane ? lane.status : "missing";
+  let command = options.validatorCommand;
+  if (laneStatus === "missing") {
+    command = options.draftCommand;
+  } else if (laneStatus === "ready" && options.readyCommand) {
+    command = options.readyCommand;
+  }
+  return {
+    blockerId: options.blockerId,
+    laneId: options.laneId,
+    laneStatus,
+    priority: options.priority,
+    command,
+    validatorCommand: options.validatorCommand,
+    progressAuditCommand: "node tools/evolution_goal_status.js --json",
+    requiresRealEvidence: true,
+    liveModeRemainsFalse: true,
+    whyNow: options.whyNow,
+  };
+}
+
+function selectHandoff({
+  reviewBlockers,
+  revenueBlockers,
+  externalLiveBlockers,
+  publicRouteBlockers,
+  operationalBlockers,
+  localEvidence,
+  liveMode,
+}) {
+  const hardLaneCandidates = [];
+  if (reviewBlockers.length) {
+    hardLaneCandidates.push(laneHandoff(localEvidence, {
+      blockerId: "humanReviewClosure",
+      laneId: "liveReviewClosure",
+      priority: "hard_gate",
+      draftCommand: "node tools/draft_live_review_closure.js --write-local",
+      validatorCommand: "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready",
+      readyCommand: "node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json",
+      whyNow: "One closure packet addresses the current human review-date blockers without changing liveMode.",
+    }));
+  }
+  if (revenueBlockers.length) {
+    hardLaneCandidates.push(laneHandoff(localEvidence, {
+      blockerId: "privatePaymentFiscalEvidence",
+      laneId: "revenueSetupEvidence",
+      priority: "hard_gate",
+      draftCommand: "node tools/draft_revenue_setup_evidence_index.js --write-local",
+      validatorCommand: "node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js",
+      whyNow: "Validated payment and fiscal evidence is required before any paid operating decision.",
+    }));
+  }
+  if (externalLiveBlockers.length) {
+    hardLaneCandidates.push(laneHandoff(localEvidence, {
+      blockerId: "privateExternalLiveEvidence",
+      laneId: "externalLivePacket",
+      priority: "hard_gate",
+      draftCommand: "node tools/draft_external_live_packet.js --write-local",
+      validatorCommand: "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js",
+      whyNow: "The strict Stripe, bank, support, Google, and review packet must validate before a human live decision.",
+    }));
+  }
+
+  const activeHardLane = hardLaneCandidates.find((handoff) => handoff.laneStatus !== "missing")
+    || hardLaneCandidates[0];
+  if (activeHardLane) {
+    return activeHardLane;
+  }
+
+  const immediatePublicRouteBlocker = publicRouteBlockers.find(
+    (blocker) => blocker.id !== "publicLiveReceipt"
+  );
+  if (immediatePublicRouteBlocker) {
+    const blocker = immediatePublicRouteBlocker;
+    return {
+      blockerId: blocker.id,
+      laneId: null,
+      laneStatus: "open",
+      priority: "public_route",
+      command: blocker.command || blocker.nextAction,
+      validatorCommand: blocker.validatorCommand || "node tools/preflight_public_launch.js",
+      progressAuditCommand: "node tools/evolution_goal_status.js --json",
+      requiresRealEvidence: true,
+      liveModeRemainsFalse: true,
+      whyNow: "The public route must be verified before readiness can advance.",
+    };
+  }
+
+  if (operationalBlockers.length) {
+    const blocker = operationalBlockers[0];
+    const config = blocker.id === "humanReviewerCapacity"
+      ? {
+        draftCommand: "node tools/draft_reviewer_candidate_tracker.js --write-local",
+        validatorCommand: "node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready",
+      }
+      : {
+        draftCommand: "node tools/draft_delivery_review_checklist.js --write-local",
+        validatorCommand: "node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready",
+      };
+    return laneHandoff(localEvidence, {
+      blockerId: blocker.id,
+      laneId: blocker.laneId,
+      priority: "operational_gate",
+      ...config,
+      whyNow: `${blocker.label} is the next operating-capacity gate after live evidence is ready.`,
+    });
+  }
+
+  const receiptBlocker = publicRouteBlockers.find((blocker) => blocker.id === "publicLiveReceipt");
+  if (receiptBlocker) {
+    return {
+      blockerId: receiptBlocker.id,
+      laneId: null,
+      laneStatus: "open",
+      priority: "public_route",
+      command: receiptBlocker.command || receiptBlocker.nextAction,
+      validatorCommand: receiptBlocker.validatorCommand || "node tools/preflight_public_launch.js",
+      progressAuditCommand: "node tools/evolution_goal_status.js --json",
+      requiresRealEvidence: true,
+      liveModeRemainsFalse: true,
+      whyNow: "All private readiness and operating-capacity validators are ready; issue the short-lived public receipt before the separate human live decision.",
+    };
+  }
+
+  if (!liveMode) {
+    return {
+      blockerId: "humanLiveModeDecision",
+      laneId: null,
+      laneStatus: "ready",
+      priority: "human_decision",
+      command: "node tools/preflight_public_launch.js",
+      validatorCommand: "node tools/evolution_goal_status.js --json",
+      progressAuditCommand: "node tools/survival_check.js",
+      requiresRealEvidence: true,
+      liveModeRemainsFalse: true,
+      whyNow: "Every tracked gate is ready; a human operator must review the public receipt and make the separate liveMode decision.",
+    };
+  }
+
+  return {
+    blockerId: "liveOperationsReview",
+    laneId: null,
+    laneStatus: "ready",
+    priority: "live_operations",
+    command: "python tools/vau_company_evolution.py --depth 1",
+    validatorCommand: "node tools/survival_check.js",
+    progressAuditCommand: "node tools/evolution_goal_status.js --json",
+    requiresRealEvidence: true,
+    liveModeRemainsFalse: false,
+    whyNow: "Live mode is active; review real outcomes and receipts before scaling, revising, or stopping the lane.",
+  };
+}
+
 function evolutionMode(hardBlockers, publicRouteBlockers, operationalBlockers, liveMode) {
   if (hardBlockers.length) {
     return {
@@ -205,8 +387,18 @@ function evolutionMode(hardBlockers, publicRouteBlockers, operationalBlockers, l
   };
 }
 
-function buildStatus(config, logText, localEvidence) {
-  const evidenceRows = liveGateRows(config).filter((row) => row.id !== "liveMode");
+function buildStatus(config, logText, localEvidence, publicLiveReceiptReady) {
+  const evidenceRows = [
+    ...liveGateRows(config).filter((row) => row.id !== "liveMode"),
+    {
+      id: "publicLiveReceipt",
+      label: "issued public live receipt bound to the current public config, terms, and privacy notice",
+      passed: publicLiveReceiptReady,
+      command: "node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force",
+      validatorCommand: "node tools/export_public_live_receipt.js --check-public-js --require-issued",
+      nextAction: "Validate revenue, external-live, reviewer-capacity, delivery-review, and the current public legal documents, then export the seven-day public-only live receipt while liveMode remains false.",
+    },
+  ];
   const publicRouteBlockers = evidenceRows
     .filter((row) => !row.passed)
     .filter((row) => !REVIEW_CLOSURE_FIELDS.includes(row.id));
@@ -219,7 +411,12 @@ function buildStatus(config, logText, localEvidence) {
   const revenueBlockers = blockerFromLane(localEvidenceSummary, "revenueSetupEvidence", {
     id: "privatePaymentFiscalEvidence",
     label: "private payment/fiscal evidence",
-    nextAction: "Complete REVENUE_SETUP_EVIDENCE_INDEX.local.json outside git and run node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all.",
+    nextAction: "Complete REVENUE_SETUP_EVIDENCE_INDEX.local.json outside git and run node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js.",
+  });
+  const externalLiveBlockers = blockerFromLane(localEvidenceSummary, "externalLivePacket", {
+    id: "privateExternalLiveEvidence",
+    label: "private external live evidence",
+    nextAction: "Complete EXTERNAL_LIVE_PACKET.local.json outside git and run node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js.",
   });
   const operationalBlockers = [
     ...blockerFromLane(localEvidenceSummary, "reviewerCandidateTracker", {
@@ -236,6 +433,7 @@ function buildStatus(config, logText, localEvidence) {
   const hardBlockers = [
     ...reviewBlockers,
     ...revenueBlockers.map((blocker) => blocker.id),
+    ...externalLiveBlockers.map((blocker) => blocker.id),
   ];
   const passes = evolutionPasses(logText);
   const latestPass = summarizeLatestPass(passes[passes.length - 1]);
@@ -245,7 +443,7 @@ function buildStatus(config, logText, localEvidence) {
     operationalBlockers,
     config.liveMode === true,
   );
-  const publicLiveReady = !publicRouteBlockers.length && !hardBlockers.length;
+  const publicLiveReady = !publicRouteBlockers.length && !hardBlockers.length && !operationalBlockers.length;
   const publicGateRows = [
     ...evidenceRows,
     {
@@ -259,8 +457,17 @@ function buildStatus(config, logText, localEvidence) {
   ];
   const localEvidenceActions = localEvidenceSummary.lanes
     .filter((lane) => !lane.ready)
-    .filter((lane) => !["liveReviewClosure", "revenueSetupEvidence"].includes(lane.id))
+    .filter((lane) => !["externalLivePacket", "liveReviewClosure", "revenueSetupEvidence"].includes(lane.id))
     .map((lane) => `${lane.label}: ${lane.nextAction}`);
+  const selectedHandoff = selectHandoff({
+    reviewBlockers,
+    revenueBlockers,
+    externalLiveBlockers,
+    publicRouteBlockers,
+    operationalBlockers,
+    localEvidence: localEvidenceSummary,
+    liveMode: config.liveMode === true,
+  });
 
   return {
     system: "STRANGE_COMPANY_EVOLUTION_STATUS",
@@ -268,13 +475,16 @@ function buildStatus(config, logText, localEvidence) {
     mode: modeState.mode,
     nextLoop: modeState.nextLoop,
     publicLiveReady,
-    companyOperationalReady: publicLiveReady && !operationalBlockers.length,
+    companyOperationalReady: publicLiveReady,
     liveMode: config.liveMode === true,
     publicGateRows,
     hardBlockers,
     publicRouteBlockers: publicRouteBlockers.map((blocker) => blocker.id),
+    publicLiveReceiptReady,
+    selectedHandoff,
     reviewClosureActions: closureActions,
     revenueBlockers,
+    externalLiveBlockers,
     operationalBlockers,
     localEvidence: localEvidenceSummary,
     evolutionPassCount: passes.length,
@@ -285,11 +495,12 @@ function buildStatus(config, logText, localEvidence) {
         : []),
       ...publicRouteBlockers.map((blocker) => blocker.nextAction),
       ...revenueBlockers.map((blocker) => blocker.nextAction),
+      ...externalLiveBlockers.map((blocker) => blocker.nextAction),
       ...localEvidenceActions,
       "Run node tools/audit_evolution_log.js after every repo evolution pass.",
     ],
     guardrails: [
-      "Do not set liveMode true while hard blockers or private payment/fiscal evidence remain open.",
+      "Do not set liveMode true while any hard blocker or private live evidence remains open.",
       "Do not commit local evidence packets, credentials, tax IDs, bank data, or customer-private material.",
       "Do not treat simulations, templates, or AI output as legal, tax, payment, privacy, fiscal, or launch approval.",
     ],
@@ -310,6 +521,10 @@ function printText(status) {
     console.log(`Latest result: ${status.latestPass.result}`);
   }
   console.log("");
+  console.log("Selected handoff:");
+  console.log(`- blocker: ${status.selectedHandoff.blockerId}`);
+  console.log(`- command: ${status.selectedHandoff.command}`);
+  console.log(`- validate: ${status.selectedHandoff.validatorCommand}`);
   console.log("Hard blockers:");
   for (const blocker of status.hardBlockers) {
     console.log(`- ${blocker}`);
@@ -320,6 +535,10 @@ function printText(status) {
   }
   console.log("Revenue blockers:");
   for (const blocker of status.revenueBlockers) {
+    console.log(`- ${blocker.id}: ${blocker.nextAction}`);
+  }
+  console.log("External live blockers:");
+  for (const blocker of status.externalLiveBlockers) {
     console.log(`- ${blocker.id}: ${blocker.nextAction}`);
   }
   console.log("Operational blockers:");
@@ -342,7 +561,13 @@ function printText(status) {
 const status = buildStatus(
   loadPublicConfig(publicConfigPath),
   readText(evolutionLogPath),
-  loadLocalEvidenceStatus(localEvidenceDir),
+  loadLocalEvidenceStatus(localEvidenceDir, publicConfigPath),
+  issuedPublicLiveReceiptReady(
+    publicConfigPath,
+    publicLiveReceiptPath,
+    termsDocumentPath,
+    privacyDocumentPath,
+  ),
 );
 
 if (asJson) {

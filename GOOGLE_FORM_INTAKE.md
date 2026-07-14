@@ -84,11 +84,8 @@ Use the `Form Spec` tab as the source of truth for questions. At minimum, the fo
 
 ## Verification Gate
 
-Current public responder URL:
-
-```text
-https://docs.google.com/forms/d/e/1FAIpQLSdziVPmI5O76mU4SMWhnML80jN_VsfXxSKtFe3hF1RWkF7mfQ/viewform
-```
+The responder URL is intentionally omitted from this tracked public document.
+Keep it only in ignored local evidence and in the final live release config.
 
 Verification evidence:
 
@@ -107,14 +104,21 @@ Before setting `googleFormVerified: true`:
 4. Copy the public responder URL, not the edit URL.
 5. Record the Sheet/Form evidence in private Setup Evidence.
 
-Those steps are complete as of 2026-05-24, so `public-config.js` may keep:
+Those setup steps were exercised on 2026-05-24. Historical verification does
+not authorize a permanently open route. While `liveMode` is false, the receipt
+is missing/expired/revoked, or any stop rule is active, keep external Form
+response collection disabled and keep the tracked closed config at:
 
 ```js
-googleFormUrl: "https://docs.google.com/forms/..."
-googleFormVerified: true
+googleFormUrl: ""
+googleFormVerified: false
 ```
 
-Keep `liveMode: false` until legal review, Brazil compliance review, AI handoff review, payment, fiscal/NFS-e, and entity/bank routes are all real.
+For a live release, prepare the verified URL locally while response collection
+is still disabled, complete all four validators and issue the receipt, then
+publish the issued receipt and `liveMode: true` together. Enable Form responses
+only after the live Pages deployment is verified. A static browser receipt
+cannot revoke a Google Form opened through an old or direct link.
 
 ## AI Boundary
 

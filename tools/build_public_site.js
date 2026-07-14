@@ -81,6 +81,7 @@ function buildSite() {
   for (const file of [
     "public.js",
     "public-config.js",
+    "public-live-receipt.js",
     "public-ama-answers.js",
     "styles.css",
     "EXTERNAL_LIVE_PACKET.template.json",
@@ -104,6 +105,7 @@ function buildSite() {
     "tools/local_evidence_status.js",
     "tools/draft_live_review_closure.js",
     "tools/render_live_review_public_config_patch.js",
+    "tools/export_public_live_receipt.js",
     "tools/draft_reviewer_candidate_tracker.js",
     "tools/draft_revenue_setup_evidence_index.js",
     "tools/draft_delivery_review_checklist.js",
@@ -140,8 +142,11 @@ function assertBundle() {
     "index.html",
     "public.js",
     "public-config.js",
+    "public-live-receipt.js",
     "public-ama-answers.js",
     "styles.css",
+    "TERMOS.md",
+    "AVISO_DE_PRIVACIDADE.md",
     "PUBLIC_AMA.md",
     "PUBLIC_AMA_QUEUE.template.json",
     "PUBLIC_AMA_ANSWERS.template.json",
@@ -155,6 +160,7 @@ function assertBundle() {
     "tools/local_evidence_status.js",
     "tools/validate_live_review_closure.js",
     "tools/render_live_review_public_config_patch.js",
+    "tools/export_public_live_receipt.js",
     "tools/validate_delivery_review_checklist.js",
     "tools/export_public_ama_answers.js",
     "tools/build_public_site.js",
@@ -170,6 +176,9 @@ function assertBundle() {
     : "";
   if (!index.includes('src="public-ama-answers.js"')) {
     fail("Public bundle index.html must load public-ama-answers.js.");
+  }
+  if (!index.includes('src="public-live-receipt.js"')) {
+    fail("Public bundle index.html must load public-live-receipt.js.");
   }
 
   const forbidden = [

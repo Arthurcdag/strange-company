@@ -105,6 +105,15 @@ class DeliveryReviewChecklistTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("ready gate passed", result.stdout)
 
+    def test_ready_gate_rejects_complete_non_local_checklist(self) -> None:
+        payload = ready_payload()
+        payload["mode"] = "simulation"
+
+        result = run_validator(str(write_payload(payload)), "--require-ready")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("mode must be local", result.stderr)
+
     def test_ready_gate_requires_https_delivery_artifact(self) -> None:
         payload = ready_payload()
         payload["deliveryLoop"]["deliveryArtifactUrl"] = "http://example.com/not-safe"

@@ -297,3 +297,56 @@ Verified with:
 Result: validated payment/fiscal evidence now clears its hard blocker, missing
 public or operational evidence cannot produce a false live-decision state, and
 live mode no longer makes an otherwise ready system report itself as unready.
+
+## 2026-07-14 - Fail-Closed Live Readiness and Operator Handoff
+
+Objective: eliminate pre-live false positives, give the operator one
+dependency-aware next handoff, and stop the public paid desk from inviting
+customer data before strict live readiness.
+
+Changed:
+
+- Added `privateExternalLiveEvidence` to the evolution status hard blockers and made `selectedHandoff` choose one non-executing evidence lane before the backlog.
+- Updated the next-action packet to put the selected handoff first and expose the external live blocker separately.
+- Updated VAU to validate revenue and external-live packets through the authoritative Node validators and fail closed when either packet, Node, or validation is unavailable.
+- Made strict revenue/external validation require the current `public-config.js`, cross-checked the revenue packet's internal support, form, terms, and privacy evidence against its public snapshot, and rejected stale evidence even when only the snapshot was updated.
+- Rejected future public review dates, required real ordered UTC timestamps for support and Form connectivity tests, and capped those external test receipts at 30 days so a new public lease cannot be issued from impossible or stale timing evidence.
+- Added a public-only seven-day receipt with separate SHA-256 core and envelope integrity checks, no private packet data or hashes, and attestations for revenue, external-live, reviewer-capacity, and delivery-review validators.
+- Bound the receipt to normalized public `TERMOS.md` and `AVISO_DE_PRIVACIDADE.md` hashes so post-review legal-copy drift invalidates readiness across Windows and Linux.
+- Made the browser recompute both receipt digests and refetch the current receipt plus legal documents before submit, on visibility, and every minute, so expiry, legal drift, and server-side revocation close already-open tabs.
+- Added a safe `--revoke` path that writes a current-core fail-closed placeholder with no private packets, including after the Form URL is removed.
+- Required strict reviewer/delivery evidence and VAU capacity inputs to use `mode: local`, and required the pre-live external packet to attest `google.acceptingResponses: false`.
+- Required every individual revenue evidence gate to use `mode: local`; support, privacy, terms, and ledger gates also bind to the current public config instead of accepting diagnostic packets as proof.
+- Removed the responder URL from the tracked closed config and public documentation, and documented that the static lease cannot close a directly opened external Form; response collection remains a human-owned external toggle.
+- Removed mutable third-party runtime JavaScript from the public page and added a same-origin Content Security Policy, leaving only the allowlisted receipt/legal-document GETs.
+- Made the Pages deployment run the full Python test suite before build, upload, or deploy, so a direct `main` push cannot bypass behavioral regressions.
+- Aligned status and VAU so operating capacity is complete before receipt issuance or a human live decision.
+- Fixed individual revenue evidence gates so mandatory no-secrets and human-approval attestations apply outside `--require-all` too.
+- Made the public order form hidden and disabled by default, with a closed-intake notice that hands visitors to the public-safe AMA until strict readiness passes.
+- Reordered every live handoff runbook to keep `liveMode` false through review-date publication, bound private validation, reviewer/delivery validation, receipt issuance, preflight, and status; the human flip is a separate last decision.
+- Added regression tests plus preflight, functionality-audit, survival, README, and VAU documentation contracts for the new boundaries.
+
+Verified with:
+
+- `node --check public.js`
+- `node --check tools\evolution_goal_status.js`
+- `node --check tools\generate_evolution_next_packet.js`
+- `node --check tools\validate_revenue_setup_evidence_index.js`
+- `node --check tools\export_public_live_receipt.js`
+- `python -m unittest tests.test_revenue_setup_evidence_index tests.test_evolution_goal_status tests.test_evolution_next_packet tests.test_vau_company_evolution tests.test_public_ama`
+- `python -m unittest tests.test_public_live_receipt tests.test_external_live_packet_binding`
+- `python -m unittest discover -s tests`
+- `node tools\audit_evolution_log.js`
+- `node tools\preflight_public_launch.js`
+- `node tools\preflight_public_launch.js --deployment`
+- `node tools\audit_company_functionality.js`
+- `node tools\build_public_site.js --check --output .public-site-build.local --force`
+- `node tools\survival_check.js`
+
+Result: missing, internally stale, future-dated, malformed, or config-mismatched private evidence and a
+missing, edited, expired, revoked, or stale public receipt can no longer produce a
+live-decision state; `liveMode` or a format-valid fake digest alone cannot open
+the paid desk, public legal-document drift closes the receipt, operating-capacity
+gates are aligned across the browser, status, and VAU, and the public AMA remains
+available. The bundle is explicit that direct Google Form response collection is
+an external human-controlled route, not something a static receipt can revoke.

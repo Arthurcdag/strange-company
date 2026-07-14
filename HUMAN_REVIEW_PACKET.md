@@ -141,21 +141,32 @@ Use this section every time the project advances one review gate:
    - `node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json`
    - if both pass, copy only `termsReviewedAt`, `privacyReviewedAt`, `brazilComplianceReviewedAt`, and `aiHandoffReviewedAt` into `public-config.js`; keep `liveMode: false`.
 4. Validate final live readiness only after payment, bank, support, Google, and attestation evidence also exists:
-   - `node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live`
+   - `node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js`
+   - `node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js`
      (expecting `--require-live` only when all blockers are closed)
    - `node tools/check_external_live_packet_gate.js`
-5. For reviewer capacity, always keep the lane private:
+5. Close the private operational-readiness lanes:
    - update `REVIEWER_CANDIDATE_TRACKER.local.json` for new contacts,
    - run `node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-one` after first contact,
-   - run `node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready` once roles are filled.
-6. Re-run the full local launch checks:
+   - run `node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready` once roles are filled,
+   - complete `DELIVERY_REVIEW_CHECKLIST.local.json` and run `node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready`.
+6. Export the public-only receipt while `liveMode` remains `false`, then run the pre-live checks:
+   - `node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force`
+   - `node tools/export_public_live_receipt.js --check-public-js --require-issued`
    - `node tools/preflight_public_launch.js`
-   - `node tools/audit_company_functionality.js`
-7. Only when all checked items are complete and reviewed, set `liveMode: true` in `public-config.js`.
+   - `node tools/evolution_goal_status.js --json`
+7. Only when all checked items are complete, external Form responses remain
+   disabled, status has no hard, public-route, or operational blockers, and a
+   human approves the decision, make the separate `liveMode: true` change; run
+   `node tools/preflight_public_launch.js --deployment`, publish the issued
+   receipt and live config together, verify Pages, and only then enable responses.
 
 If any item fails, keep `liveMode: false`, record the failure, and repeat the same checklist.
 
-Use ISO dates: `YYYY-MM-DD`. Review dates must be the real human review dates.
+Use ISO dates: `YYYY-MM-DD`. Review dates must be the real human review dates and
+cannot be in the future. Support received/replied and Google Form test times must
+be ISO-8601 UTC timestamps ending in `Z`, correctly ordered, and no older than 30
+days when strict live validation runs.
 
 ## Public Config Patch Values
 
@@ -168,7 +179,7 @@ termsReviewedAt: "YYYY-MM-DD",
 privacyReviewedAt: "YYYY-MM-DD",
 brazilComplianceReviewedAt: "YYYY-MM-DD",
 aiHandoffReviewedAt: "YYYY-MM-DD",
-liveMode: true,
+liveMode: false,
 ```
 
 Do not put Sheet URLs, Stripe dashboard URLs, bank metadata, tax IDs, private reviewer notes, or credentials in `public-config.js`.
@@ -193,13 +204,18 @@ Run this sequence before publishing:
 
 ```bash
 node tools/check_external_live_packet_gate.js
-node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
+node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
+node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --check-public-js --require-issued
 node tools/preflight_public_launch.js
-node tools/audit_company_functionality.js --require-live
+node tools/evolution_goal_status.js --json
 node tools/survival_check.js
 ```
 
-If any command fails, keep `liveMode: false`.
+If any command fails, keep `liveMode: false`. If all pass and status has no hard, public-route, or operational blockers, review the receipt before the separate human `liveMode` decision.
 
 ## Stop Rules
 

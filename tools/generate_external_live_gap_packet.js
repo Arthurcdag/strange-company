@@ -138,7 +138,7 @@ function snapshot(config) {
 
 const validationCommands = [
   "node tools/check_external_live_packet_gate.js",
-  "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live",
+  "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js",
   "node tools/preflight_public_launch.js",
   "node tools/audit_company_functionality.js --require-live"
 ];

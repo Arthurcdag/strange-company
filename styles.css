@@ -3997,6 +3997,7 @@ input[type="range"] {
 
 .public-ama-form,
 .public-order-form,
+.public-order-closed,
 .public-output,
 .public-ama-answers,
 .public-band article,
@@ -4012,6 +4013,43 @@ input[type="range"] {
   display: grid;
   gap: 14px;
   padding: 20px;
+}
+
+.public-order-form[hidden],
+.public-order-fields[hidden],
+.public-order-closed[hidden] {
+  display: none;
+}
+
+.public-order-fields {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.public-order-closed {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 20px;
+  border-left: 4px solid var(--amber);
+}
+
+.public-order-closed h2,
+.public-order-closed p {
+  margin: 0;
+}
+
+.public-order-closed p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.public-order-closed .order-output-actions {
+  margin-top: 0;
 }
 
 .public-ama-form .field,

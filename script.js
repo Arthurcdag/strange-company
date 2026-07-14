@@ -1681,7 +1681,7 @@ function liveEvidencePacket() {
     missing,
     "",
     "[Validation Commands]",
-    "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live",
+    "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js",
     "node tools/audit_company_functionality.js --require-live",
     "",
     "[Stop Rules]",

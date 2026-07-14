@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { spawnSync } = require("child_process");
 const vm = require("vm");
 
 const root = path.resolve(__dirname, "..");
@@ -40,7 +41,23 @@ function loadPublicConfig() {
   return sandbox.window.PUBLIC_ORDER_CONFIG || {};
 }
 
-function externalLiveBlockers(config) {
+function issuedPublicLiveReceiptReady() {
+  const result = spawnSync(process.execPath, [
+    "tools/export_public_live_receipt.js",
+    "--check-public-js",
+    "--require-issued",
+    "--public-config",
+    "public-config.js",
+    "--public-js",
+    "public-live-receipt.js",
+  ], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  return result.status === 0;
+}
+
+function externalLiveBlockers(config, publicLiveReceiptReady) {
   const blockers = [];
   if (!config.liveMode) blockers.push("public-config.js liveMode is false");
   if (!config.supportInboxVerified) blockers.push("support inbox is not verified");
@@ -50,6 +67,7 @@ function externalLiveBlockers(config) {
   if (!String(config.privacyReviewedAt || "").trim()) blockers.push("privacy review date is blank");
   if (!String(config.brazilComplianceReviewedAt || "").trim()) blockers.push("Brazil compliance review date is blank");
   if (!String(config.aiHandoffReviewedAt || "").trim()) blockers.push("AI legal handoff review date is blank");
+  if (!publicLiveReceiptReady) blockers.push("issued public live receipt is missing or stale");
   return blockers;
 }
 
@@ -189,6 +207,19 @@ function auditDocs() {
   assertIncludes("tools/vau_company_evolution.py", "public-ama-answers.js", "VAU public AMA answer archive path");
   assertIncludes("tools/vau_company_evolution.py", "--public-ama-queue", "VAU public AMA queue argument");
   assertIncludes("tools/vau_company_evolution.py", "--public-ama-answers", "VAU public AMA answer archive argument");
+  assertIncludes("tools/vau_company_evolution.py", "--external-live-packet", "VAU external live packet argument");
+  assertIncludes("tools/vau_company_evolution.py", "privateExternalLiveEvidenceReady", "VAU external live readiness gate");
+  assertIncludes("tools/vau_company_evolution.py", "validate_external_live_packet.js", "VAU authoritative external live validator");
+  assertIncludes("tools/vau_company_evolution.py", "--public-live-receipt", "VAU public live receipt argument");
+  assertIncludes("tools/vau_company_evolution.py", "publicLiveReceiptReady", "VAU public live receipt gate");
+  assertIncludes("public-live-receipt.js", '"status": "not_issued"', "public live receipt fail-closed placeholder");
+  assertIncludes("tools/export_public_live_receipt.js", "local_packet_validators_passed", "public live receipt issued status");
+  assertIncludes("tools/export_public_live_receipt.js", "privatePacketHashesExcluded", "public live receipt private hash exclusion");
+  assertIncludes("tools/export_public_live_receipt.js", "--public-config", "public live receipt config binding");
+  assertIncludes("tools/export_public_live_receipt.js", "--reviewer-tracker", "public live receipt reviewer-capacity gate");
+  assertIncludes("tools/export_public_live_receipt.js", "--delivery-review-checklist", "public live receipt delivery-review gate");
+  assertIncludes("tools/export_public_live_receipt.js", "envelopeSha256", "public live receipt full-envelope integrity");
+  assertIncludes("tools/export_public_live_receipt.js", "RECEIPT_VALIDITY_MS", "public live receipt expiry window");
   assertIncludes("PUBLIC_AMA_PUBLICATION_PACKET.md", "Manual Close Sheet", "public AMA publication close sheet");
   assertIncludes("PUBLIC_AMA_PUBLICATION_PACKET.md", "node tools/export_public_ama_answers.js --input PUBLIC_AMA_QUEUE.local.json --output public-ama-answers.js --require-published --force", "public AMA publication export command");
   assertIncludes("PUBLIC_AMA_PUBLICATION_PACKET.md", "node tools/build_public_site.js --check --output .public-site-build.local --force", "public AMA publication bundle check");
@@ -214,14 +245,14 @@ function auditDocs() {
   assertIncludes("REVENUE_SETUP_EVIDENCE_PACKET.md", "REVENUE_SETUP_EVIDENCE_INDEX.template.json", "revenue setup packet template link");
   assertIncludes("REVENUE_SETUP_EVIDENCE_PACKET.md", "--require-all", "revenue setup packet full readiness command");
   assertIncludes("HUMAN_REVIEW_PACKET.md", "Manual Close Sheet", "human review manual close sheet");
-  assertIncludes("HUMAN_REVIEW_PACKET.md", "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live", "human review validation command");
+  assertIncludes("HUMAN_REVIEW_PACKET.md", "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js", "human review config-bound validation command");
   assertIncludes("HUMAN_REVIEW_PACKET.md", "Do not put Sheet URLs, Stripe dashboard URLs, bank metadata, tax IDs, private reviewer notes, or credentials in `public-config.js`.", "human review public config boundary");
   assertIncludes("HUMAN_REVIEW_PACKET.md", "CONKA8_LAW_INSTRUCTIONS.md", "human review packet conka8 link");
   assertIncludes("HUMAN_REVENUE_INSTRUCTIONS.md", "tools/draft_revenue_setup_evidence_index.js", "human revenue setup draft generator link");
   assertIncludes("HUMAN_REVENUE_INSTRUCTIONS.md", "tools/validate_revenue_setup_evidence_index.js", "human revenue setup validator link");
   assertIncludes("HUMAN_REVENUE_INSTRUCTIONS.md", "node tools/draft_revenue_setup_evidence_index.js --write-local", "human revenue setup draft command");
   assertIncludes("HUMAN_REVENUE_INSTRUCTIONS.md", "node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-payment", "human revenue setup payment command");
-  assertIncludes("HUMAN_REVENUE_INSTRUCTIONS.md", "node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all", "human revenue setup full command");
+  assertIncludes("HUMAN_REVENUE_INSTRUCTIONS.md", "node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js", "human revenue config-bound full command");
   assertIncludes("tools/validate_revenue_setup_evidence_index.js", "Revenue setup evidence index validation failed", "revenue setup evidence index validator");
   assertIncludes("tools/validate_revenue_setup_evidence_index.js", "--require-all", "revenue setup evidence index full gate");
   assertIncludes("tools/validate_revenue_setup_evidence_index.js", "--template-ok", "revenue setup evidence index template command");
@@ -277,6 +308,10 @@ function auditDocs() {
   assertIncludes("public.html", 'href="PUBLIC_AMA.md"', "public AMA rules link");
   assertIncludes("public.html", 'id="publicAmaAnswers"', "public AMA published answers panel");
   assertIncludes("public.html", 'src="public-ama-answers.js"', "public AMA answer archive loader");
+  assertIncludes("public.html", 'src="public-live-receipt.js"', "public live receipt loader");
+  assertIncludes("public.html", 'id="publicOrderClosed"', "public paid-intake closed notice");
+  assertIncludes("public.html", 'href="#ama"', "public paid-intake AMA handoff");
+  assertIncludes("public.html", 'id="publicOrderFields" hidden disabled', "public order fields fail closed");
   assertIncludes("TERMS.md", "Brazilian operating entity", "Brazil-first terms operator gate");
   assertIncludes("TERMS.md", "NFS-e", "Brazil fiscal terms gate");
   assertIncludes("PRIVACY.md", "LGPD", "LGPD privacy notice");
@@ -292,6 +327,15 @@ function auditPublicBoundary() {
   assertIncludes("public.js", "Public AMA Desk", "public AMA source label");
   assertIncludes("public.js", "Public intake is closed", "public closed-intake copy");
   assertIncludes("public.js", "if (!readiness.liveReady)", "public submit live gate");
+  assertIncludes("public.js", "function setPublicOrderAvailability()", "public order availability gate");
+  assertIncludes("public.js", "readiness.liveReady === true", "public order strict readiness check");
+  assertIncludes("public.js", "function publicLiveReceiptReady(", "public live receipt gate");
+  assertIncludes("public.js", 'receipt.status === "local_packet_validators_passed"', "public live receipt issued status");
+  assertIncludes("public.js", 'globalThis.crypto.subtle.digest("SHA-256", bytes)', "public live receipt browser digest verification");
+  assertIncludes("public.js", "attestations.operationalValidatorsPassed === true", "public live receipt browser capacity gate");
+  assertIncludes("public.js", "receipt.envelopeSha256", "public live receipt browser envelope gate");
+  assertIncludes("public.js", "function schedulePublicReceiptExpiry()", "public live receipt open-tab expiry timer");
+  assertIncludes("public.js", "fields.disabled = !liveReady", "public order fields disabled before readiness");
   assertIncludes("public.js", 'readiness.liveReady ? `<a href="${mailtoUrl(order)}">Open email draft</a>` : ""', "public email action gated by live readiness");
   const privatePatterns = [
     [/strange-company-revenue-start/, "revenue start storage key"],
@@ -309,7 +353,7 @@ function auditPublicBoundary() {
     [/\bPaid pilot pipeline\b/i, "private paid pilot pipeline"],
     [/\bDaily pilot run\b/i, "private daily pilot console"]
   ];
-  for (const file of ["public.html", "public.js", "public-config.js"]) {
+  for (const file of ["public.html", "public.js", "public-config.js", "public-live-receipt.js"]) {
     for (const [pattern, label] of privatePatterns) {
       assertAbsent(file, pattern, label);
     }
@@ -336,7 +380,7 @@ try {
   failures.push(`public-config.js failed to load: ${error.message}`);
 }
 
-const liveBlockers = externalLiveBlockers(config);
+const liveBlockers = externalLiveBlockers(config, issuedPublicLiveReceiptReady());
 if (requireLive && liveBlockers.length) {
   failures.push(`external live-operation gate is blocked: ${liveBlockers.join("; ")}`);
 }

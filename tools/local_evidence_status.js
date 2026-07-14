@@ -12,6 +12,7 @@ function argValue(name, fallback = "") {
 }
 
 const localDir = path.resolve(process.cwd(), argValue("--local-dir", root));
+const publicConfigPath = path.resolve(process.cwd(), argValue("--public-config", path.join(root, "public-config.js")));
 
 const lanes = [
   {
@@ -19,6 +20,7 @@ const lanes = [
     label: "External live packet",
     localFile: "EXTERNAL_LIVE_PACKET.local.json",
     validator: "tools/validate_external_live_packet.js",
+    bindPublicConfig: true,
     draftCommand: "node tools/draft_external_live_packet.js --write-local",
     checks: [
       {
@@ -47,6 +49,7 @@ const lanes = [
     label: "Revenue setup evidence",
     localFile: "REVENUE_SETUP_EVIDENCE_INDEX.local.json",
     validator: "tools/validate_revenue_setup_evidence_index.js",
+    bindPublicConfig: true,
     draftCommand: "node tools/draft_revenue_setup_evidence_index.js --write-local",
     checks: [
       {
@@ -119,7 +122,17 @@ function runNode(commandArgs) {
 }
 
 function validatorCommand(lane, fileName, checkArgs = []) {
-  return ["node", lane.validator, fileName, ...checkArgs].join(" ");
+  const bindingArgs = lane.bindPublicConfig && checkArgs.length
+    ? ["--public-config", "public-config.js"]
+    : [];
+  return ["node", lane.validator, fileName, ...checkArgs, ...bindingArgs].join(" ");
+}
+
+function validatorArgs(lane, fileName, checkArgs = []) {
+  const bindingArgs = lane.bindPublicConfig && checkArgs.length
+    ? ["--public-config", publicConfigPath]
+    : [];
+  return [lane.validator, fileName, ...checkArgs, ...bindingArgs];
 }
 
 function localPath(lane) {
@@ -195,7 +208,7 @@ function inspectLane(lane) {
 
   let passed = 0;
   for (const [index, check] of lane.checks.entries()) {
-    const ok = runNode([lane.validator, localPath(lane), ...check.args]);
+    const ok = runNode(validatorArgs(lane, localPath(lane), check.args));
     checks[index].passed = ok;
     if (ok) {
       passed += 1;

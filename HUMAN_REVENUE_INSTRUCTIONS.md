@@ -10,12 +10,17 @@ Use `tools/draft_revenue_setup_evidence_index.js` and `tools/validate_revenue_se
 node tools/draft_revenue_setup_evidence_index.js --write-local
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-payment
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-tax
-node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-support
-node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-privacy
-node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-terms
-node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-ledger
-node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-support --public-config public-config.js
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-privacy --public-config public-config.js
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-terms --public-config public-config.js
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-ledger --public-config public-config.js
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
 ```
+
+Every `--require-*` command is an actual evidence gate and accepts only
+`mode: "local"`; template, simulation, and local-draft packets remain diagnostic
+inputs only. Support, privacy, terms, and ledger gates also require the current
+`public-config.js` binding shown above so a stale public snapshot cannot pass.
 
 Use [REVIEWER_CANDIDATE_PACKET.md](REVIEWER_CANDIDATE_PACKET.md), [REVIEWER_CANDIDATE_TRACKER.template.json](REVIEWER_CANDIDATE_TRACKER.template.json), [tools/draft_reviewer_candidate_tracker.js](tools/draft_reviewer_candidate_tracker.js), and [tools/validate_reviewer_candidate_tracker.js](tools/validate_reviewer_candidate_tracker.js) when the next blocker is reviewer capacity. The tracker records private outreach evidence; it does not close legal, tax, privacy, payment, or live-mode gates.
 
@@ -313,10 +318,14 @@ termsReviewedAt: "YYYY-MM-DD",
 privacyReviewedAt: "YYYY-MM-DD",
 brazilComplianceReviewedAt: "YYYY-MM-DD",
 aiHandoffReviewedAt: "YYYY-MM-DD",
-liveMode: true
+liveMode: false
 ```
 
 Keep `liveMode: false` if any review date is blank, any outside evidence is missing, or any stop rule is active.
+
+Keep Google Form response collection disabled during this pre-live validation
+and record `google.acceptingResponses: false` in the ignored external-live
+packet. Do not push the responder URL in a pre-flip closed config.
 
 Run:
 
@@ -324,9 +333,14 @@ Run:
 node --check public-config.js
 node --check public.js
 node --check script.js
+node tools\validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
+node tools\validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
+node tools\validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
+node tools\validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+node tools\export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools\export_public_live_receipt.js --check-public-js --require-issued
 node tools\preflight_public_launch.js
-node tools\audit_company_functionality.js
-node tools\audit_company_functionality.js --require-live
+node tools\evolution_goal_status.js --json
 node tools\survival_check.js
 python -B -m unittest discover -s tests
 git diff --check
@@ -335,10 +349,27 @@ git diff --check
 Expected result before real launch:
 
 ```text
-All checks pass, including --require-live, only after public-config.js has real reviewed dates and liveMode is true.
+All pre-live checks pass only after `public-config.js` has real reviewed dates and `liveMode: false`, the revenue packet matches that snapshot, and the external-live packet matches every field except its local target `publicConfig.liveMode: true`. The receipt is issued from the still-false tracked config; only the final human decision flips it.
 ```
 
-If `--require-live` fails, do not force the config. Record the blocker and fix the outside evidence first.
+If any command fails, do not force the config. Record the blocker and fix the
+outside evidence first. If all pass and status has no hard, public-route, or
+operational blockers, a human may make the separate `liveMode: true` change and
+must run `node tools/preflight_public_launch.js --deployment` before publication.
+Publish the issued receipt and live config together; enable external Form
+responses only after the live Pages deployment is verified.
+
+If a stop rule or receipt expiry occurs, disable Form responses first. Then set
+`liveMode: false`, clear `googleFormUrl`, set `googleFormVerified: false`, and run:
+
+```powershell
+node tools\export_public_live_receipt.js --revoke --public-config public-config.js --output public-live-receipt.js
+node tools\preflight_public_launch.js --deployment
+```
+
+Publish that closed config and placeholder together. The revoke path does not
+require the private packets; a receipt in an already open tab is rechecked from
+the server and fails closed.
 
 ## First Paid Pilot Procedure
 
@@ -533,6 +564,9 @@ ledger out of sync
 customer submitted sensitive data
 provider payout not reconciled
 ```
+
+When pausing public intake, also follow the fail-closed rollback above; the
+static receipt cannot disable a Google Form reached from an old direct link.
 
 ## Refund Or Cancellation Procedure
 

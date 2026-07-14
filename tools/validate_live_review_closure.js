@@ -85,13 +85,18 @@ function requireText(obj, key, sectionPath, required = true) {
 
 function requireDate(obj, key, sectionPath, required = true) {
   const value = obj ? obj[key] : "";
-  if (required && !isIsoDate(value)) {
+  const valid = isIsoDate(value);
+  if (required && !valid) {
     fail(`${sectionPath}.${key} must be YYYY-MM-DD.`);
   }
-  if (!required && !isBlank(value) && !isIsoDate(value)) {
+  if (!required && !isBlank(value) && !valid) {
     fail(`${sectionPath}.${key} must be YYYY-MM-DD when present.`);
   }
-  return isIsoDate(value);
+  if (valid && String(value).trim() > new Date().toISOString().slice(0, 10)) {
+    fail(`${sectionPath}.${key} must not be in the future.`);
+    return false;
+  }
+  return valid;
 }
 
 function requireTrue(obj, key, sectionPath) {

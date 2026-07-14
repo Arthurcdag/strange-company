@@ -3,10 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; form-action 'none'; object-src 'none'; base-uri 'none'" />
     <title>Strange Works Studio Order Desk</title>
     <link rel="stylesheet" href="styles.css" />
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
     <script src="public-config.js" defer></script>
+    <script src="public-live-receipt.js" defer></script>
     <script src="public-ama-answers.js" defer></script>
     <script src="public.js" defer></script>
   </head>
@@ -43,15 +44,12 @@
           </p>
           <div class="public-status-grid" aria-label="AMA boundaries">
             <article>
-              <i data-lucide="messages-square"></i>
               <span>Public questions</span>
             </article>
             <article>
-              <i data-lucide="shield-check"></i>
               <span>No private data</span>
             </article>
             <article>
-              <i data-lucide="mail"></i>
               <span>Support inbox</span>
             </article>
           </div>
@@ -91,7 +89,6 @@
             <span>I understand this AMA question can be handled as a public-safe inquiry and does not request legal, tax, accounting, payment, refund, privacy, or launch approval.</span>
           </label>
           <button class="primary-action" type="submit">
-            <i data-lucide="messages-square"></i>
             <span>Create AMA packet</span>
           </button>
         </form>
@@ -118,57 +115,69 @@
           </p>
           <div class="public-status-grid" aria-label="Operating boundaries">
             <article>
-              <i data-lucide="file-check-2"></i>
               <span>Manual review</span>
             </article>
             <article>
-              <i data-lucide="shield-alert"></i>
               <span>No regulated data</span>
             </article>
             <article>
-              <i data-lucide="receipt-text"></i>
               <span>Invoice only</span>
             </article>
           </div>
         </div>
 
-        <form class="public-order-form" id="publicOrderForm">
-          <div class="field-row">
-            <div class="field">
-              <label for="publicCustomer">Customer</label>
-              <input id="publicCustomer" name="customer" type="text" autocomplete="organization" required />
-            </div>
-            <div class="field">
-              <label for="publicContact">Contact email</label>
-              <input id="publicContact" name="contact" type="text" inputmode="email" autocomplete="email" required />
-            </div>
+        <div class="public-order-closed" id="publicOrderClosed" role="status" aria-live="polite">
+          <span class="metric-label">Paid intake closed</span>
+          <h2>This site is not accepting paid-intake details.</h2>
+          <p>
+            The public-safe AMA remains available for questions about the prototype, launch
+            gates, and operating boundaries. Do not use any previously shared external intake
+            link while this closed state is shown.
+          </p>
+          <div class="order-output-actions">
+            <a href="#ama">Ask a public-safe question</a>
+            <a href="PUBLIC_AMA.md" target="_blank" rel="noreferrer">Review AMA boundaries</a>
           </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="publicService">Service</label>
-              <select id="publicService" name="service"></select>
+        </div>
+
+        <form class="public-order-form" id="publicOrderForm" hidden aria-hidden="true">
+          <fieldset class="public-order-fields" id="publicOrderFields" hidden disabled>
+            <div class="field-row">
+              <div class="field">
+                <label for="publicCustomer">Customer</label>
+                <input id="publicCustomer" name="customer" type="text" autocomplete="organization" required />
+              </div>
+              <div class="field">
+                <label for="publicContact">Contact email</label>
+                <input id="publicContact" name="contact" type="text" inputmode="email" autocomplete="email" required />
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="publicService">Service</label>
+                <select id="publicService" name="service"></select>
+              </div>
+              <div class="field">
+                <label for="publicAmount">Monthly amount</label>
+                <input id="publicAmount" name="amount" type="text" inputmode="decimal" value="750" required />
+              </div>
             </div>
             <div class="field">
-              <label for="publicAmount">Monthly amount</label>
-              <input id="publicAmount" name="amount" type="text" inputmode="decimal" value="750" required />
+              <label for="publicNeed">Need</label>
+              <textarea id="publicNeed" name="need" rows="5" required></textarea>
             </div>
-          </div>
-          <div class="field">
-            <label for="publicNeed">Need</label>
-            <textarea id="publicNeed" name="need" rows="5" required></textarea>
-          </div>
-          <label class="order-check">
-            <input name="clean" type="checkbox" required />
-            <span>No protected health information, credentials, payment data, private keys, or regulated source documents are included.</span>
-          </label>
-          <label class="order-check">
-            <input name="terms" type="checkbox" required />
-            <span>I read the Portuguese Terms and Privacy Notice and understand this creates a manual invoice request, not an automatic payment or guaranteed acceptance.</span>
-          </label>
-          <button class="primary-action" type="submit">
-            <i data-lucide="send"></i>
-            <span>Create request packet</span>
-          </button>
+            <label class="order-check">
+              <input name="clean" type="checkbox" required />
+              <span>No protected health information, credentials, payment data, private keys, or regulated source documents are included.</span>
+            </label>
+            <label class="order-check">
+              <input name="terms" type="checkbox" required />
+              <span>I read the Portuguese Terms and Privacy Notice and understand this creates a manual invoice request, not an automatic payment or guaranteed acceptance.</span>
+            </label>
+            <button class="primary-action" type="submit">
+              <span>Create request packet</span>
+            </button>
+          </fieldset>
         </form>
       </section>
 

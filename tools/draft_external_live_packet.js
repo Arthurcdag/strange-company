@@ -78,7 +78,7 @@ function buildDraft(template, config) {
     draftWarnings: [
       "This draft only copies public-safe values from public-config.js.",
       "Blank private fields must be completed from real external evidence before --require-live can pass.",
-      "Do not set liveMode true until support, Google Form, terms/privacy, Brazil compliance, AI handoff, Stripe, and bank evidence are real."
+      "Keep public-config.js liveMode false. After every external evidence gate is real, set only this local packet's publicConfig.liveMode target to true for --require-live; the tracked flip remains a separate human decision."
     ]
   };
 }

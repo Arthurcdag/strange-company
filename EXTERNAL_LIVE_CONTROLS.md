@@ -56,13 +56,25 @@ Run the gate regression that proves an otherwise-complete live packet still fail
 node tools/check_external_live_packet_gate.js
 ```
 
-Validate the completed local packet before changing `public-config.js`:
+Copy only the reviewed public-safe values and review dates into `public-config.js` first and keep its `liveMode: false`. The revenue packet must match that pre-live snapshot exactly. The external-live packet must match every public field except its local `publicConfig.liveMode`, which is `true` because `--require-live` validates the intended post-decision target; the binding deliberately ignores only this one phase field. The tracked config and receipt remain `false` until the separate human flip. Then validate both packets:
 
 ```bash
-node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
 ```
 
 Only use the resulting public values in `public-config.js`; keep Stripe dashboard URLs, Sheet URLs, bank last4, and operator names in the private Operations evidence lane.
+
+After the external and revenue packets validate against the same current config, also close the reviewer-capacity and delivery-review gates before exporting the public-only receipt while `liveMode` is still `false`:
+
+```bash
+node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
+node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --check-public-js --require-issued
+```
+
+The receipt contains only the already-public config snapshot, process attestations, fixed-path SHA-256 hashes of normalized `TERMOS.md` and `AVISO_DE_PRIVACIDADE.md`, and integrity digests for both the public core and the full envelope. It contains neither private packet data nor hashes of private packets. The browser refetches the receipt and legal documents and recomputes the digests; any envelope edit, legal-copy drift, a config change other than the final `liveMode` flip, or expiry after seven days closes the paid desk. This is a time-limited process receipt, not external certification, a signature, or proof that a particular operator ran the validators.
 
 ## Launch Gate Evidence Panel
 
@@ -95,6 +107,12 @@ Minimum checks:
 - [ ] A reply can be sent from the support address.
 - [ ] The support address is the same address that will appear in `public-config.js`.
 - [ ] No personal-only mailbox is treated as the permanent customer support system.
+
+Record the received, replied, and Google Form test times as real ISO-8601 UTC
+timestamps ending in `Z`. Strict live validation rejects future times, a support
+reply earlier than its received message, and connectivity tests older than 30
+days. Rerun the tests instead of reissuing a receipt from stale connectivity
+evidence.
 
 Evidence to record privately:
 
@@ -187,9 +205,14 @@ Response setup:
 - [ ] Submit one safe test response.
 - [ ] Confirm the response lands in the Sheet.
 - [ ] Copy the public Form URL that starts with `https://docs.google.com/forms/`.
-- [ ] Paste only that Form URL into `public-config.js`.
+- [ ] Turn off external Form response collection after the safe test.
+- [ ] Record `google.acceptingResponses: false` in the ignored external-live packet.
+- [ ] Paste only that Form URL into the local release config; do not publish a
+  pre-live snapshot that exposes the URL while the desk is closed.
 
 Do not depend on Google Forms `entry.*` IDs in the public site. The public page should open the form and provide a copyable packet; it should not auto-submit customer data.
+The receipt gates only the static site. It cannot disable an external Form reached
+through a direct or previously shared URL, so the human operator owns that toggle.
 
 ## 4. Terms And Privacy Review Dates
 
@@ -287,7 +310,7 @@ window.PUBLIC_ORDER_CONFIG = {
   privacyReviewedAt: "YYYY-MM-DD",
   brazilComplianceReviewedAt: "YYYY-MM-DD",
   aiHandoffReviewedAt: "YYYY-MM-DD",
-  liveMode: true,
+  liveMode: false,
   services: [
     {
       id: "proof-sprint",
@@ -310,11 +333,22 @@ Keep `supportEmail` set to the verified pilot inbox (`tuiidagnese+strangeworks@g
 Run:
 
 ```bash
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
+node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
+node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --check-public-js --require-issued
 node tools/preflight_public_launch.js
-node tools/audit_company_functionality.js --require-live
+node tools/evolution_goal_status.js --json
 ```
 
-Both must pass before publishing the live config.
+Every command must pass while `liveMode` remains false and the ready config
+stays unpublished. Review the issued receipt and confirm status has no hard,
+public-route, or operational blockers; only then may a human make the separate
+`liveMode: true` change. Run `node tools/preflight_public_launch.js --deployment`,
+publish the issued receipt and live config together, verify Pages, and only then
+enable external Form responses.
 
 ## 8. Live Smoke Test
 

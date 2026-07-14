@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests.test_revenue_setup_evidence_index import valid_evidence_payload
+from tests.test_revenue_setup_evidence_index import valid_evidence_payload, write_public_config
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -35,6 +35,9 @@ class EvolutionNextPacketTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Evolution Next Action Packet", result.stdout)
+        self.assertIn("## Do This Next", result.stdout)
+        self.assertIn("Blocker: humanReviewClosure", result.stdout)
+        self.assertIn("draft_live_review_closure.js", result.stdout)
         self.assertIn("termsReviewedAt", result.stdout)
         self.assertIn("Review Closure Workflow", result.stdout)
         self.assertIn("LIVE_REVIEW_CLOSURE.local.json", result.stdout)
@@ -44,6 +47,8 @@ class EvolutionNextPacketTests(unittest.TestCase):
         self.assertIn("liveReviewClosure", result.stdout)
         self.assertIn("node tools/local_evidence_status.js --json", result.stdout)
         self.assertIn("privatePaymentFiscalEvidence", result.stdout)
+        self.assertIn("privateExternalLiveEvidence", result.stdout)
+        self.assertIn("External Live Blockers", result.stdout)
         self.assertIn("Operational Blockers", result.stdout)
         self.assertIn("Do not set `liveMode: true`", result.stdout)
 
@@ -51,12 +56,18 @@ class EvolutionNextPacketTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as workspace:
             evidence = pathlib.Path(workspace) / "REVENUE_SETUP_EVIDENCE_INDEX.local.json"
             evidence.write_text(json.dumps(valid_evidence_payload(), indent=2), encoding="utf-8")
-            result = run_packet("--local-evidence-dir", workspace)
+            result = run_packet(
+                "--local-evidence-dir",
+                workspace,
+                "--public-config",
+                str(write_public_config()),
+            )
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("## Revenue Blockers\n\n- none", result.stdout)
         self.assertNotIn("privatePaymentFiscalEvidence", result.stdout)
         self.assertIn("revenueSetupEvidence: ready", result.stdout)
+        self.assertIn("privateExternalLiveEvidence", result.stdout)
 
     def test_write_local_respects_force(self) -> None:
         with tempfile.TemporaryDirectory() as workspace:

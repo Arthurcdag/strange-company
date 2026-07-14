@@ -4,6 +4,7 @@ import argparse
 import copy
 import json
 import re
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,10 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PUBLIC_CONFIG = ROOT / "public-config.js"
 DEFAULT_REVIEWER_TRACKER = ROOT / "REVIEWER_CANDIDATE_TRACKER.local.json"
 DEFAULT_REVENUE_EVIDENCE_INDEX = ROOT / "REVENUE_SETUP_EVIDENCE_INDEX.local.json"
+DEFAULT_EXTERNAL_LIVE_PACKET = ROOT / "EXTERNAL_LIVE_PACKET.local.json"
+DEFAULT_PUBLIC_LIVE_RECEIPT = ROOT / "public-live-receipt.js"
+DEFAULT_TERMS_DOCUMENT = ROOT / "TERMOS.md"
+DEFAULT_PRIVACY_DOCUMENT = ROOT / "AVISO_DE_PRIVACIDADE.md"
 DEFAULT_PUBLIC_AMA_QUEUE = ROOT / "PUBLIC_AMA_QUEUE.local.json"
 DEFAULT_PUBLIC_AMA_ANSWERS = ROOT / "public-ama-answers.js"
 DEFAULT_DELIVERY_REVIEW_CHECKLIST = ROOT / "DELIVERY_REVIEW_CHECKLIST.local.json"
@@ -308,13 +313,54 @@ def infer_reviewer_metrics(tracker_path: Path = DEFAULT_REVIEWER_TRACKER) -> tup
         len(found_candidates) >= len(REQUIRED_REVIEWER_ROLES)
         and REQUIRED_REVIEWER_ROLES.issubset(ready_roles)
         and all(role in ready_roles for role in REQUIRED_REVIEWER_ROLES)
+        and _node_validator_passes(
+            "validate_reviewer_candidate_tracker.js",
+            tracker_path,
+            "--require-ready",
+        )
     )
 
     return len(found_candidates), is_ready_pool
 
 
-def _infer_revenue_evidence(evidence_path: Path) -> tuple[bool, str]:
+def _node_validator_passes(
+    script_name: str,
+    packet_path: Path,
+    gate: str,
+    *extra_args: str,
+) -> bool:
+    if not packet_path.exists():
+        return False
+    try:
+        result = subprocess.run(
+            [
+                "node",
+                str(ROOT / "tools" / script_name),
+                str(packet_path),
+                gate,
+                *extra_args,
+            ],
+            cwd=ROOT,
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
+def _infer_revenue_evidence(evidence_path: Path, public_config: Path) -> tuple[bool, str]:
     if not evidence_path.exists():
+        return False, ""
+    if not _node_validator_passes(
+        "validate_revenue_setup_evidence_index.js",
+        evidence_path,
+        "--require-all",
+        "--public-config",
+        str(public_config),
+    ):
         return False, ""
 
     try:
@@ -375,6 +421,53 @@ def _infer_revenue_evidence(evidence_path: Path) -> tuple[bool, str]:
         if payment_ref and tax_ref
         else "revenue-evidence-ready",
     )
+
+
+def _infer_external_live_evidence(evidence_path: Path, public_config: Path) -> tuple[bool, str]:
+    ready = _node_validator_passes(
+        "validate_external_live_packet.js",
+        evidence_path,
+        "--require-live",
+        "--public-config",
+        str(public_config),
+    )
+    return ready, "validator:passed" if ready else ""
+
+
+def _infer_public_live_receipt(
+    receipt_path: Path,
+    public_config: Path,
+    terms_document: Path,
+    privacy_document: Path,
+) -> tuple[bool, str]:
+    if not receipt_path.exists():
+        return False, ""
+    try:
+        result = subprocess.run(
+            [
+                "node",
+                str(ROOT / "tools" / "export_public_live_receipt.js"),
+                "--check-public-js",
+                "--require-issued",
+                "--public-config",
+                str(public_config),
+                "--public-js",
+                str(receipt_path),
+                "--terms-doc",
+                str(terms_document),
+                "--privacy-doc",
+                str(privacy_document),
+            ],
+            cwd=ROOT,
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False, ""
+    ready = result.returncode == 0
+    return ready, "public-receipt:issued" if ready else ""
 
 
 def _read_public_ama_answer_records(answers_path: Path) -> list[dict[str, Any]]:
@@ -475,6 +568,12 @@ def infer_delivery_review_loop(
 ) -> tuple[bool, str]:
     if not checklist_path.exists():
         return False, ""
+    if not _node_validator_passes(
+        "validate_delivery_review_checklist.js",
+        checklist_path,
+        "--require-ready",
+    ):
+        return False, ""
 
     try:
         data = json.loads(checklist_path.read_text(encoding="utf-8-sig"))
@@ -550,6 +649,10 @@ def build_current_state(
     public_config: Path = DEFAULT_PUBLIC_CONFIG,
     reviewer_tracker: Path = DEFAULT_REVIEWER_TRACKER,
     revenue_evidence_index: Path = DEFAULT_REVENUE_EVIDENCE_INDEX,
+    external_live_packet: Path = DEFAULT_EXTERNAL_LIVE_PACKET,
+    public_live_receipt: Path = DEFAULT_PUBLIC_LIVE_RECEIPT,
+    terms_document: Path = DEFAULT_TERMS_DOCUMENT,
+    privacy_document: Path = DEFAULT_PRIVACY_DOCUMENT,
     public_ama_queue: Path = DEFAULT_PUBLIC_AMA_QUEUE,
     public_ama_answers: Path = DEFAULT_PUBLIC_AMA_ANSWERS,
     delivery_review_checklist: Path = DEFAULT_DELIVERY_REVIEW_CHECKLIST,
@@ -561,7 +664,18 @@ def build_current_state(
     ai_handoff_reviewed_at = _read_string_config(text, "aiHandoffReviewedAt")
     human_reviewers_found, reviewers_ready = infer_reviewer_metrics(reviewer_tracker)
     payment_fiscal_evidence_ready, payment_fiscal_evidence = _infer_revenue_evidence(
-        revenue_evidence_index
+        revenue_evidence_index,
+        public_config,
+    )
+    external_live_evidence_ready, external_live_evidence = _infer_external_live_evidence(
+        external_live_packet,
+        public_config,
+    )
+    public_live_receipt_ready, public_live_receipt_evidence = _infer_public_live_receipt(
+        public_live_receipt,
+        public_config,
+        terms_document,
+        privacy_document,
     )
     ama_questions, ama_answers_ready, ama_answers_published, ama_queue_evidence = infer_public_ama_metrics(
         public_ama_queue,
@@ -587,6 +701,8 @@ def build_current_state(
             "brazilComplianceReviewed": bool(brazil_reviewed_at),
             "aiHandoffReviewed": bool(ai_handoff_reviewed_at),
             "privatePaymentFiscalEvidenceReady": payment_fiscal_evidence_ready,
+            "privateExternalLiveEvidenceReady": external_live_evidence_ready,
+            "publicLiveReceiptReady": public_live_receipt_ready,
             "humanReviewersReady": reviewers_ready,
             "publicAmaQueueActive": (ama_questions + ama_answers_published) > 0,
             "publicAmaAnswerReady": (ama_answers_ready + ama_answers_published) > 0,
@@ -599,6 +715,8 @@ def build_current_state(
             "brazilComplianceReviewedAt": brazil_reviewed_at,
             "aiHandoffReviewedAt": ai_handoff_reviewed_at,
             "privatePaymentFiscalEvidence": payment_fiscal_evidence,
+            "privateExternalLiveEvidence": external_live_evidence,
+            "publicLiveReceipt": public_live_receipt_evidence,
             "publicAmaQueue": ama_queue_evidence,
             "deliveryReviewLoop": delivery_review_loop_evidence,
         },
@@ -633,6 +751,10 @@ def hard_blockers(state: dict[str, Any]) -> list[str]:
         blockers.append("aiHandoffReviewedAt")
     if not gates.get("privatePaymentFiscalEvidenceReady"):
         blockers.append("private payment/fiscal evidence")
+    if not gates.get("privateExternalLiveEvidenceReady"):
+        blockers.append("private external live evidence")
+    if not gates.get("publicLiveReceiptReady"):
+        blockers.append("public live readiness receipt")
     return blockers
 
 
@@ -661,6 +783,7 @@ def company_operational_ready(state: dict[str, Any]) -> bool:
 
 def continuous_evolution_goal(state: dict[str, Any]) -> dict[str, Any]:
     hard = hard_blockers(state)
+    setup_hard = [blocker for blocker in hard if blocker != "public live readiness receipt"]
     operational = operational_blockers(state)
     gates = state.get("gates", {})
     public_routes_ready = bool(
@@ -669,7 +792,7 @@ def continuous_evolution_goal(state: dict[str, Any]) -> dict[str, Any]:
     )
     live_mode = bool(get_path(state, "gates.liveMode", False))
 
-    if hard:
+    if setup_hard:
         mode = "burn_down_hard_blockers"
         next_loop = "Close one real evidence gate, rerun VAU, and keep liveMode false."
     elif not public_routes_ready or operational:
@@ -747,8 +870,8 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
             CompanyEvent(
                 name="payment_fiscal_evidence_ready",
                 domain="finance",
-                probability_hint=0.22,
-                strategic_value=1.9,
+                probability_hint=0.25,
+                strategic_value=2.2,
                 tags=("hard_gate", "manual", "finance", "evidence"),
                 state_delta={
                     "gates.privatePaymentFiscalEvidenceReady": True,
@@ -759,6 +882,65 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
                 next_action=(
                     "Prepare private Stripe/bank/fiscal evidence outside git and mark it in "
                     "REVENUE_SETUP_EVIDENCE_INDEX.local.json."
+                ),
+            )
+        )
+
+    if "private external live evidence" in hard:
+        events.append(
+            CompanyEvent(
+                name="external_live_evidence_ready",
+                domain="operations",
+                probability_hint=0.27,
+                strategic_value=2.2,
+                tags=("hard_gate", "manual", "operations", "evidence"),
+                state_delta={
+                    "gates.privateExternalLiveEvidenceReady": True,
+                    "evidence.privateExternalLiveEvidence": "validator:passed",
+                },
+                requires_real_evidence=True,
+                reason="A human live decision requires the strict external support, Google, Stripe, bank, and review packet.",
+                next_action=(
+                    "Complete EXTERNAL_LIVE_PACKET.local.json outside git, then run "
+                    "node tools/validate_external_live_packet.js "
+                    "EXTERNAL_LIVE_PACKET.local.json --require-live "
+                    "--public-config public-config.js."
+                ),
+            )
+        )
+
+    if (
+        "public live readiness receipt" in hard
+        and get_path(state, "gates.privatePaymentFiscalEvidenceReady", False)
+        and get_path(state, "gates.privateExternalLiveEvidenceReady", False)
+        and get_path(state, "gates.humanReviewersReady", False)
+        and get_path(state, "gates.deliveryReviewLoopReady", False)
+        and all(
+            get_path(state, f"gates.{gate}", False)
+            for gate in (
+                "termsReviewed",
+                "privacyReviewed",
+                "brazilComplianceReviewed",
+                "aiHandoffReviewed",
+            )
+        )
+    ):
+        events.append(
+            CompanyEvent(
+                name="public_live_receipt_issued",
+                domain="operations",
+                probability_hint=0.3,
+                strategic_value=2.1,
+                tags=("hard_gate", "manual", "public_receipt"),
+                state_delta={
+                    "gates.publicLiveReceiptReady": True,
+                    "evidence.publicLiveReceipt": "public-receipt:issued",
+                },
+                requires_real_evidence=True,
+                reason="The public desk needs a short-lived, config-bound receipt after all four private readiness and operating-capacity validators pass.",
+                next_action=(
+                    "Run node tools/export_public_live_receipt.js with revenue, external-live, reviewer, and delivery packets "
+                    "while liveMode remains false, review the public-only output, and then rerun VAU."
                 ),
             )
         )
@@ -1202,11 +1384,17 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run VAU across Strange Company as a whole-company evolution model."
         " Use --revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json and"
+        " --external-live-packet EXTERNAL_LIVE_PACKET.local.json and"
+        " --public-live-receipt public-live-receipt.js and"
         " --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json."
     )
     parser.add_argument("--public-config", default=str(DEFAULT_PUBLIC_CONFIG))
     parser.add_argument("--reviewer-tracker", default=str(DEFAULT_REVIEWER_TRACKER))
     parser.add_argument("--revenue-evidence-index", default=str(DEFAULT_REVENUE_EVIDENCE_INDEX))
+    parser.add_argument("--external-live-packet", default=str(DEFAULT_EXTERNAL_LIVE_PACKET))
+    parser.add_argument("--public-live-receipt", default=str(DEFAULT_PUBLIC_LIVE_RECEIPT))
+    parser.add_argument("--terms-doc", default=str(DEFAULT_TERMS_DOCUMENT))
+    parser.add_argument("--privacy-doc", default=str(DEFAULT_PRIVACY_DOCUMENT))
     parser.add_argument("--public-ama-queue", default=str(DEFAULT_PUBLIC_AMA_QUEUE))
     parser.add_argument("--public-ama-answers", default=str(DEFAULT_PUBLIC_AMA_ANSWERS))
     parser.add_argument("--delivery-review-checklist", default=str(DEFAULT_DELIVERY_REVIEW_CHECKLIST))
@@ -1223,6 +1411,10 @@ def main() -> int:
         Path(args.public_config),
         reviewer_tracker=Path(args.reviewer_tracker),
         revenue_evidence_index=Path(args.revenue_evidence_index),
+        external_live_packet=Path(args.external_live_packet),
+        public_live_receipt=Path(args.public_live_receipt),
+        terms_document=Path(args.terms_doc),
+        privacy_document=Path(args.privacy_doc),
         public_ama_queue=Path(args.public_ama_queue),
         public_ama_answers=Path(args.public_ama_answers),
         delivery_review_checklist=Path(args.delivery_review_checklist),

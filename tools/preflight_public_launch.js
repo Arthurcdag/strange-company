@@ -5,6 +5,7 @@ const vm = require("vm");
 
 const root = path.resolve(__dirname, "..");
 const failures = [];
+const deploymentMode = process.argv.includes("--deployment");
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
@@ -35,6 +36,26 @@ function checkExternalLivePacketGate() {
   });
   const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
   assert(result.status === 0, `external live packet gate regression failed:\n${output}`);
+}
+
+function checkPublicLiveReceipt() {
+  const receiptArgs = [
+    "tools/export_public_live_receipt.js",
+    "--check-public-js",
+    "--public-config",
+    "public-config.js",
+    "--public-js",
+    "public-live-receipt.js",
+  ];
+  if (deploymentMode && loadPublicConfig().liveMode === true) {
+    receiptArgs.push("--require-issued");
+  }
+  const result = spawnSync(process.execPath, receiptArgs, {
+    cwd: root,
+    encoding: "utf8"
+  });
+  const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
+  assert(result.status === 0, `public live receipt regression failed:\n${output}`);
 }
 
 function loadPublicConfig() {
@@ -86,14 +107,28 @@ function checkPublicSurface() {
   ];
 
   assert(publicHtml.includes('class="public-site"'), "public.html must render the public surface.");
+  assert(
+    publicHtml.includes('http-equiv="Content-Security-Policy"')
+      && publicHtml.includes("script-src 'self'")
+      && publicHtml.includes("connect-src 'self'")
+      && publicHtml.includes("form-action 'none'"),
+    "public.html must keep a self-contained fail-closed Content Security Policy."
+  );
+  assert(!/<script\b[^>]*\bsrc=["']https?:\/\//i.test(publicHtml), "public.html must not execute third-party runtime scripts.");
   assert(publicHtml.includes('id="publicAmaForm"'), "public.html must render the public AMA form.");
   assert(publicHtml.includes('id="publicAmaAnswers"'), "public.html must render the public AMA answer archive.");
   assert(publicHtml.includes('href="PUBLIC_AMA.md"'), "public.html must link the public AMA rules.");
+  assert(publicHtml.includes('src="public-live-receipt.js"'), "public.html must load the public live receipt before public.js.");
+  assert(publicHtml.includes('id="publicOrderClosed"'), "public.html must render the fail-closed paid-intake notice.");
+  assert(publicHtml.includes('href="#ama"'), "public.html must hand closed paid intake to the public-safe AMA.");
+  assert(publicHtml.includes('id="publicOrderForm" hidden aria-hidden="true"'), "public order form must start hidden.");
+  assert(publicHtml.includes('id="publicOrderFields" hidden disabled'), "public order fields must start disabled.");
   assert(publicHtml.includes("public-config.js"), "public.html must load public-config.js.");
   assert(publicHtml.includes("public-ama-answers.js"), "public.html must load public-ama-answers.js.");
   assert(publicHtml.includes("public.js"), "public.html must load public.js.");
   assert(!publicHtml.includes("script.js"), "public.html must not load the private command center script.");
   assert(pagesWorkflow.includes("node tools/build_public_site.js --check --output _site --force"), "pages workflow must use the public site build checker.");
+  assert(pagesWorkflow.includes("python -m unittest discover -s tests"), "Pages deployment must run the full test suite before upload/deploy.");
   assert(validateWorkflow.includes("node tools/build_public_site.js --check --output .public-site-build.local --force"), "validate workflow must check the public site bundle.");
 
   const forbiddenPublicPatterns = [
@@ -116,7 +151,10 @@ function checkPublicSurface() {
     ["ledger bridge form id", /operationsLedgerBridgeForm/],
     ["daily run storage key", /strange-company-daily-pilot-run/],
     ["plugin workflow UI", /\b(Alpaca|Binance|Zotero|Life Science Research|GitHub signal)\b/],
-    ["automatic network submit", /\bfetch\s*\(/],
+    ["beacon network submit", /\bsendBeacon\s*\(/],
+    ["XHR network submit", /\bXMLHttpRequest\b/],
+    ["WebSocket network channel", /\bWebSocket\s*\(/],
+    ["EventSource network channel", /\bEventSource\s*\(/],
     ["private Setup evidence panel", /\bSetup evidence\b/i],
     ["private Customer acquisition panel", /\bCustomer acquisition\b/i],
     ["setup evidence form id", /setupEvidencePanel/],
@@ -132,6 +170,33 @@ function checkPublicSurface() {
     for (const [label, pattern] of forbiddenPublicPatterns) {
       assert(!pattern.test(contents), `${file} exposes ${label}.`);
     }
+  }
+
+  const fetchCalls = publicJs.match(/\bfetch\s*\(/g) || [];
+  const assetHelperReferences = publicJs.match(/\bfetchPublicAssetText\s*\(/g) || [];
+  assert(fetchCalls.length === 1, "public.js may contain only the fixed same-origin public-asset GET.");
+  assert(
+    publicJs.includes("const response = await fetch(assetPath, requestOptions);"),
+    "public.js fetch must stay inside the public-asset verification helper."
+  );
+  assert(
+    publicJs.includes('const requestOptions = { cache: "no-store", credentials: "same-origin" };'),
+    "public.js public-asset fetch must be same-origin and bypass the browser cache."
+  );
+  assert(assetHelperReferences.length === 3, "public.js public-asset helper must have only its declaration and two fixed call sites.");
+  assert(
+    publicJs.includes('Object.freeze({ key: "terms", path: "TERMOS.md" })')
+      && publicJs.includes('Object.freeze({ key: "privacy", path: "AVISO_DE_PRIVACIDADE.md" })'),
+    "public.js legal-document fetch allowlist must stay fixed."
+  );
+  assert(
+    publicJs.includes('fetchPublicAssetText("public-live-receipt.js")'),
+    "public.js receipt revalidation fetch must stay fixed."
+  );
+  assert(!/\bmethod\s*:/.test(publicJs), "public.js public-asset fetch must remain a GET.");
+  assert(!/\bbody\s*:/.test(publicJs), "public.js must not attach a request body to network calls.");
+  for (const [file, contents] of publicFiles.filter(([file]) => file !== "public.js")) {
+    assert(!/\bfetch\s*\(/.test(contents), `${file} must not perform network fetches.`);
   }
 
   const requiredGuardTerms = [
@@ -153,6 +218,21 @@ function checkPublicSurface() {
     "No order, invoice, payment request, customer support ticket, or launch approval is created.",
     "Public intake is closed",
     "if (!readiness.liveReady)",
+    "function setPublicOrderAvailability()",
+    "readiness.liveReady === true",
+    "function publicLiveReceiptReady(",
+    "function fetchPublicAssetText(",
+    "function parsePublicLiveReceiptScript(",
+    "await waitForLatestPublicLiveReceiptRefresh();",
+    "PUBLIC_LIVE_RECEIPT_REFRESH_EPOCH",
+    'receipt.status === "local_packet_validators_passed"',
+    'globalThis.crypto.subtle.digest("SHA-256", bytes)',
+    "attestations.operationalValidatorsPassed === true",
+    "receipt.envelopeSha256",
+    "validUntilDate.valueOf() > now",
+    "function schedulePublicReceiptExpiry()",
+    "form.hidden = !liveReady",
+    "fields.disabled = !liveReady",
     "readiness.liveReady ? `<a href=\"${mailtoUrl(order)}\">Open email draft</a>` : \"\""
   ];
   for (const term of requiredGuardTerms) {
@@ -467,7 +547,9 @@ function checkPaidPilotProfitReadinessContract() {
   );
   assert(satelliteDoc.includes("Profit Readiness"), "SATELLITE_COMPANY.md must document Profit Readiness.");
   assert(runbook.includes("Paid Pilot Profit Readiness"), "OPERATIONS_RUNBOOK.md must document Paid Pilot Profit Readiness.");
-  assert(publicConfig.liveMode === false, "public-config.js must keep liveMode false by default.");
+  if (!deploymentMode) {
+    assert(publicConfig.liveMode === false, "public-config.js must keep liveMode false by default; use --deployment only for the separately reviewed live flip.");
+  }
 
   for (const [file, contents] of [
     ["public.html", publicHtml],
@@ -982,7 +1064,10 @@ function checkPublicAmaQueueContract() {
     ["public AMA VAU default path", vauCompany, "PUBLIC_AMA_QUEUE.local.json"],
     ["public AMA VAU answer archive path", vauCompany, "public-ama-answers.js"],
     ["public AMA VAU queue argument", vauCompany, "--public-ama-queue"],
-    ["public AMA VAU answer archive argument", vauCompany, "--public-ama-answers"]
+    ["public AMA VAU answer archive argument", vauCompany, "--public-ama-answers"],
+    ["VAU external live packet argument", vauCompany, "--external-live-packet"],
+    ["VAU external live evidence gate", vauCompany, "privateExternalLiveEvidenceReady"],
+    ["VAU authoritative external live validator", vauCompany, "validate_external_live_packet.js"]
   ];
 
   for (const [label, contents, snippet] of required) {
@@ -1011,7 +1096,7 @@ function checkRevenueSetupEvidenceIndexContract() {
     ["AI handoff revenue packet reference", aiHandoff, "REVENUE_SETUP_EVIDENCE_PACKET.md"],
     ["human revenue draft command", humanRevenue, "node tools/draft_revenue_setup_evidence_index.js --write-local"],
     ["human revenue payment gate command", humanRevenue, "node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-payment"],
-    ["human revenue all-gates command", humanRevenue, "node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all"],
+    ["human revenue config-bound all-gates command", humanRevenue, "node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js"],
     ["human revenue packet includes draft command", packet, "tools/draft_revenue_setup_evidence_index.js"],
     ["human revenue packet includes validate command", packet, "tools/validate_revenue_setup_evidence_index.js"],
     ["revenue setup index template schema", template, '"schemaVersion": 1'],
@@ -1144,6 +1229,8 @@ function checkEvolutionGoalStatusContract() {
     ["status active goal", statusTool, 'goalStatus: "active"'],
     ["status hard blocker mode", statusTool, "burn_down_hard_blockers"],
     ["status revenue blocker", statusTool, "privatePaymentFiscalEvidence"],
+    ["status external live blocker", statusTool, "privateExternalLiveEvidence"],
+    ["status selected handoff", statusTool, "selectedHandoff"],
     ["status review closure actions", statusTool, "reviewClosureActions"],
     ["status review closure local packet", statusTool, "LIVE_REVIEW_CLOSURE.local.json"],
     ["status review closure renderer", statusTool, "render_live_review_public_config_patch.js"],
@@ -1180,6 +1267,8 @@ function checkEvolutionNextPacketContract() {
     ["next packet local target", generator, "EVOLUTION_NEXT_ACTION.local.md"],
     ["next packet status source", generator, "tools/evolution_goal_status.js"],
     ["next packet review closure section", generator, "Review Closure Workflow"],
+    ["next packet selected handoff section", generator, "Do This Next"],
+    ["next packet external live blocker section", generator, "External Live Blockers"],
     ["next packet review closure source", generator, "reviewClosureActions"],
     ["next packet local evidence section", generator, "Local Evidence Matrix"],
     ["next packet local evidence validation command", generator, "node tools/local_evidence_status.js --json"],
@@ -1335,6 +1424,7 @@ function checkConfig() {
 }
 
 compileJavaScript("public-config.js");
+compileJavaScript("public-live-receipt.js");
 compileJavaScript("public-ama-answers.js");
 compileJavaScript("public.js");
 compileJavaScript("script.js");
@@ -1345,6 +1435,7 @@ compileJavaScript("tools/generate_evolution_next_packet.js");
 compileJavaScript("tools/local_evidence_status.js");
 compileJavaScript("tools/draft_live_review_closure.js");
 compileJavaScript("tools/render_live_review_public_config_patch.js");
+compileJavaScript("tools/export_public_live_receipt.js");
 compileJavaScript("tools/build_public_site.js");
 compileJavaScript("tools/draft_external_live_packet.js");
 compileJavaScript("tools/generate_external_live_gap_packet.js");
@@ -1361,6 +1452,7 @@ compileJavaScript("tools/validate_public_ama_queue.js");
 compileJavaScript("tools/draft_delivery_review_checklist.js");
 compileJavaScript("tools/validate_delivery_review_checklist.js");
 checkExternalLivePacketGate();
+checkPublicLiveReceipt();
 checkPublicSurface();
 checkPrivateUrlAllowlists();
 checkOutcomeEvidenceContract();

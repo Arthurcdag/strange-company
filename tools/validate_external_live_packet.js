@@ -1,14 +1,38 @@
 const fs = require("fs");
 const path = require("path");
+const vm = require("vm");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
 const requireLive = args.includes("--require-live");
 const templateOk = args.includes("--template-ok") || !requireLive;
-const packetArg = args.find((arg) => !arg.startsWith("--"));
+
+function argValue(name) {
+  const index = args.indexOf(name);
+  return index >= 0 && args[index + 1] ? String(args[index + 1]) : "";
+}
+
+const publicConfigArg = argValue("--public-config");
+const publicConfigPath = publicConfigArg ? path.resolve(process.cwd(), publicConfigArg) : "";
+const packetArg = args.find((arg, index) => !arg.startsWith("--") && args[index - 1] !== "--public-config");
 const packetPath = packetArg
   ? path.resolve(process.cwd(), packetArg)
   : path.join(root, "EXTERNAL_LIVE_PACKET.template.json");
+
+const PUBLIC_CONFIG_BINDING_FIELDS = [
+  "operatorName",
+  "jurisdiction",
+  "aiGeneratedLegalDocsRequireHumanReview",
+  "supportEmail",
+  "googleFormUrl",
+  "supportInboxVerified",
+  "googleFormVerified",
+  "termsReviewedAt",
+  "privacyReviewedAt",
+  "brazilComplianceReviewedAt",
+  "aiHandoffReviewedAt",
+];
+const EXTERNAL_TEST_FRESHNESS_MS = 30 * 24 * 60 * 60 * 1000;
 
 const failures = [];
 const warnings = [];
@@ -26,6 +50,17 @@ function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, "utf8"));
   } catch (error) {
     fail(`could not read JSON packet: ${error.message}`);
+    return {};
+  }
+}
+
+function readPublicConfig(filePath) {
+  try {
+    const sandbox = { window: {} };
+    vm.runInNewContext(fs.readFileSync(filePath, "utf8"), sandbox, { filename: filePath });
+    return sandbox.window.PUBLIC_ORDER_CONFIG || {};
+  } catch (error) {
+    fail(`could not read current public config: ${error.message}`);
     return {};
   }
 }
@@ -88,6 +123,12 @@ function requireEquals(packet, dottedPath, expected, label) {
 }
 
 function assertShape(packet) {
+  if (packet.schemaVersion !== 1) {
+    fail("packet schemaVersion must be 1.");
+  }
+  if (requireLive && packet.mode !== "local") {
+    fail("packet mode must be local for --require-live.");
+  }
   const requiredObjects = [
     "support",
     "google",
@@ -100,6 +141,38 @@ function assertShape(packet) {
   for (const key of requiredObjects) {
     if (!packet[key] || typeof packet[key] !== "object" || Array.isArray(packet[key])) {
       fail(`packet is missing object section ${key}.`);
+    }
+  }
+}
+
+function requireRecentIsoUtcTimestamp(value, dottedPath, label, now = Date.now()) {
+  const text = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(text)) {
+    fail(`${label} must be an ISO-8601 UTC timestamp at ${dottedPath}.`);
+    return Number.NaN;
+  }
+  const parsed = new Date(text);
+  const canonical = text.includes(".") ? text : `${text.slice(0, -1)}.000Z`;
+  if (Number.isNaN(parsed.valueOf()) || parsed.toISOString() !== canonical) {
+    fail(`${label} must be a real ISO-8601 UTC timestamp at ${dottedPath}.`);
+    return Number.NaN;
+  }
+  const timestamp = parsed.valueOf();
+  if (timestamp > now) {
+    fail(`${label} must not be in the future at ${dottedPath}.`);
+  }
+  if (timestamp < now - EXTERNAL_TEST_FRESHNESS_MS) {
+    fail(`${label} must be no more than 30 days old at ${dottedPath}.`);
+  }
+  return timestamp;
+}
+
+function validateCurrentPublicConfigBinding(packet, currentConfig) {
+  for (const field of PUBLIC_CONFIG_BINDING_FIELDS) {
+    const packetValue = valueAt(packet, `publicConfig.${field}`);
+    const currentValue = currentConfig[field];
+    if (packetValue !== currentValue) {
+      fail(`publicConfig.${field} must match the current public-config.js value.`);
     }
   }
 }
@@ -189,6 +262,8 @@ function validateOptionalFormats(packet) {
     const value = valueAt(packet, dottedPath);
     if (!isBlank(value) && !isIsoDate(value)) {
       fail(`${dottedPath} must be YYYY-MM-DD when present.`);
+    } else if (!isBlank(value) && String(value).trim() > new Date().toISOString().slice(0, 10)) {
+      fail(`${dottedPath} must not be in the future.`);
     }
   }
 
@@ -229,6 +304,7 @@ function validateLive(packet) {
   requireTrue(packet, "google.invoicesHeaderVerified", "Invoices header verification");
   requireTrue(packet, "google.leadsHeaderVerified", "Leads header verification");
   requireTrue(packet, "google.formLinkedToSheet", "Google Form response link");
+  requireEquals(packet, "google.acceptingResponses", false, "Google Form pre-live response collection");
   requireTrue(packet, "google.verified", "Google intake verification");
 
   requirePath(packet, "legalReview.termsReviewedAt", "terms review date");
@@ -273,6 +349,33 @@ function validateLive(packet) {
   requireTrue(packet, "attestation.noSecretsInRepo", "no-secrets attestation");
   requireTrue(packet, "attestation.strangeCompanyRemainsSealed", "sealed company attestation");
   requireTrue(packet, "attestation.satelliteIsRevenueOperator", "satellite operator attestation");
+
+  const now = Date.now();
+  const supportReceivedAt = requireRecentIsoUtcTimestamp(
+    valueAt(packet, "support.testReceivedAt"),
+    "support.testReceivedAt",
+    "support test received timestamp",
+    now
+  );
+  const supportRepliedAt = requireRecentIsoUtcTimestamp(
+    valueAt(packet, "support.testRepliedAt"),
+    "support.testRepliedAt",
+    "support test replied timestamp",
+    now
+  );
+  requireRecentIsoUtcTimestamp(
+    valueAt(packet, "google.testResponseTimestamp"),
+    "google.testResponseTimestamp",
+    "Google Form test response timestamp",
+    now
+  );
+  if (
+    Number.isFinite(supportReceivedAt)
+    && Number.isFinite(supportRepliedAt)
+    && supportRepliedAt < supportReceivedAt
+  ) {
+    fail("support.testRepliedAt must be at or after support.testReceivedAt.");
+  }
 }
 
 function validateTemplate(packet) {
@@ -291,6 +394,11 @@ validateOptionalFormats(packet);
 
 if (requireLive) {
   validateLive(packet);
+  if (publicConfigPath) {
+    validateCurrentPublicConfigBinding(packet, readPublicConfig(publicConfigPath));
+  } else {
+    fail("--require-live requires --public-config public-config.js so readiness cannot pass against a stale public snapshot.");
+  }
 } else if (templateOk) {
   validateTemplate(packet);
 }

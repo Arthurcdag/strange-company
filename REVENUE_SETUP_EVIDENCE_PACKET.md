@@ -130,7 +130,7 @@ Use ISO dates: `YYYY-MM-DD`. Review dates must be the real human review dates.
 
 ## Public Config Patch Values
 
-Only after every gate above closes, patch the public-safe fields. These must match `EXTERNAL_LIVE_PACKET.local.json` and `REVENUE_SETUP_EVIDENCE_INDEX.local.json`:
+Only after every gate above closes, patch the public-safe fields. These must match both local packets, except for the intentional phase field: `public-config.js`, the revenue packet, and the receipt stay at `liveMode: false`, while the external-live packet uses local `publicConfig.liveMode: true` as the post-decision target required by `--require-live`. The binding ignores only that one field:
 
 ```js
 supportEmail: "reviewed support email",
@@ -141,10 +141,10 @@ termsReviewedAt: "YYYY-MM-DD",
 privacyReviewedAt: "YYYY-MM-DD",
 brazilComplianceReviewedAt: "YYYY-MM-DD",
 aiHandoffReviewedAt: "YYYY-MM-DD",
-liveMode: true
+liveMode: false
 ```
 
-Do not put Sheet URLs, Stripe dashboard URLs, bank metadata, tax IDs, CPF, CNPJ artifacts, private reviewer notes, or credentials in `public-config.js`.
+Do not put Sheet URLs, Stripe dashboard URLs, bank metadata, tax IDs, CPF, CNPJ artifacts, private reviewer notes, or credentials in `public-config.js`. Keep `liveMode` false until the bound validators, receipt export/check, preflight, and status review all pass; the human flip is a separate decision.
 
 ## Evidence Index Map
 
@@ -171,20 +171,23 @@ Run before requesting any customer payment:
 node --check public-config.js
 node --check public.js
 node --check script.js
-node tools/preflight_public_launch.js
-node tools/audit_company_functionality.js
-node tools/audit_company_functionality.js --require-live
-node tools/survival_check.js
 node tools/check_external_live_packet_gate.js
-node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live
 node tools/draft_revenue_setup_evidence_index.js --write-local
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-payment
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-tax
-node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
+node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
+node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --check-public-js --require-issued
+node tools/preflight_public_launch.js
+node tools/evolution_goal_status.js --json
+node tools/survival_check.js
 python -B -m unittest discover -s tests
 ```
 
-If any command fails, keep `liveMode: false`, record the blocker in the manual close sheet, and fix the outside evidence before retrying.
+Run the bound validators and receipt export only after the reviewed public dates are in `public-config.js` with `liveMode: false`. If any command fails, keep `liveMode: false`, record the blocker in the manual close sheet, and fix the outside evidence before retrying. If all pass, the human `liveMode` flip remains a separate decision followed by `node tools/preflight_public_launch.js --deployment` before publication.
 
 ## Stop Rules
 

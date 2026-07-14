@@ -125,16 +125,18 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 
 ## Prototype
 
-- [public.html](public.html): public GitHub Pages Order Desk and documentation surface.
+- [public.html](public.html): public GitHub Pages documentation and AMA surface; the paid desk stays hidden and disabled until strict live readiness passes.
 - [public-config.js](public-config.js): public support inbox, Google Form URL, service names, and prices.
+- [public-live-receipt.js](public-live-receipt.js): public-only fail-closed lease; paid intake stays closed until all four private readiness and operating-capacity validators pass, the receipt envelope is issued, and its seven-day validity has not expired.
 - [public-ama-answers.js](public-ama-answers.js): public-safe AMA answer archive loaded by the static page; empty until approved answers are exported.
 - [public.js](public.js): payment-safe public request packet builder.
 - [tools/build_public_site.js](tools/build_public_site.js): cross-platform builder/checker for the GitHub Pages public bundle.
+- [tools/export_public_live_receipt.js](tools/export_public_live_receipt.js): two-phase exporter that validates revenue, external-live, reviewer-capacity, and delivery-review packets and emits a public-only, config-bound seven-day receipt while `liveMode` remains false; `--revoke` replaces any lease with a closed placeholder without private packets.
 - [tools/preflight_public_launch.js](tools/preflight_public_launch.js): launch preflight for public/private separation, URL allowlists, live-mode config, and sensitive-data guard coverage.
 - [tools/audit_company_functionality.js](tools/audit_company_functionality.js): repo-level audit for Strange Company, the satellite operator, and the external live-operation gate.
 - [tools/audit_evolution_log.js](tools/audit_evolution_log.js): public-safe audit for `EVOLUTION_LOG.md`, requiring objective, changed artifacts, verification commands, and a result for each evolution pass.
-- [tools/evolution_goal_status.js](tools/evolution_goal_status.js): public-safe active-goal status report for current mode, live/revenue blockers, local evidence matrix, review-closure workflow, latest logged pass, and next actions.
-- [tools/generate_evolution_next_packet.js](tools/generate_evolution_next_packet.js): local packet generator for `EVOLUTION_NEXT_ACTION.local.md`, translating current status into a hard-blocker burn-down checklist.
+- [tools/evolution_goal_status.js](tools/evolution_goal_status.js): public-safe active-goal status report with one deterministic `selectedHandoff`; strict readiness requires review closure, config-bound revenue/external evidence, reviewer and delivery capacity, and an issued public live receipt.
+- [tools/generate_evolution_next_packet.js](tools/generate_evolution_next_packet.js): local packet generator for `EVOLUTION_NEXT_ACTION.local.md`, putting the selected handoff first and retaining the remaining blocker backlog.
 - [tools/local_evidence_status.js](tools/local_evidence_status.js): public-safe status report for ignored local evidence lanes; it reports missing, partial, ready, or invalid packets without printing private packet contents.
 - [tools/survival_check.js](tools/survival_check.js): survival drill that confirms the charter, resilience model, receipt chain, Brazil/AI gates, public/private boundary, and expected live-gate behavior still hold.
 - [tools/google_apps_script_create_intake_form.gs](tools/google_apps_script_create_intake_form.gs): Apps Script builder for creating the Google Form intake and linking it to the private Sheet ledger.
@@ -204,9 +206,37 @@ To reduce the private payment/fiscal hard blocker, complete `REVENUE_SETUP_EVIDE
 node tools/draft_revenue_setup_evidence_index.js --write-local
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-payment
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-tax
-node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all
-python tools/vau_company_evolution.py --revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --depth 1
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
+node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
+node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --check-public-js --require-issued
+python tools/vau_company_evolution.py --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --public-live-receipt public-live-receipt.js --depth 1
 ```
+
+Run the receipt exporter only after all four private validators pass while
+`liveMode` is still `false`; keep that pre-flip config unpublished, make the
+separate human flip last, and run `node tools/preflight_public_launch.js
+--deployment`. The receipt carries no private packet data or hashes. Its core
+and full envelope have independent SHA-256 integrity checks, the browser
+recomputes both, and the lease expires after seven days. The core also binds
+the normalized UTF-8 contents of `TERMOS.md` and `AVISO_DE_PRIVACIDADE.md`
+through fixed-path, domain-separated SHA-256 hashes, so changing either public
+legal document requires a new receipt. This is a
+process-integrity receipt, not external certification or cryptographic proof
+that a specific operator ran the validators. VAU independently rechecks the
+private packets, so a missing, expired, stale, config-mismatched, or
+capacity-incomplete artifact cannot produce a human-live-decision recommendation.
+
+The receipt gates the static bundle only; it cannot disable a Google Form opened
+through a direct or previously shared link. Closed releases therefore keep the
+Form URL blank and response collection disabled. After a verified live deploy,
+the human operator may enable responses. On expiry or any stop rule, disable
+responses first, set `liveMode: false`, clear the Form URL/verified flag, run
+`node tools/export_public_live_receipt.js --revoke --public-config
+public-config.js --output public-live-receipt.js`, run the deployment preflight,
+and publish the closed config plus placeholder together.
 
 To close the repeatable delivery-review loop without exposing customer evidence, complete `DELIVERY_REVIEW_CHECKLIST.local.json` from `DELIVERY_REVIEW_CHECKLIST.template.json`:
 
@@ -216,7 +246,9 @@ node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local
 python tools/vau_company_evolution.py --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --depth 1
 ```
 
-Pull requests also run the same syntax and public launch preflight checks through the `Validate static site` workflow.
+Pull requests run the full test suite, syntax checks, and public launch preflight
+through the `Validate static site` workflow. The Pages deployment independently
+runs the full test suite again before it can upload or deploy `main`.
 
 The GitHub repository deploys `public.html` as the GitHub Pages homepage from `main`. The private command center is not the public homepage and should not be treated as live autonomous business operation.
 

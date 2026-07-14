@@ -9,6 +9,8 @@ The company-level loop models:
 - human review capacity
 - Brazil/legal/privacy/AI handoff review status
 - private payment and fiscal evidence readiness
+- private external support, Google, Stripe, bank, and review evidence readiness
+- public-only live receipt readiness, bound to the current public config plus normalized `TERMOS.md` and `AVISO_DE_PRIVACIDADE.md`
 - delivery review loop readiness
 - revenue pilot flow
 - support, tooling, and risk pressure
@@ -55,6 +57,18 @@ When a reviewed delivery loop exists locally, pass it explicitly:
   --depth 1
 ```
 
+When evaluating live-decision readiness, pass all four private readiness and operating-capacity packets plus the public receipt explicitly. VAU calls the authoritative Node validators and fails closed if Node, a packet, the issued receipt, or a validator is unavailable:
+
+```powershell
+& 'C:\Program Files\LibreOffice\program\python.exe' tools\vau_company_evolution.py `
+  --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json `
+  --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json `
+  --revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json `
+  --external-live-packet EXTERNAL_LIVE_PACKET.local.json `
+  --public-live-receipt public-live-receipt.js `
+  --depth 1
+```
+
 ## Rules
 
 VAU may recommend a future, but it cannot create real-world evidence.
@@ -66,11 +80,13 @@ Hard blockers remain hard:
 - `brazilComplianceReviewedAt`
 - `aiHandoffReviewedAt`
 - private payment/fiscal evidence
+- private external live evidence validated against the current config with `node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js`
 
 Operational blockers also matter before scaling:
 
 - 4 human reviewers
 - repeatable delivery review loop, validated with `node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready`
+- issued seven-day public live receipt, validated with `node tools/export_public_live_receipt.js --check-public-js --require-issued`, after both capacity gates pass
 
 If these are not complete, the correct VAU evolution is to keep `liveMode`
 closed and burn down blockers.
@@ -95,7 +111,9 @@ path is:
 
 1. complete human/legal/privacy/Brazil/AI handoff review dates,
 2. prepare private payment/fiscal evidence,
-3. finish the 4-reviewer bench,
-4. make the delivery review loop repeatable,
-5. qualify one controlled pilot,
-6. only then consider a human live-mode decision.
+3. validate the separate external support/Google/Stripe/bank live packet,
+4. finish the 4-reviewer bench,
+5. make the delivery review loop repeatable,
+6. export and review the seven-day public-only config-bound receipt while `liveMode` remains false,
+7. rerun preflight/status and require a separate human live-mode decision,
+8. only after an explicit human flip, qualify one controlled pilot.

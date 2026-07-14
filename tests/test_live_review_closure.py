@@ -138,6 +138,17 @@ class LiveReviewClosureTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("aiOnlyApproval must remain false", result.stderr)
 
+    def test_ready_gate_rejects_future_review_dates(self) -> None:
+        payload = ready_payload()
+        payload["reviewGates"]["terms"]["reviewedAt"] = "2099-01-01"
+        payload["publicConfigPatch"]["termsReviewedAt"] = "2099-01-01"
+
+        result = run_validator(str(write_payload(payload)), "--require-ready")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("terms.reviewedAt must not be in the future", result.stderr)
+        self.assertIn("termsReviewedAt must not be in the future", result.stderr)
+
     def test_docs_and_ci_reference_live_review_closure(self) -> None:
         self.assertIn("LIVE_REVIEW_CLOSURE.template.json", README.read_text(encoding="utf-8"))
         self.assertIn("LIVE_REVIEW_CLOSURE.local.json", HUMAN_REVIEW_PACKET.read_text(encoding="utf-8"))

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import tempfile
 import textwrap
 import unittest
@@ -21,6 +22,10 @@ from tools.vau_company_evolution import (
     update_futures_with_real_event,
     create_initial_future,
 )
+from tests.test_evolution_goal_status import valid_external_live_payload
+from tests.test_revenue_setup_evidence_index import valid_evidence_payload
+from tests.test_reviewer_candidate_tracker import candidate as reviewer_candidate
+from tests.test_public_live_receipt import generation_args, ready_files, run_exporter
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -29,6 +34,10 @@ PUBLIC_CONFIG_TEMPLATE = """
 window.PUBLIC_ORDER_CONFIG = {
   operatorName: "Strange Works Studio",
   jurisdiction: "BR",
+  complianceMode: "brazil-draft",
+  aiGeneratedLegalDocsRequireHumanReview: true,
+  supportEmail: "support@example.com",
+  googleFormUrl: "https://docs.google.com/forms/d/e/example/viewform",
   supportInboxVerified: true,
   googleFormVerified: true,
   termsReviewedAt: "%s",
@@ -36,6 +45,12 @@ window.PUBLIC_ORDER_CONFIG = {
   brazilComplianceReviewedAt: "%s",
   aiHandoffReviewedAt: "%s",
   liveMode: false,
+  services: [{
+    id: "proof-sprint",
+    title: "Compliance proof sprint",
+    detail: "Public test offer",
+    price: 750,
+  }],
 };
 """
 
@@ -103,37 +118,29 @@ def write_reviewer_tracker(records: list[dict]) -> Path:
     return Path(temp.name)
 
 
-def write_revenue_evidence_index(ready: bool = False) -> Path:
-    payload = json.loads(EVIDENCE_INDEX_TEMPLATE.read_text(encoding="utf-8"))
+def write_revenue_evidence_index(ready: bool = False, review_date: str = "2026-06-01") -> Path:
+    payload = valid_evidence_payload() if ready else json.loads(
+        EVIDENCE_INDEX_TEMPLATE.read_text(encoding="utf-8")
+    )
     if ready:
-        payload["payment"].update(
-            {
-                "paymentEvidenceId": "evidence-payment-001",
-                "provider": "Stripe",
-                "businessAccountName": "Strange Works Studio",
-                "payoutDestinationVerified": True,
-                "testPaymentId": "pi_test_001",
-                "testPayoutStatus": "test payout route checked",
-                "reconciliationOwner": "Operator",
-                "feesReviewed": True,
-                "verified": True,
-            }
+        payload["publicConfig"].update(
+            termsReviewedAt=review_date,
+            privacyReviewedAt=review_date,
+            brazilComplianceReviewedAt=review_date,
+            aiHandoffReviewedAt=review_date,
         )
-        payload["tax"].update(
-            {
-                "taxEvidenceId": "evidence-tax-001",
-                "taxRegime": "Simples Nacional",
-                "cnae": "6201-5/02",
-                "nfseRoute": "municipal",
-                "fiscalDocumentOwner": "accountant",
-                "testNfseOrReceiptStatus": "test NFSe generated and reviewed",
-                "accountantReviewedAt": "2026-06-01",
-                "monthlyReconciliationOwner": "Operator",
-                "verified": True,
-            }
-        )
-        payload["attestation"]["reviewedAt"] = "2026-06-01"
-        payload["attestation"]["aiDidNotApproveLegalTaxPaymentOrPrivacy"] = True
+        payload["privacy"]["privacyReviewedAt"] = review_date
+        payload["terms"]["termsReviewedAt"] = review_date
+    temp = tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False)
+    json.dump(payload, temp, ensure_ascii=False, indent=2)
+    temp.close()
+    return Path(temp.name)
+
+
+def write_external_live_packet(ready: bool = False, review_date: str = "2026-07-13") -> Path:
+    payload = valid_external_live_payload(review_date) if ready else json.loads(
+        (ROOT / "EXTERNAL_LIVE_PACKET.template.json").read_text(encoding="utf-8")
+    )
     temp = tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False)
     json.dump(payload, temp, ensure_ascii=False, indent=2)
     temp.close()
@@ -265,6 +272,7 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         self.assertFalse(company_operational_ready(state))
         self.assertIn("termsReviewedAt", hard_blockers(state))
         self.assertIn("private payment/fiscal evidence", hard_blockers(state))
+        self.assertIn("private external live evidence", hard_blockers(state))
 
     def test_review_dates_remove_public_review_blockers(self) -> None:
         path = write_public_config(
@@ -280,9 +288,15 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         self.assertNotIn("termsReviewedAt", blockers)
         self.assertNotIn("privacyReviewedAt", blockers)
         self.assertIn("private payment/fiscal evidence", blockers)
+        self.assertIn("private external live evidence", blockers)
 
     def test_ready_revenue_evidence_local_index_removes_payment_blocker(self) -> None:
-        path = write_public_config()
+        path = write_public_config(
+            terms="2026-06-01",
+            privacy="2026-06-01",
+            brazil="2026-06-01",
+            ai_handoff="2026-06-01",
+        )
         tracker = write_reviewer_tracker([])
         evidence = write_revenue_evidence_index(ready=True)
         state = build_current_state(path, tracker, evidence)
@@ -290,7 +304,44 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         blockers = hard_blockers(state)
         self.assertNotIn("private payment/fiscal evidence", blockers)
         self.assertTrue(state["gates"]["privatePaymentFiscalEvidenceReady"])
-        self.assertIn("payment:evidence-payment-001", state["evidence"]["privatePaymentFiscalEvidence"])
+        self.assertIn("payment:pay-001", state["evidence"]["privatePaymentFiscalEvidence"])
+        self.assertIn("private external live evidence", blockers)
+
+    def test_revenue_evidence_attestations_are_enforced_by_authoritative_validator(self) -> None:
+        path = write_public_config(
+            terms="2026-06-01",
+            privacy="2026-06-01",
+            brazil="2026-06-01",
+            ai_handoff="2026-06-01",
+        )
+        tracker = write_reviewer_tracker([])
+        ready_payload = write_revenue_evidence_index(ready=True)
+        payload = json.loads(ready_payload.read_text(encoding="utf-8"))
+        payload["attestation"]["aiDidNotApproveLegalTaxPaymentOrPrivacy"] = False
+        invalid = tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False)
+        json.dump(payload, invalid, ensure_ascii=False, indent=2)
+        invalid.close()
+
+        state = build_current_state(path, tracker, Path(invalid.name))
+
+        self.assertFalse(state["gates"]["privatePaymentFiscalEvidenceReady"])
+        self.assertIn("private payment/fiscal evidence", hard_blockers(state))
+
+    def test_valid_external_live_packet_closes_only_external_blocker(self) -> None:
+        state = build_current_state(
+            write_public_config(
+                terms="2026-07-13",
+                privacy="2026-07-13",
+                brazil="2026-07-13",
+                ai_handoff="2026-07-13",
+            ),
+            write_reviewer_tracker([]),
+            external_live_packet=write_external_live_packet(ready=True),
+        )
+
+        self.assertTrue(state["gates"]["privateExternalLiveEvidenceReady"])
+        self.assertEqual(state["evidence"]["privateExternalLiveEvidence"], "validator:passed")
+        self.assertNotIn("private external live evidence", hard_blockers(state))
 
     def test_incomplete_revenue_evidence_index_keeps_payment_blocker(self) -> None:
         path = write_public_config()
@@ -339,6 +390,21 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         self.assertTrue(state["gates"]["deliveryReviewLoopReady"])
         self.assertIn("artifact:artifact-001", state["evidence"]["deliveryReviewLoop"])
         self.assertNotIn("delivery review loop", operational_blockers(state))
+
+    def test_non_local_delivery_checklist_cannot_close_delivery_loop_blocker(self) -> None:
+        checklist = write_delivery_review_checklist(ready=True)
+        payload = json.loads(checklist.read_text(encoding="utf-8"))
+        payload["mode"] = "simulation"
+        checklist.write_text(json.dumps(payload), encoding="utf-8")
+
+        state = build_current_state(
+            write_public_config(),
+            write_reviewer_tracker([]),
+            delivery_review_checklist=checklist,
+        )
+
+        self.assertFalse(state["gates"]["deliveryReviewLoopReady"])
+        self.assertIn("delivery review loop", operational_blockers(state))
 
     def test_incomplete_delivery_review_checklist_keeps_delivery_loop_blocker(self) -> None:
         path = write_public_config()
@@ -409,6 +475,11 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         self.assertIn("REVIEWER_CANDIDATE_TRACKER.local.json", joined_actions)
         self.assertIn("--require-one", joined_actions)
         self.assertIn("private Stripe/bank/fiscal evidence", joined_actions)
+        self.assertIn("EXTERNAL_LIVE_PACKET.local.json", joined_actions)
+        external_action = next(
+            action for action in actions if "EXTERNAL_LIVE_PACKET.local.json" in action
+        )
+        self.assertIn("--require-live --public-config public-config.js", external_action)
         self.assertFalse(result["public_live_ready"])
 
     def test_continuous_evolution_goal_keeps_guardrails_visible(self) -> None:
@@ -451,10 +522,13 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
             ai_handoff="2026-05-25",
         )
         tracker = write_reviewer_tracker([])
+        revenue = write_revenue_evidence_index(ready=True, review_date="2026-05-25")
+        external = write_external_live_packet(ready=True, review_date="2026-05-25")
         state = build_current_state(
             path,
             tracker,
-            revenue_evidence_index=write_revenue_evidence_index(ready=True),
+            revenue_evidence_index=revenue,
+            external_live_packet=external,
         )
 
         goal = continuous_evolution_goal(state)
@@ -482,40 +556,53 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         path = write_public_config()
         tracker = write_reviewer_tracker(
             [
-                {
-                    "candidateId": "r1",
-                    "candidateLabel": "Alice",
-                    "reviewRole": "terms_consumer_law",
-                    "contactStatus": "paid_test_ready",
-                    "readyForPaidTest": True,
-                },
-                {
-                    "candidateId": "r2",
-                    "candidateLabel": "Bruno",
-                    "reviewRole": "privacy_lgpd",
-                    "contactStatus": "paid_test_ready",
-                    "readyForPaidTest": True,
-                },
-                {
-                    "candidateId": "r3",
-                    "candidateLabel": "Clara",
-                    "reviewRole": "tax_nfse_accounting",
-                    "contactStatus": "paid_test_ready",
-                    "readyForPaidTest": True,
-                },
-                {
-                    "candidateId": "r4",
-                    "candidateLabel": "Davi",
-                    "reviewRole": "payment_reconciliation",
-                    "contactStatus": "paid_test_ready",
-                    "readyForPaidTest": True,
-                },
+                reviewer_candidate("r1", "terms_consumer_law"),
+                reviewer_candidate("r2", "privacy_lgpd"),
+                reviewer_candidate("r3", "tax_nfse_accounting"),
+                reviewer_candidate("r4", "payment_reconciliation"),
             ]
         )
         state = build_current_state(path, tracker)
 
         self.assertEqual(state["metrics"]["human_reviewers_found"], 4)
         self.assertTrue(state["gates"]["humanReviewersReady"])
+
+    def test_non_local_reviewer_pool_cannot_mark_capacity_ready(self) -> None:
+        roles = [
+            "terms_consumer_law",
+            "privacy_lgpd",
+            "tax_nfse_accounting",
+            "payment_reconciliation",
+        ]
+        tracker = write_reviewer_tracker(
+            [
+                {
+                    "candidateId": f"r{index}",
+                    "candidateLabel": f"Reviewer {index}",
+                    "reviewRole": role,
+                    "contactStatus": "paid_test_ready",
+                    "readyForPaidTest": True,
+                    "contactedAt": "2026-06-01",
+                    "scope": "Review the assigned launch blocker.",
+                    "rateBand": "BRL 150-300 paid test",
+                    "availability": "Within two business days",
+                    "paidTestTask": "Review assigned blocker.",
+                    "conflictCheck": "No known conflict recorded",
+                    "humanRecorded": True,
+                    "evidenceRef": f"private-reviewer-{index}",
+                }
+                for index, role in enumerate(roles, start=1)
+            ]
+        )
+        payload = json.loads(tracker.read_text(encoding="utf-8"))
+        payload["mode"] = "simulation"
+        tracker.write_text(json.dumps(payload), encoding="utf-8")
+
+        state = build_current_state(write_public_config(), tracker)
+
+        self.assertEqual(state["metrics"]["human_reviewers_found"], 4)
+        self.assertFalse(state["gates"]["humanReviewersReady"])
+        self.assertIn("4 human reviewers", operational_blockers(state))
 
     def test_four_contacted_reviewers_do_not_close_ready_pool(self) -> None:
         roles = [
@@ -551,6 +638,8 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
                 "brazilComplianceReviewed": True,
                 "aiHandoffReviewed": True,
                 "privatePaymentFiscalEvidenceReady": True,
+                "privateExternalLiveEvidenceReady": True,
+                "publicLiveReceiptReady": True,
                 "humanReviewersReady": True,
                 "deliveryReviewLoopReady": True,
                 "supportInboxVerified": False,
@@ -575,6 +664,8 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         tracker = write_reviewer_tracker([])
         state = build_current_state(path, tracker)
         state["gates"]["privatePaymentFiscalEvidenceReady"] = True
+        state["gates"]["privateExternalLiveEvidenceReady"] = True
+        state["gates"]["publicLiveReceiptReady"] = True
         state["gates"]["humanReviewersReady"] = True
         state["gates"]["deliveryReviewLoopReady"] = True
         state["metrics"]["human_reviewers_found"] = 4
@@ -586,6 +677,117 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         self.assertTrue(company_operational_ready(state))
         self.assertIn("controlled_pilot_request_qualified", event_names)
         self.assertIn("live_mode_ready_for_human_flip", event_names)
+
+    def test_missing_external_live_evidence_suppresses_live_flip_future(self) -> None:
+        state = build_current_state(
+            write_public_config(
+                terms="2026-05-25",
+                privacy="2026-05-25",
+                brazil="2026-05-25",
+                ai_handoff="2026-05-25",
+            ),
+            write_reviewer_tracker([]),
+        )
+        state["gates"].update(
+            privatePaymentFiscalEvidenceReady=True,
+            privateExternalLiveEvidenceReady=False,
+            publicLiveReceiptReady=True,
+            humanReviewersReady=True,
+            deliveryReviewLoopReady=True,
+        )
+        state["metrics"]["human_reviewers_found"] = 4
+
+        events = generate_company_events(create_initial_future(state)[0])
+        event_names = {event.name for event in events}
+
+        self.assertFalse(public_live_ready(state))
+        self.assertFalse(company_operational_ready(state))
+        self.assertNotIn("controlled_pilot_request_qualified", event_names)
+        self.assertNotIn("live_mode_ready_for_human_flip", event_names)
+
+    def test_missing_public_live_receipt_suppresses_live_flip_future(self) -> None:
+        state = build_current_state(
+            write_public_config(
+                terms="2026-05-25",
+                privacy="2026-05-25",
+                brazil="2026-05-25",
+                ai_handoff="2026-05-25",
+            ),
+            write_reviewer_tracker([]),
+        )
+        state["gates"].update(
+            privatePaymentFiscalEvidenceReady=True,
+            privateExternalLiveEvidenceReady=True,
+            publicLiveReceiptReady=False,
+            humanReviewersReady=True,
+            deliveryReviewLoopReady=True,
+        )
+        state["metrics"]["human_reviewers_found"] = 4
+
+        events = generate_company_events(create_initial_future(state)[0])
+        event_names = {event.name for event in events}
+
+        self.assertIn("public live readiness receipt", hard_blockers(state))
+        self.assertIn("public_live_receipt_issued", event_names)
+        self.assertFalse(public_live_ready(state))
+        self.assertNotIn("controlled_pilot_request_qualified", event_names)
+        self.assertNotIn("live_mode_ready_for_human_flip", event_names)
+
+    def test_legal_document_drift_invalidates_vau_receipt_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            config, external, revenue = ready_files(folder)
+            receipt = folder / "public-live-receipt.js"
+            terms_document = folder / "TERMOS.md"
+            privacy_document = folder / "AVISO_DE_PRIVACIDADE.md"
+            terms_document.write_text(
+                (ROOT / "TERMOS.md").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            privacy_document.write_text(
+                (ROOT / "AVISO_DE_PRIVACIDADE.md").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            document_args = (
+                "--terms-doc",
+                str(terms_document),
+                "--privacy-doc",
+                str(privacy_document),
+            )
+            generated = run_exporter(
+                *generation_args(config, external, revenue, receipt, *document_args)
+            )
+            self.assertEqual(generated.returncode, 0, generated.stderr)
+
+            state = build_current_state(
+                config,
+                reviewer_tracker=folder / "REVIEWER_CANDIDATE_TRACKER.local.json",
+                revenue_evidence_index=revenue,
+                external_live_packet=external,
+                public_live_receipt=receipt,
+                terms_document=terms_document,
+                privacy_document=privacy_document,
+                delivery_review_checklist=folder / "DELIVERY_REVIEW_CHECKLIST.local.json",
+            )
+            self.assertTrue(state["gates"]["publicLiveReceiptReady"])
+
+            privacy_document.write_text(
+                f"{privacy_document.read_text(encoding='utf-8')}\nMaterial privacy drift.\n",
+                encoding="utf-8",
+            )
+            drifted_state = build_current_state(
+                config,
+                reviewer_tracker=folder / "REVIEWER_CANDIDATE_TRACKER.local.json",
+                revenue_evidence_index=revenue,
+                external_live_packet=external,
+                public_live_receipt=receipt,
+                terms_document=terms_document,
+                privacy_document=privacy_document,
+                delivery_review_checklist=folder / "DELIVERY_REVIEW_CHECKLIST.local.json",
+            )
+
+        self.assertFalse(drifted_state["gates"]["publicLiveReceiptReady"])
+        self.assertIn("public live readiness receipt", hard_blockers(drifted_state))
 
     def test_observed_reviewer_event_keeps_matching_future(self) -> None:
         path = write_public_config()

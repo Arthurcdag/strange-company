@@ -145,6 +145,28 @@ class ReviewerCandidateTrackerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("ready reviewer pool", result.stdout)
 
+    def test_strict_gates_reject_complete_non_local_tracker(self) -> None:
+        data = json.loads(TEMPLATE.read_text(encoding="utf-8"))
+        data["mode"] = "simulation"
+        data["candidateRecords"] = [
+            candidate("reviewer-001", "terms_consumer_law"),
+            candidate("reviewer-002", "privacy_lgpd"),
+            candidate("reviewer-003", "tax_nfse_accounting"),
+            candidate("reviewer-004", "payment_reconciliation"),
+        ]
+        data["attestation"]["operator"] = "human-operator"
+        data["attestation"]["reviewedAt"] = "2026-06-11"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            packet = pathlib.Path(tmp) / "tracker.simulation.json"
+            packet.write_text(json.dumps(data), encoding="utf-8")
+
+            for gate in ("--require-one", "--require-ready"):
+                with self.subTest(gate=gate):
+                    result = run_validator(str(packet), gate)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("mode must be local", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

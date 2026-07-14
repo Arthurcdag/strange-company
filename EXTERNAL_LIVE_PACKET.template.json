@@ -18,6 +18,7 @@
     "invoicesHeaderVerified": false,
     "leadsHeaderVerified": false,
     "formLinkedToSheet": false,
+    "acceptingResponses": false,
     "verified": false
   },
   "legalReview": {

@@ -35,8 +35,8 @@ Use this decision table before changing `public-config.js`.
 | Public site must be visible now | Push to `main`; Pages deploys `public.html` automatically. |
 | Support inbox, Google Form, terms, privacy, Stripe, and bank are not verified | Keep `liveMode: false`. |
 | Support inbox and Google Form are verified, but Stripe/bank are not ready | Keep packet-only mode; do not send payment traffic. |
-| All external controls are verified | Set the real config values and turn `liveMode: true` last. |
-| Any stop rule triggers after launch | Set `liveMode: false`, record an incident, and stop traffic. |
+| All external controls are verified | Complete the bound validators, issue/check the public receipt, run preflight/status with `liveMode: false`, then require a separate human flip. |
+| Any stop rule triggers after launch | Disable external Form responses, close and revoke the public bundle, record an incident, and stop traffic. |
 
 ## 15 Minute Repo Pass
 
@@ -72,20 +72,54 @@ supportInboxVerified: true,
 googleFormVerified: true,
 termsReviewedAt: "YYYY-MM-DD",
 privacyReviewedAt: "YYYY-MM-DD",
-liveMode: true
+brazilComplianceReviewedAt: "YYYY-MM-DD",
+aiHandoffReviewedAt: "YYYY-MM-DD",
+liveMode: false
 ```
 
-Set `liveMode: true` last.
+Keep this ready config local and unpublished at `liveMode: false` while its fields
+are bound to both private evidence packets and the public-only receipt is issued.
+The external-live packet alone uses local `publicConfig.liveMode: true` as the
+intended post-decision target; every other bound field must match, including
+`google.acceptingResponses: false` while the receipt is issued.
 
 Then run:
 
 ```bash
-node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
+node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
+node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --check-public-js --require-issued
 node tools/preflight_public_launch.js
-node tools/audit_company_functionality.js --require-live
+node tools/evolution_goal_status.js --json
 ```
 
-Do not publish the live config unless both pass.
+Do not open paid intake unless every command passes and the status has no hard,
+public-route, or operational blockers. After that review, a human may make the
+separate `liveMode: true` change, run `node tools/preflight_public_launch.js
+--deployment`, and publish the issued receipt and live config together. Enable
+external Form responses only after the live Pages deployment is verified.
+
+Set `liveMode: true` last means exactly that isolated human step, never part of
+private validation or receipt export. Do not push or deploy the pre-flip config
+containing the responder URL. The deployment preflight runs only after the flip
+and validates the issued public receipt.
+
+## Fail-Closed Rollback
+
+The static receipt cannot turn off a Google Form reached directly. On expiry or
+any stop rule, first disable external Form responses. Then set `liveMode: false`,
+clear `googleFormUrl`, set `googleFormVerified: false`, and run:
+
+```bash
+node tools/export_public_live_receipt.js --revoke --public-config public-config.js --output public-live-receipt.js
+node tools/preflight_public_launch.js --deployment
+```
+
+Publish the closed config and fail-closed placeholder together. Revocation does
+not need the four private packets and still works after the Form URL is cleared.
 
 ## Publish
 

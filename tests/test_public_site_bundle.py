@@ -8,6 +8,9 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 BUILD_PUBLIC_SITE = ROOT / "tools" / "build_public_site.js"
+PREFLIGHT = ROOT / "tools" / "preflight_public_launch.js"
+PAGES_WORKFLOW = ROOT / ".github" / "workflows" / "pages.yml"
+VALIDATE_WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
 
 
 class PublicSiteBundleTests(unittest.TestCase):
@@ -36,6 +39,7 @@ class PublicSiteBundleTests(unittest.TestCase):
                 "index.html",
                 "public.js",
                 "public-config.js",
+                "public-live-receipt.js",
                 "public-ama-answers.js",
                 "PUBLIC_AMA.md",
                 "PUBLIC_AMA_QUEUE.template.json",
@@ -50,6 +54,7 @@ class PublicSiteBundleTests(unittest.TestCase):
                 "tools/local_evidence_status.js",
                 "tools/validate_live_review_closure.js",
                 "tools/render_live_review_public_config_patch.js",
+                "tools/export_public_live_receipt.js",
                 "tools/validate_delivery_review_checklist.js",
                 "tools/export_public_ama_answers.js",
                 "tools/build_public_site.js",
@@ -64,6 +69,40 @@ class PublicSiteBundleTests(unittest.TestCase):
             self.assertNotIn("DELIVERY_REVIEW_CHECKLIST.local.json", bundled_names)
             self.assertNotIn("EVOLUTION_NEXT_ACTION.local.md", bundled_names)
             self.assertNotIn("LIVE_REVIEW_CLOSURE.local.json", bundled_names)
+
+            bundled_html = (output / "index.html").read_text(encoding="utf-8")
+            self.assertIn('http-equiv="Content-Security-Policy"', bundled_html)
+            self.assertIn("script-src 'self'", bundled_html)
+            self.assertNotRegex(bundled_html, r'<script\b[^>]*\bsrc=["\']https?://')
+
+    def test_deployment_preflight_supports_the_separate_live_flip(self) -> None:
+        preflight = PREFLIGHT.read_text(encoding="utf-8")
+        self.assertIn('process.argv.includes("--deployment")', preflight)
+        self.assertIn('receiptArgs.push("--require-issued")', preflight)
+        self.assertIn("if (!deploymentMode)", preflight)
+        for workflow in (PAGES_WORKFLOW, VALIDATE_WORKFLOW):
+            with self.subTest(workflow=workflow.name):
+                self.assertIn(
+                    "node tools/preflight_public_launch.js --deployment",
+                    workflow.read_text(encoding="utf-8"),
+                )
+
+        self.assertIn(
+            "python -m unittest discover -s tests",
+            PAGES_WORKFLOW.read_text(encoding="utf-8"),
+        )
+
+        for extra in ([], ["--deployment"]):
+            with self.subTest(extra=extra):
+                result = subprocess.run(
+                    ["node", str(PREFLIGHT.relative_to(ROOT)), *extra],
+                    cwd=ROOT,
+                    check=False,
+                    encoding="utf-8",
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":

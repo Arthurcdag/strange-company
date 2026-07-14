@@ -10,6 +10,14 @@ const localEvidenceDirIndex = args.indexOf("--local-evidence-dir");
 const localEvidenceDir = localEvidenceDirIndex >= 0 && args[localEvidenceDirIndex + 1]
   ? path.resolve(process.cwd(), args[localEvidenceDirIndex + 1])
   : "";
+const publicConfigIndex = args.indexOf("--public-config");
+const publicConfig = publicConfigIndex >= 0 && args[publicConfigIndex + 1]
+  ? path.resolve(process.cwd(), args[publicConfigIndex + 1])
+  : "";
+const publicLiveReceiptIndex = args.indexOf("--public-live-receipt");
+const publicLiveReceipt = publicLiveReceiptIndex >= 0 && args[publicLiveReceiptIndex + 1]
+  ? path.resolve(process.cwd(), args[publicLiveReceiptIndex + 1])
+  : "";
 const outputIndex = args.indexOf("--output");
 const outputPath = outputIndex >= 0 && args[outputIndex + 1]
   ? path.resolve(process.cwd(), args[outputIndex + 1])
@@ -21,6 +29,12 @@ function statusJson() {
   const statusArgs = ["tools/evolution_goal_status.js", "--json"];
   if (localEvidenceDir) {
     statusArgs.push("--local-evidence-dir", localEvidenceDir);
+  }
+  if (publicConfig) {
+    statusArgs.push("--public-config", publicConfig);
+  }
+  if (publicLiveReceipt) {
+    statusArgs.push("--public-live-receipt", publicLiveReceipt);
   }
   const result = spawnSync(process.execPath, statusArgs, {
     cwd: root,
@@ -47,12 +61,34 @@ function localEvidenceMatrix(status) {
     .join("\n");
 }
 
+function selectedHandoff(status) {
+  const handoff = status.selectedHandoff;
+  if (!handoff) {
+    return "- unavailable";
+  }
+  return [
+    `- Blocker: ${handoff.blockerId}`,
+    `- Evidence lane: ${handoff.laneId || "none"}`,
+    `- Lane status: ${handoff.laneStatus}`,
+    `- Priority: ${handoff.priority}`,
+    `- Do: \`${handoff.command}\``,
+    `- Validate: \`${handoff.validatorCommand}\``,
+    `- Recheck: \`${handoff.progressAuditCommand}\``,
+    `- Why now: ${handoff.whyNow}`,
+    `- Requires real evidence: ${handoff.requiresRealEvidence}`,
+    `- liveMode remains false: ${handoff.liveModeRemainsFalse}`,
+  ].join("\n");
+}
+
 function packet(status) {
   const hardBlockers = status.hardBlockers.length
     ? status.hardBlockers.map((blocker) => `- ${blocker}`).join("\n")
     : "- none";
   const revenueBlockers = status.revenueBlockers.length
     ? status.revenueBlockers.map((blocker) => `- ${blocker.id}: ${blocker.nextAction}`).join("\n")
+    : "- none";
+  const externalLiveBlockers = status.externalLiveBlockers.length
+    ? status.externalLiveBlockers.map((blocker) => `- ${blocker.id}: ${blocker.nextAction}`).join("\n")
     : "- none";
   const operationalBlockers = status.operationalBlockers.length
     ? status.operationalBlockers.map((blocker) => `- ${blocker.id}: ${blocker.nextAction}`).join("\n")
@@ -79,6 +115,10 @@ function packet(status) {
     `liveMode: ${status.liveMode}`,
     `Latest logged pass: ${latest}`,
     "",
+    "## Do This Next",
+    "",
+    selectedHandoff(status),
+    "",
     "## Current Hard Blockers",
     "",
     hardBlockers,
@@ -86,6 +126,10 @@ function packet(status) {
     "## Revenue Blockers",
     "",
     revenueBlockers,
+    "",
+    "## External Live Blockers",
+    "",
+    externalLiveBlockers,
     "",
     "## Operational Blockers",
     "",

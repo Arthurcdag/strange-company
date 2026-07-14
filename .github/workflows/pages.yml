@@ -29,6 +29,9 @@ jobs:
         with:
           submodules: false
 
+      - name: Run full test suite
+        run: python -m unittest discover -s tests
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
@@ -37,11 +40,12 @@ jobs:
           node tools/validate_external_live_packet.js --template-ok
           node tools/validate_live_review_closure.js --template-ok
           node tools/validate_delivery_review_checklist.js --template-ok
+          node tools/export_public_live_receipt.js --check-public-js
           node tools/audit_evolution_log.js
           node tools/evolution_goal_status.js --json
           node tools/local_evidence_status.js --json
           node tools/generate_evolution_next_packet.js
-          node tools/preflight_public_launch.js
+          node tools/preflight_public_launch.js --deployment
 
       - name: Build static bundle
         run: node tools/build_public_site.js --check --output _site --force

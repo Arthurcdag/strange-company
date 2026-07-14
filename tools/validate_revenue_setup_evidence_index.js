@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const vm = require("vm");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
@@ -11,9 +12,58 @@ const requirePrivacy = args.includes("--require-privacy");
 const requireTerms = args.includes("--require-terms");
 const requireLedger = args.includes("--require-ledger");
 const requireAll = args.includes("--require-all");
-const templateOk = args.includes("--template-ok") || (!requireEntity && !requireTax && !requirePayment && !requireSupport && !requirePrivacy && !requireTerms && !requireLedger && !requireAll);
-const packetArg = args.find((arg) => !arg.startsWith("--"));
+const requireAnyEvidence = requireEntity || requireTax || requirePayment || requireSupport || requirePrivacy || requireTerms || requireLedger || requireAll;
+const requireConfigBinding = requireSupport || requirePrivacy || requireTerms || requireLedger || requireAll;
+const templateOk = args.includes("--template-ok") || !requireAnyEvidence;
+
+function argValue(name) {
+  const index = args.indexOf(name);
+  return index >= 0 && args[index + 1] ? String(args[index + 1]) : "";
+}
+
+const publicConfigArg = argValue("--public-config");
+const publicConfigPath = publicConfigArg ? path.resolve(process.cwd(), publicConfigArg) : "";
+const packetArg = args.find((arg, index) => !arg.startsWith("--") && args[index - 1] !== "--public-config");
 const packetPath = packetArg ? path.resolve(process.cwd(), packetArg) : path.join(root, "REVENUE_SETUP_EVIDENCE_INDEX.template.json");
+
+const PUBLIC_CONFIG_BINDING_FIELDS = [
+  "operatorName",
+  "jurisdiction",
+  "supportEmail",
+  "googleFormUrl",
+  "supportInboxVerified",
+  "googleFormVerified",
+  "termsReviewedAt",
+  "privacyReviewedAt",
+  "brazilComplianceReviewedAt",
+  "aiHandoffReviewedAt",
+];
+const PUBLIC_REVIEW_DATE_FIELDS = [
+  "termsReviewedAt",
+  "privacyReviewedAt",
+  "brazilComplianceReviewedAt",
+  "aiHandoffReviewedAt",
+];
+const OPERATOR_OWNERSHIP_FIELDS = [
+  "responsibleOperator",
+  "legalBusinessName",
+  "businessAddressForInvoices",
+  "supportOwner",
+  "accountingOwner",
+  "lgpdPrivacyOwner",
+  "paymentReconciliationOwner",
+  "refundOwner",
+  "dailyInboxCheckTime",
+];
+
+const INTERNAL_PUBLIC_CONFIG_BINDINGS = [
+  { internalPath: "support.supportEmail", publicField: "supportEmail" },
+  { internalPath: "ledger.googleFormUrl", publicField: "googleFormUrl" },
+  { internalPath: "terms.termsReviewedAt", publicField: "termsReviewedAt" },
+  { internalPath: "privacy.privacyReviewedAt", publicField: "privacyReviewedAt" },
+  { internalPath: "support.verified", publicField: "supportInboxVerified" },
+  { internalPath: "ledger.verified", publicField: "googleFormVerified" },
+];
 
 const failures = [];
 const warnings = [];
@@ -31,6 +81,17 @@ function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, "utf8"));
   } catch (error) {
     fail(`could not read JSON index: ${error.message}`);
+    return {};
+  }
+}
+
+function readPublicConfig(filePath) {
+  try {
+    const sandbox = { window: {} };
+    vm.runInNewContext(fs.readFileSync(filePath, "utf8"), sandbox, { filename: filePath });
+    return sandbox.window.PUBLIC_ORDER_CONFIG || {};
+  } catch (error) {
+    fail(`could not read current public config: ${error.message}`);
     return {};
   }
 }
@@ -98,6 +159,18 @@ function requireObject(obj, sectionPath) {
     return false;
   }
   return true;
+}
+
+function rejectFutureDate(value, label) {
+  if (isIsoDate(value) && String(value).trim() > new Date().toISOString().slice(0, 10)) {
+    fail(`${label} must not be in the future.`);
+  }
+}
+
+function valueAt(value, dottedPath) {
+  return dottedPath.split(".").reduce((current, part) => (
+    current && typeof current === "object" ? current[part] : undefined
+  ), value);
 }
 
 function validateSectionObject(data, section, requiredFields, requiredBooleans) {
@@ -247,6 +320,7 @@ function validateSectionGates(packet, section) {
   validateSectionObject(sectionData, section, rules.fields, rules.booleans);
   for (const key of rules.dates) {
     requireDate(sectionData, key, `sections.${section}`);
+    rejectFutureDate(sectionData && sectionData[key], `sections.${section}.${key}`);
   }
   if (rules.urls.includes("googleFormUrl") && !isGoogleFormUrl(sectionData && sectionData.googleFormUrl)) {
     fail(`sections.${section}.googleFormUrl must be a Google Form URL.`);
@@ -281,12 +355,32 @@ function validateShape(packet) {
 
 function validateGateModeFlags() {
   const attestation = packet.attestation || {};
-  if ((requireAll || requireEntity || requireTax || requirePayment || requireSupport || requirePrivacy || requireTerms || requireLedger) && !attestation.noSecretsInRepo) {
+  if (requireAnyEvidence && !attestation.noSecretsInRepo) {
     fail("attestation.noSecretsInRepo must be true.");
   }
-  if ((requireAll || requireTax || requirePayment) && !attestation.aiDidNotApproveLegalTaxPaymentOrPrivacy) {
+  if (requireAnyEvidence && !attestation.strangeCompanyRemainsSealed) {
+    fail("attestation.strangeCompanyRemainsSealed must be true.");
+  }
+  if (requireAnyEvidence && !attestation.satelliteIsRevenueOperator) {
+    fail("attestation.satelliteIsRevenueOperator must be true.");
+  }
+  if (requireAnyEvidence && (!packet.publicConfig || packet.publicConfig.liveMode !== false)) {
+    fail("publicConfig.liveMode must be false for revenue evidence readiness gates.");
+  }
+  if ((requireAll || requireTax || requirePayment || requirePrivacy || requireTerms) && !attestation.aiDidNotApproveLegalTaxPaymentOrPrivacy) {
     fail("attestation.aiDidNotApproveLegalTaxPaymentOrPrivacy must be true.");
   }
+}
+
+function validateStrictOwnership(packet) {
+  if (!requireAnyEvidence) {
+    return;
+  }
+  validateSectionObject(packet.operator, "operator", OPERATOR_OWNERSHIP_FIELDS, []);
+  const attestation = packet.attestation || {};
+  requireText(attestation, "operator", "sections.attestation");
+  requireDate(attestation, "reviewedAt", "sections.attestation");
+  rejectFutureDate(attestation.reviewedAt, "sections.attestation.reviewedAt");
 }
 
 function validateTemplate(packet) {
@@ -345,11 +439,44 @@ function validateAttestation(packet) {
   }
 }
 
+function validateCurrentPublicConfigBinding(packet, currentConfig) {
+  for (const field of PUBLIC_CONFIG_BINDING_FIELDS) {
+    const packetValue = packet.publicConfig ? packet.publicConfig[field] : undefined;
+    if (packetValue !== currentConfig[field]) {
+      fail(`publicConfig.${field} must match the current public-config.js value.`);
+    }
+  }
+}
+
+function validateStrictPublicReviewDates(packet) {
+  for (const field of PUBLIC_REVIEW_DATE_FIELDS) {
+    const value = packet.publicConfig ? packet.publicConfig[field] : undefined;
+    if (!isBlank(value)) {
+      rejectFutureDate(value, `publicConfig.${field}`);
+    }
+  }
+}
+
+function validateInternalPublicConfigBinding(packet, currentConfig) {
+  for (const { internalPath, publicField } of INTERNAL_PUBLIC_CONFIG_BINDINGS) {
+    const internalValue = valueAt(packet, internalPath);
+    const packetPublicValue = packet.publicConfig ? packet.publicConfig[publicField] : undefined;
+    const currentPublicValue = currentConfig[publicField];
+    if (internalValue !== packetPublicValue || internalValue !== currentPublicValue) {
+      fail(`${internalPath} must match publicConfig.${publicField} and the current public-config.js value.`);
+    }
+  }
+}
+
 const packet = readJson(packetPath);
 validateShape(packet);
 validatePublicConfig(packet);
 validateAttestation(packet);
 validateTemplate(packet);
+
+if (requireAnyEvidence && packet.mode !== "local") {
+  fail("packet mode must be local for evidence readiness gates.");
+}
 
 if (templateOk && !packet.mode) {
   // no-op to keep shape checks active while skipping gate checks in template mode.
@@ -376,8 +503,15 @@ if (requireTerms || requireAll) {
 if (requireLedger || requireAll) {
   validateSectionGates(packet, "ledger");
 }
-if (requireAll) {
-  validateGateModeFlags();
+validateGateModeFlags();
+validateStrictOwnership(packet);
+if (requireConfigBinding && publicConfigPath) {
+  const currentPublicConfig = readPublicConfig(publicConfigPath);
+  validateCurrentPublicConfigBinding(packet, currentPublicConfig);
+  validateInternalPublicConfigBinding(packet, currentPublicConfig);
+  validateStrictPublicReviewDates(packet);
+} else if (requireConfigBinding) {
+  fail("config-sensitive evidence gates require --public-config <path> to bind the evidence index to the current public config.");
 }
 
 if (failures.length) {

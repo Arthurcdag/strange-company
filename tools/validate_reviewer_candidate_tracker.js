@@ -204,6 +204,12 @@ function requireAttestation(packet) {
   requireTrue(attestation.satelliteIsReviewerContractingLane, "attestation.satelliteIsReviewerContractingLane");
 }
 
+function requireLocalMode(packet) {
+  if (packet.mode !== "local") {
+    fail("mode must be local before reviewer records can be treated as real evidence.");
+  }
+}
+
 function hasRecordedCandidate(record, index) {
   requireText(record, "candidateId", "recorded candidate", index);
   requireText(record, "candidateLabel", "recorded candidate", index);
@@ -277,6 +283,7 @@ scanForSecrets(packet);
 validateCandidateFormats(packet);
 
 if (requireOne || requireReady) {
+  requireLocalMode(packet);
   requireAttestation(packet);
 }
 if (requireReady) {
