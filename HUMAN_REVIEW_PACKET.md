@@ -63,10 +63,11 @@ The remaining live blockers are outside-repo evidence: human terms review, human
 Local evidence status, evolution goal status, and the next-action packet report
 one of four phases: `missing`, `invalid`, `document_ready_unbound`, or
 `config_bound_ready`. A packet with valid document digests but dates not yet
-copied into the current public config is only `document_ready_unbound`; render
-its date-only patch, keep `liveMode: false`, then run the strict config-bound
-validator. VAU remains blocked and closure-first until all four dates and that
-binding pass together.
+bound into the current public config is only `document_ready_unbound`; run the
+transactional binder in plan mode, inspect its local-only plan, and apply only
+that exact plan. The binder keeps `liveMode: false`, binds all four dates, and
+advances the receipt to a matching fail-closed placeholder. VAU remains blocked
+and closure-first until all four dates and that binding pass together.
 
 ## AI Can Prepare
 
@@ -77,7 +78,7 @@ AI may prepare:
 - Google Form field list and Apps Script instructions,
 - Stripe and bank evidence labels,
 - `EXTERNAL_LIVE_PACKET.local.json` draft structure,
-- public config patch with placeholders,
+- a non-mutating closure-binding plan for operator inspection,
 - validation commands and stop rules.
 
 AI must not:
@@ -90,7 +91,8 @@ AI must not:
 
 ## Manual Close Sheet
 
-Fill this sheet outside the repo before editing `public-config.js`.
+Fill this sheet outside the repo before binding reviewed dates into
+`public-config.js`.
 
 ```text
 operator_name:
@@ -171,9 +173,11 @@ Use this section every time the project advances one review gate:
 2. Copy the produced field names into the manual close sheet.
 3. For the four public review-date fields only, generate or update `LIVE_REVIEW_CLOSURE.local.json`, confirm that each human reviewed the exact files represented by its path-bound digests, and run:
    - `node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready`
-   - `node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json`
-   - if both pass, copy only `termsReviewedAt`, `privacyReviewedAt`, `brazilComplianceReviewedAt`, and `aiHandoffReviewedAt` into `public-config.js`; keep `liveMode: false`.
-   - run `node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js` and stop unless the dates and all nine document digests remain bound.
+   - optional preview only: `node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json`; do not apply this preview manually.
+   - `node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json`
+   - inspect the local-only plan ID and exact four-date delta; the plan must say that `liveMode` remains false and that the target receipt is a fail-closed placeholder. Do not publish or commit the plan or PLAN_ID because it commits to private closure evidence.
+   - apply that unchanged plan with `node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --apply --expect-plan-id <PLAN_ID>`; never copy the dates or refresh the receipt as separate manual operations.
+   - run `node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js` and `node tools/export_public_live_receipt.js --check-public-js`; stop unless the dates, all nine document digests, and the new placeholder remain bound.
    - run `node tools/check_live_review_closure_conformance.js` and stop if the status surfaces disagree on phase or VAU disagrees on closure readiness, blocking, or first hard-gate priority.
 4. Validate final live readiness only after payment, bank, support, Google, and attestation evidence also exists:
    - `node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js`
@@ -210,9 +214,14 @@ cannot be in the future. Support received/replied and Google Form test times mus
 be ISO-8601 UTC timestamps ending in `Z`, correctly ordered, and no older than 30
 days when strict live validation runs.
 
-## Public Config Patch Values
+## Public Config Values
 
-Only after the manual close sheet is complete, patch public-safe values:
+Only after the manual close sheet is complete may public-safe values be bound.
+The four review dates are binder-owned: place the real dates in
+`LIVE_REVIEW_CLOSURE.local.json`, validate the packet, inspect
+`node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json`, and
+apply only its unchanged local plan. Do not copy these values into the config
+by hand.
 
 ```js
 googleFormUrl: "https://docs.google.com/forms/...",

@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const vm = require("vm");
+const { parsePublicOrderConfig } = require("./strict_public_data");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
@@ -93,17 +93,7 @@ function isBlank(value) {
 function loadPublicConfig(filePath) {
   try {
     const source = fs.readFileSync(filePath, "utf8");
-    const sandbox = { window: {} };
-    vm.runInNewContext(source, sandbox, {
-      filename: filePath,
-      timeout: 1000,
-      contextCodeGeneration: { strings: false, wasm: false },
-    });
-    const config = sandbox.window.PUBLIC_ORDER_CONFIG;
-    if (!isPlainObject(config)) {
-      throw new Error("must assign window.PUBLIC_ORDER_CONFIG to an object");
-    }
-    return config;
+    return parsePublicOrderConfig(source, filePath);
   } catch (error) {
     fail(`could not load public config ${filePath}: ${error.message}`);
     return null;

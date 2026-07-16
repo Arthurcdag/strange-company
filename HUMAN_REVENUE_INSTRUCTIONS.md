@@ -305,7 +305,9 @@ Stop rule: do not rely on intake if the form writes to the wrong Sheet or if the
 
 ## Repo Configuration Before Live Intake
 
-Only edit `public-config.js` after the human gates above have real evidence.
+Only update non-review public fields in `public-config.js` after the human gates
+above have real evidence. The closure binder exclusively owns the four
+reviewed-at fields.
 
 Update these fields:
 
@@ -314,10 +316,7 @@ supportEmail: "reviewed support email",
 googleFormUrl: "reviewed Google Form URL",
 supportInboxVerified: true,
 googleFormVerified: true,
-termsReviewedAt: "YYYY-MM-DD",
-privacyReviewedAt: "YYYY-MM-DD",
-brazilComplianceReviewedAt: "YYYY-MM-DD",
-aiHandoffReviewedAt: "YYYY-MM-DD",
+// The closure binder writes the four reviewed-at fields transactionally.
 liveMode: false
 ```
 
@@ -329,10 +328,19 @@ packet. Do not push the responder URL in a pre-flip closed config.
 
 Run:
 
+Keep the binder plan and PLAN_ID local because they commit to private closure
+evidence. Execute only the exact `applyArguments` reported by the unchanged
+plan.
+
 ```powershell
 node --check public-config.js
 node --check public.js
 node --check script.js
+node tools\validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready
+node tools\bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json
+node tools\bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --apply --expect-plan-id <PLAN_ID>
+node tools\validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
+node tools\export_public_live_receipt.js --check-public-js
 node tools\validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
 node tools\validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
 node tools\validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready

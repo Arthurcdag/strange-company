@@ -278,11 +278,15 @@ class EvolutionGoalStatusTests(unittest.TestCase):
         self.assertEqual(data["liveReviewClosurePhase"], "missing")
         self.assertIn("draft_live_review_closure.js", data["selectedHandoff"]["command"])
         self.assertIn(
-            "--require-ready --public-config public-config.js",
+            "--require-ready",
+            data["selectedHandoff"]["validatorCommand"],
+        )
+        self.assertNotIn(
+            "--public-config",
             data["selectedHandoff"]["validatorCommand"],
         )
         self.assertIn("LIVE_REVIEW_CLOSURE.local.json", data["reviewClosureActions"][0])
-        self.assertTrue(any("render_live_review_public_config_patch.js" in action for action in data["reviewClosureActions"]))
+        self.assertTrue(any("bind_live_review_closure.js" in action for action in data["reviewClosureActions"]))
         self.assertIn("LIVE_REVIEW_CLOSURE.local.json", data["nextActions"][0])
         self.assertIn("privatePaymentFiscalEvidence", data["revenueBlockers"][0]["id"])
         self.assertEqual(data["localEvidence"]["system"], "STRANGE_COMPANY_LOCAL_EVIDENCE_STATUS")
@@ -291,7 +295,7 @@ class EvolutionGoalStatusTests(unittest.TestCase):
         self.assertGreaterEqual(data["evolutionPassCount"], 3)
         self.assertEqual(
             data["latestPass"]["title"],
-            "Fail-Closed Live Recovery and Deployment Freshness",
+            "Revocation-Dominant Review Closure Binding",
         )
 
     def test_text_output_names_latest_pass(self) -> None:
@@ -305,9 +309,9 @@ class EvolutionGoalStatusTests(unittest.TestCase):
         self.assertIn("Review closure workflow:", result.stdout)
         self.assertIn("Operational blockers:", result.stdout)
         self.assertIn("Local evidence:", result.stdout)
-        self.assertIn("render_live_review_public_config_patch.js", result.stdout)
+        self.assertIn("bind_live_review_closure.js", result.stdout)
 
-    def test_document_ready_unbound_packet_selects_date_only_patch_without_mutation(self) -> None:
+    def test_document_ready_unbound_packet_selects_transaction_plan_without_mutation(self) -> None:
         config_before = (ROOT / "public-config.js").read_text(encoding="utf-8")
         with tempfile.TemporaryDirectory() as workspace:
             write_json(
@@ -324,7 +328,7 @@ class EvolutionGoalStatusTests(unittest.TestCase):
         self.assertEqual(data["selectedHandoff"]["laneStatus"], "partial")
         self.assertEqual(data["selectedHandoff"]["lanePhase"], "document_ready_unbound")
         self.assertEqual(data["liveReviewClosurePhase"], "document_ready_unbound")
-        self.assertIn("render_live_review_public_config_patch.js", data["selectedHandoff"]["command"])
+        self.assertIn("bind_live_review_closure.js", data["selectedHandoff"]["command"])
         self.assertIn(
             "--require-ready --public-config public-config.js",
             data["selectedHandoff"]["validatorCommand"],
@@ -425,6 +429,16 @@ class EvolutionGoalStatusTests(unittest.TestCase):
         self.assertIn("humanReviewClosureEvidence", invalid_data["hardBlockers"])
         self.assertIn("Inspect and repair", invalid_data["reviewClosureActions"][0])
         self.assertNotIn("draft_live_review_closure.js", invalid_data["reviewClosureActions"][0])
+        self.assertIn(
+            "validate_live_review_closure.js",
+            invalid_data["selectedHandoff"]["command"],
+        )
+        invalid_row = next(
+            row for row in invalid_data["publicGateRows"]
+            if row["id"] == "humanReviewClosureEvidence"
+        )
+        self.assertIn("validate_live_review_closure.js", invalid_row["command"])
+        self.assertNotIn("draft_live_review_closure.js", invalid_row["command"])
 
         self.assertEqual(stale_result.returncode, 0, stale_result.stderr)
         stale_data = json.loads(stale_result.stdout)
@@ -439,7 +453,7 @@ class EvolutionGoalStatusTests(unittest.TestCase):
         self.assertIn("humanReviewClosureEvidence", stale_data["hardBlockers"])
         self.assertEqual(stale_data["selectedHandoff"]["laneId"], "liveReviewClosure")
         self.assertIn(
-            "render_live_review_public_config_patch.js",
+            "bind_live_review_closure.js",
             stale_data["selectedHandoff"]["command"],
         )
 

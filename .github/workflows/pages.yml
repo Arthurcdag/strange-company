@@ -38,6 +38,8 @@ jobs:
 
       - name: Run public launch preflight
         run: |
+          node --check tools/strict_public_data.js
+          node --check tools/bind_live_review_closure.js
           node tools/validate_external_live_packet.js --template-ok
           node tools/validate_live_review_closure.js --template-ok
           node tools/validate_delivery_review_checklist.js --template-ok

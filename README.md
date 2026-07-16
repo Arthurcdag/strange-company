@@ -144,7 +144,8 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [tools/draft_external_live_packet.js](tools/draft_external_live_packet.js): public-config-to-local-packet draft generator for `EXTERNAL_LIVE_PACKET.local.json`.
 - [tools/draft_live_review_closure.js](tools/draft_live_review_closure.js): local draft generator for `LIVE_REVIEW_CLOSURE.local.json`; it snapshots normalized, path-bound SHA-256 digests for every document that must receive human review.
 - [tools/validate_live_review_closure.js](tools/validate_live_review_closure.js): local validator for the ignored live-review closure packet; `--require-ready` recomputes every required document digest, while adding `--public-config public-config.js` is the authoritative final config-bound readiness gate.
-- [tools/render_live_review_public_config_patch.js](tools/render_live_review_public_config_patch.js): renders the public-safe review-date patch from a ready `LIVE_REVIEW_CLOSURE.local.json` while keeping `liveMode` false.
+- [tools/render_live_review_public_config_patch.js](tools/render_live_review_public_config_patch.js): preview-only renderer for the four public-safe review dates from a ready `LIVE_REVIEW_CLOSURE.local.json`; use the transactional binder for the actual config/receipt transition.
+- [tools/bind_live_review_closure.js](tools/bind_live_review_closure.js): local-only plan-token transaction that binds exactly the four approved review dates into `public-config.js` and advances `public-live-receipt.js` to a matching fail-closed placeholder; default execution is non-mutating, while `--apply --expect-plan-id <PLAN_ID>` rejects stale inputs and keeps `liveMode` false. The PLAN_ID commits to private closure evidence and must not be published. Apply is atomic per file and receipt-first, so an interruption between files remains closed and can resume; it is not an all-or-nothing two-file filesystem transaction.
 - [tools/render_public_live_shutdown_patch.js](tools/render_public_live_shutdown_patch.js): output-only emergency renderer for the exact fail-closed public config patch; status selects it before evidence repair whenever `liveMode` is true and the live public config or current issued receipt/runtime gate is invalid.
 - [tools/draft_reviewer_candidate_tracker.js](tools/draft_reviewer_candidate_tracker.js): local draft generator for `REVIEWER_CANDIDATE_TRACKER.local.json`.
 - [tools/draft_revenue_setup_evidence_index.js](tools/draft_revenue_setup_evidence_index.js): local draft generator for `REVENUE_SETUP_EVIDENCE_INDEX.local.json`.
@@ -187,10 +188,13 @@ node tools/local_evidence_status.js --json
 
 For `liveReviewClosure`, use its explicit `phase`: draft absent is `missing`,
 malformed or document-stale evidence is `invalid`, digest-valid evidence whose
-dates are not yet copied into the current public config is
+dates are not yet bound into the current public config is
 `document_ready_unbound`, and only the strict config-bound validator produces
-`config_bound_ready`. The unbound phase selects the safe date-patch renderer;
-it never invents review dates or edits `public-config.js` automatically.
+`config_bound_ready`. The unbound phase selects the transactional closure
+binder. Its default run is a non-mutating, local-only plan; applying that exact
+plan binds the four dates and advances the receipt to a matching fail-closed
+placeholder while keeping `liveMode: false`. The separate renderer is preview
+only and must never be copied into the config manually.
 
 To burn down the reviewer-capacity blocker without faking evidence, create `REVIEWER_CANDIDATE_TRACKER.local.json` from the template and run:
 
@@ -254,13 +258,20 @@ only its three public config values, then run
 `node tools/export_public_live_receipt.js --revoke --public-config
 public-config.js --output public-live-receipt.js`, run the deployment preflight,
 and publish the closed config plus placeholder together. Schema v4 advances a
-monotonic generation on issue and revoke, and an output-scoped exclusive lock
-serializes local receipt mutations. An open browser rejects a lower generation
+monotonic generation on issue and revoke. Issuance captures the exact receipt
+preimage and rechecks it under the output lock after validation, so an in-flight
+issuer cannot overwrite a newer revocation or competing issue. An open browser rejects a lower generation
 or a different receipt identity at the same observed generation. Pages also
 rejects non-main or stale-main deploys. A new client served a complete
 same-origin rollback has no independent trust anchor, and a current-main revert
 is still current, so disabling the external Form first remains the authoritative
 emergency stop.
+
+Repository write policy is a separate external control. Before any live release,
+protect `main` with pull-request and required-check rules, prohibit direct and
+force pushes without an emergency process, and require a non-self approving
+reviewer for the `github-pages` environment. Repo code and receipt hashes do not
+substitute for those GitHub controls.
 
 To close the repeatable delivery-review loop without exposing customer evidence, complete `DELIVERY_REVIEW_CHECKLIST.local.json` from `DELIVERY_REVIEW_CHECKLIST.template.json`:
 

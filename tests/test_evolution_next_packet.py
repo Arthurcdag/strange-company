@@ -52,7 +52,7 @@ class EvolutionNextPacketTests(unittest.TestCase):
         self.assertIn("termsReviewedAt", result.stdout)
         self.assertIn("Review Closure Workflow", result.stdout)
         self.assertIn("LIVE_REVIEW_CLOSURE.local.json", result.stdout)
-        self.assertIn("render_live_review_public_config_patch.js", result.stdout)
+        self.assertIn("bind_live_review_closure.js", result.stdout)
         self.assertIn("Document-Bound Review Closure Prerequisite", result.stdout)
         self.assertIn("document-stale", result.stdout)
         self.assertIn("Local Evidence Matrix", result.stdout)

@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const vm = require("vm");
+const { parseFrozenWindowJson } = require("./strict_public_data");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
@@ -133,9 +133,11 @@ function validatePublicArchive(archive, label) {
 
 function loadPublicJsArchive(filePath) {
   try {
-    const sandbox = { window: {}, Object };
-    vm.runInNewContext(fs.readFileSync(filePath, "utf8"), sandbox, { filename: filePath });
-    return sandbox.window.PUBLIC_AMA_ANSWERS;
+    return parseFrozenWindowJson(
+      fs.readFileSync(filePath, "utf8"),
+      "PUBLIC_AMA_ANSWERS",
+      filePath
+    );
   } catch (error) {
     fail(`Could not load ${filePath}: ${error.message}`);
     return null;

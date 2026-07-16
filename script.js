@@ -1544,6 +1544,7 @@ function googleFormUrlReady(value) {
 }
 
 function coreLiveEvidenceRows(config) {
+  const reviewBindingFix = "Record all four real dates in LIVE_REVIEW_CLOSURE.local.json, validate its exact document digests, then use bind_live_review_closure.js plan/apply; never edit the public config dates directly.";
   return [
     {
       id: "support-inbox",
@@ -1575,7 +1576,7 @@ function coreLiveEvidenceRows(config) {
       field: "termsReviewedAt",
       passed: isIsoDate(config.termsReviewedAt),
       evidence: "TERMS.md / TERMOS.md review note and external live packet legalReview section.",
-      fix: "Record the actual human review date as YYYY-MM-DD."
+      fix: reviewBindingFix
     },
     {
       id: "privacy-review",
@@ -1583,7 +1584,7 @@ function coreLiveEvidenceRows(config) {
       field: "privacyReviewedAt",
       passed: isIsoDate(config.privacyReviewedAt),
       evidence: "PRIVACY.md / AVISO_DE_PRIVACIDADE.md review note and external live packet legalReview section.",
-      fix: "Record the actual privacy review date as YYYY-MM-DD."
+      fix: reviewBindingFix
     },
     {
       id: "brazil-compliance-review",
@@ -1591,7 +1592,7 @@ function coreLiveEvidenceRows(config) {
       field: "brazilComplianceReviewedAt",
       passed: isIsoDate(config.brazilComplianceReviewedAt),
       evidence: "BRAZIL_COMPLIANCE.md, BRAZIL_COMPLIANCE_AGENTS.md, and human accounting/legal review notes.",
-      fix: "Close CNPJ/fiscal/LGPD/payment support review with a responsible human."
+      fix: reviewBindingFix
     },
     {
       id: "ai-handoff-review",
@@ -1599,7 +1600,7 @@ function coreLiveEvidenceRows(config) {
       field: "aiHandoffReviewedAt",
       passed: isIsoDate(config.aiHandoffReviewedAt),
       evidence: "AI_LEGAL_HANDOFF.md and the responsible human review record.",
-      fix: "Confirm which AI-prepared text remains draft-only and which human-owned changes are accepted."
+      fix: reviewBindingFix
     },
     {
       id: "brazil-config",
@@ -1680,12 +1681,22 @@ function liveEvidencePacket() {
     "[Missing Evidence]",
     missing,
     "",
+    "[Closure Preparation]",
+    "Only if LIVE_REVIEW_CLOSURE.local.json is absent: node tools/draft_live_review_closure.js --write-local",
+    "",
+    "[Closure Binding]",
+    "Plan (non-mutating): node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json",
+    "Apply: keep the private plan local and execute its exact applyArguments; do not substitute a copied PLAN_ID command.",
+    "",
     "[Validation Commands]",
+    "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready",
+    "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js",
     "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js",
     "node tools/audit_company_functionality.js --require-live",
     "",
     "[Stop Rules]",
     "Do not set liveMode true until support, Google Form, terms, privacy, Brazil compliance, and AI handoff evidence are real.",
+    "Do not publish or commit the binder plan or PLAN_ID; it commits to private closure evidence.",
     "Do not commit EXTERNAL_LIVE_PACKET.local.json, Sheet URLs, Stripe dashboard URLs, bank metadata, private keys, or customer secrets.",
     "Do not treat this packet as legal, tax, privacy, fiscal, payment, or support approval."
   ].join("\n");

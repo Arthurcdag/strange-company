@@ -133,6 +133,11 @@ class LocalEvidenceStatusTests(unittest.TestCase):
             self.assertIn("draft_live_review_closure.js", lane["commands"]["draft"])
             self.assertIn("--require-ready", lane["commands"]["validateDocuments"])
             self.assertNotIn("--public-config", lane["commands"]["validateDocuments"])
+            self.assertIn("bind_live_review_closure.js", lane["commands"]["planConfigBinding"])
+            self.assertIn(
+                "--apply --expect-plan-id <PLAN_ID>",
+                lane["commands"]["applyConfigBindingTemplate"],
+            )
             self.assertIn(
                 "--require-ready --public-config public-config.js",
                 lane["commands"]["validateConfigBinding"],
@@ -205,7 +210,8 @@ class LocalEvidenceStatusTests(unittest.TestCase):
             self.assertFalse(checks["config_bound_ready"]["passed"])
             self.assertFalse(checks["document_ready"]["bindsPublicConfig"])
             self.assertTrue(checks["config_bound_ready"]["bindsPublicConfig"])
-            self.assertIn("Apply only the four approved review dates", lane["nextAction"])
+            self.assertIn("bind_live_review_closure.js", lane["nextAction"])
+            self.assertIn("--expect-plan-id <PLAN_ID>", lane["nextAction"])
             self.assertNotIn("terms-reviewer", result.stdout)
 
     def test_config_bound_live_review_closure_is_finally_ready(self) -> None:

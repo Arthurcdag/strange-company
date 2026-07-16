@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
-const vm = require("vm");
+const { parsePublicOrderConfig } = require("./strict_public_data");
 
 const root = path.resolve(__dirname, "..");
 const requireLive = process.argv.includes("--require-live");
@@ -47,9 +47,7 @@ function assertAbsent(file, pattern, label) {
 }
 
 function loadPublicConfig() {
-  const sandbox = { window: {} };
-  vm.runInNewContext(read("public-config.js"), sandbox, { filename: "public-config.js" });
-  return sandbox.window.PUBLIC_ORDER_CONFIG || {};
+  return parsePublicOrderConfig(read("public-config.js"), "public-config.js");
 }
 
 function issuedPublicLiveReceiptReady() {
@@ -174,6 +172,33 @@ function auditDocs() {
   assertIncludes("EXTERNAL_LIVE_CONTROLS.md", "node tools/generate_external_live_gap_packet.js", "external live gap packet command");
   assertIncludes("tools/generate_external_live_gap_packet.js", "Strange Company external live evidence gap packet", "external live gap packet generator");
   assertIncludes("tools/generate_external_live_gap_packet.js", "node tools/check_external_live_packet_gate.js", "external live gap packet regression command");
+  assertIncludes("tools/generate_external_live_gap_packet.js", "bind_live_review_closure.js", "external live gap closure binder handoff");
+  assertIncludes("script.js", "bind_live_review_closure.js", "Operations console closure binder handoff");
+  for (const file of [
+    "README.md",
+    "HUMAN_REVIEW_PACKET.md",
+    "EXTERNAL_LIVE_CONTROLS.md",
+    "FIRST_REVENUE_CLOSEOUT.md",
+    "REVENUE_SIMULATION.md",
+    "REVENUE_SETUP_EVIDENCE_PACKET.md",
+    "REVIEW_READY_PACKET.md",
+    "ONLINE_ASAP.md",
+    "OPERATIONS_START_PACKET.md",
+    "RUN_LIVE_PILOT.md",
+    "BRAZIL_COMPLIANCE_AGENTS.md",
+    "CONKA8_LAW_INSTRUCTIONS.md",
+    "script.js",
+    "tools/generate_external_live_gap_packet.js",
+  ]) {
+    assertAbsent(file, /dates are not yet copied into|copy only those public-safe dates into|Copy the reviewed public dates into|set the relevant dates in `public-config\.js`|After copying the four review|Record the actual (?:human |privacy )?review date as YYYY-MM-DD|dates can be written into `public-config\.js`|Human sign-off dates in `public-config\.js`|bump the `termsReviewedAt`/i, "manual reviewed-date binding instruction");
+  }
+  for (const file of ["ONLINE_ASAP.md", "OPERATIONS_START_PACKET.md", "FIRST_REVENUE_CLOSEOUT.md"]) {
+    assertAbsent(file, /^\s*(?:- \[ \] )?Push to `main`\.|git push origin main|Public site must be visible now \| Push to `main`/m, "direct-main release instruction");
+  }
+  assertIncludes("tools/generate_external_live_gap_packet.js", "preparationCondition", "conditional closure preparation metadata");
+  assertIncludes("tools/generate_external_live_gap_packet.js", "exact applyArguments", "exact binder apply handoff");
+  assertIncludes("script.js", "Only if LIVE_REVIEW_CLOSURE.local.json is absent", "conditional Operations closure preparation");
+  assertIncludes("tools/evolution_goal_status.js", "phaseValidatorCommands", "phase-specific closure validation handoff");
   assertIncludes("README.md", "EXTERNAL_LIVE_PACKET.template.json", "external live packet template README link");
   assertIncludes("README.md", "tools/validate_external_live_packet.js", "external live packet validator README link");
   assertIncludes("README.md", "tools/check_external_live_packet_gate.js", "external live packet gate regression README link");
@@ -233,6 +258,26 @@ function auditDocs() {
   assertIncludes("tools/evolution_goal_status.js", "publicRuntimeReady", "evolution status public runtime readiness");
   assertIncludes("tools/evolution_goal_status.js", "reissuanceReady", "evolution status separate reissuance readiness");
   assertIncludes("tools/evolution_goal_status.js", "render_public_live_shutdown_patch.js", "evolution status live shutdown renderer");
+  assertIncludes("tools/evolution_goal_status.js", "bind_live_review_closure.js", "evolution status transactional closure binder");
+  assertIncludes("tools/bind_live_review_closure.js", "STRANGE_COMPANY_LIVE_REVIEW_BIND_PLAN", "transactional live review binder plan");
+  assertIncludes("tools/bind_live_review_closure.js", "--expect-plan-id", "transactional live review stale-plan guard");
+  assertIncludes("tools/bind_live_review_closure.js", "atomicReplace", "transactional live review atomic replacement");
+  assertIncludes("tools/strict_public_data.js", "parsePublicOrderConfig", "non-executing public config parser");
+  assertIncludes("tools/strict_public_data.js", "parseFrozenWindowJson", "non-executing frozen public JSON parser");
+  assertIncludes("tools/build_public_site.js", "tools/strict_public_data.js", "public bundle strict data parser");
+  assertIncludes(".github/workflows/validate.yml", "node --check tools/strict_public_data.js", "CI strict data parser syntax");
+  assertIncludes(".github/workflows/pages.yml", "node --check tools/strict_public_data.js", "Pages strict data parser syntax");
+  const executableDataParserPattern = new RegExp(
+    ["runInNew", "Context|runIn", "Context|require\\([\"'](?:node:)?v", "m[\"']\\)|new\\s+v", "m\\.Script"].join("")
+  );
+  for (const toolName of fs.readdirSync(path.join(root, "tools"))) {
+    if (!toolName.endsWith(".js")) continue;
+    assertAbsent(
+      `tools/${toolName}`,
+      executableDataParserPattern,
+      `unsafe executable data parser in tools/${toolName}`
+    );
+  }
   assertIncludes("tools/generate_evolution_next_packet.js", "Live Recovery Workflow", "next packet live recovery workflow");
   assertIncludes("tools/render_public_live_shutdown_patch.js", "STRANGE_COMPANY_PUBLIC_LIVE_SHUTDOWN_PATCH", "output-only public live shutdown patch");
   assertIncludes("tools/render_public_live_shutdown_patch.js", "mutatesFiles: false", "public live shutdown no-mutation boundary");
@@ -266,6 +311,9 @@ function auditDocs() {
   assertIncludes("public-live-receipt.js", '"schemaVersion": 4', "public live receipt placeholder schema v4");
   assertIncludes("tools/export_public_live_receipt.js", "nextReceiptGeneration", "public live receipt monotonic generation");
   assertIncludes("tools/export_public_live_receipt.js", "withReceiptMutationLock", "public live receipt mutation lock");
+  assertIncludes("tools/export_public_live_receipt.js", "createIssuanceSnapshot", "public live receipt issuance input snapshot");
+  assertIncludes("tools/export_public_live_receipt.js", "assertIssuanceInputsMatchSnapshot", "public live receipt issuance input compare-and-swap");
+  assertIncludes("tools/export_public_live_receipt.js", "assertReceiptOutputMatchesBaseline", "public live receipt issuance compare-and-swap");
   assertIncludes("public.js", "HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION", "public browser receipt-generation high-water mark");
   assertIncludes("public.js", "HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY", "public browser same-generation identity pin");
   assertIncludes("tools/export_public_live_receipt.js", "reviewDocuments", "public receipt nine-document review core");
@@ -283,6 +331,7 @@ function auditDocs() {
   assertIncludes("tools/build_public_site.js", "tools/check_live_review_closure_conformance.js", "public bundle closure conformance checker");
   assertIncludes("tools/build_public_site.js", "tools/vau_company_evolution.py", "public bundle VAU engine");
   assertIncludes("tools/build_public_site.js", "tools/render_public_live_shutdown_patch.js", "public bundle live shutdown renderer");
+  assertIncludes("tools/build_public_site.js", "tools/bind_live_review_closure.js", "public bundle transactional closure binder");
   assertIncludes(".github/workflows/pages.yml", "cancel-in-progress: true", "Pages stale-run cancellation");
   assertIncludes(".github/workflows/pages.yml", "github.ref == 'refs/heads/main'", "Pages main-only deployment guard");
   assertIncludes(".github/workflows/pages.yml", "origin/main", "Pages current-main deployment assertion");

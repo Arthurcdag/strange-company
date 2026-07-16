@@ -564,6 +564,49 @@ def copy_review_documents(folder: pathlib.Path) -> dict[str, pathlib.Path]:
     return documents
 
 
+def start_paused_receipt_issuance(
+    config: pathlib.Path,
+    external: pathlib.Path,
+    revenue: pathlib.Path,
+    output: pathlib.Path,
+    barrier: pathlib.Path,
+    *extra: str,
+) -> subprocess.Popen[str]:
+    environment = os.environ.copy()
+    environment["NODE_ENV"] = "test"
+    environment["STRANGE_COMPANY_TEST_RECEIPT_SNAPSHOT_BARRIER"] = str(barrier)
+    return subprocess.Popen(
+        [
+            "node",
+            str(EXPORTER.relative_to(ROOT)),
+            *generation_args(config, external, revenue, output, *extra, "--force"),
+        ],
+        cwd=ROOT,
+        encoding="utf-8",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=environment,
+    )
+
+
+def wait_for_snapshot_barrier(
+    process: subprocess.Popen[str],
+    barrier: pathlib.Path,
+) -> pathlib.Path:
+    ready_marker = pathlib.Path(f"{barrier}.ready")
+    deadline = time.monotonic() + 10
+    while not ready_marker.exists() and process.poll() is None:
+        if time.monotonic() >= deadline:
+            raise AssertionError("receipt exporter did not reach the snapshot barrier")
+        time.sleep(0.01)
+    if process.poll() is not None:
+        stdout, stderr = process.communicate()
+        raise AssertionError(
+            f"receipt exporter exited before snapshot barrier: {stdout}{stderr}"
+        )
+    return pathlib.Path(f"{barrier}.release")
+
+
 class PublicLiveReceiptTests(unittest.TestCase):
     def test_cli_rejects_missing_flag_valued_duplicate_alias_and_unknown_options(self) -> None:
         for option in ("--document-root", "--terms-doc", "--privacy-doc"):
@@ -855,7 +898,7 @@ class PublicLiveReceiptTests(unittest.TestCase):
             self.assertNotEqual(checked.returncode, 0)
             self.assertIn("stale public core", checked.stderr)
 
-    def test_issuance_uses_one_immutable_config_closure_and_document_snapshot(self) -> None:
+    def test_issuance_input_cas_aborts_when_snapshot_set_drifts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             folder = pathlib.Path(tmp)
             config, external, revenue = ready_files(folder)
@@ -872,49 +915,19 @@ class PublicLiveReceiptTests(unittest.TestCase):
             original_brazil_text = documents["BRAZIL_COMPLIANCE.md"].read_text(
                 encoding="utf-8"
             )
-            original_brazil_digest = public_review_document_digest(
-                "BRAZIL_COMPLIANCE.md",
-                original_brazil_text,
-            )
             output = folder / "public-live-receipt.js"
             barrier = folder / "receipt-snapshot-barrier"
-            ready_marker = pathlib.Path(f"{barrier}.ready")
-            release_marker = pathlib.Path(f"{barrier}.release")
-            environment = os.environ.copy()
-            environment["NODE_ENV"] = "test"
-            environment["STRANGE_COMPANY_TEST_RECEIPT_SNAPSHOT_BARRIER"] = str(
-                barrier
-            )
-            process = subprocess.Popen(
-                [
-                    "node",
-                    str(EXPORTER.relative_to(ROOT)),
-                    *generation_args(
-                        config,
-                        external,
-                        revenue,
-                        output,
-                        "--document-root",
-                        str(document_root),
-                    ),
-                ],
-                cwd=ROOT,
-                encoding="utf-8",
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=environment,
+            process = start_paused_receipt_issuance(
+                config,
+                external,
+                revenue,
+                output,
+                barrier,
+                "--document-root",
+                str(document_root),
             )
             try:
-                deadline = time.monotonic() + 10
-                while not ready_marker.exists() and process.poll() is None:
-                    if time.monotonic() >= deadline:
-                        self.fail("receipt exporter did not reach the snapshot barrier")
-                    time.sleep(0.01)
-                if process.poll() is not None:
-                    stdout, stderr = process.communicate()
-                    self.fail(
-                        f"receipt exporter exited before snapshot swap: {stdout}{stderr}"
-                    )
+                release_marker = wait_for_snapshot_barrier(process, barrier)
 
                 swapped_config = ready_public_config(live_mode=False)
                 swapped_config["operatorName"] = "Swapped operator after snapshot"
@@ -939,20 +952,178 @@ class PublicLiveReceiptTests(unittest.TestCase):
                     process.kill()
                     process.communicate()
 
-            self.assertEqual(process.returncode, 0, f"{stdout}{stderr}")
-            receipt = read_receipt(output)
-            self.assertEqual(receipt["core"]["operatorName"], "Strange Works Studio")
-            self.assertEqual(
-                receipt["core"]["reviewDocuments"]["BRAZIL_COMPLIANCE.md"],
-                original_brazil_digest,
+            self.assertNotEqual(process.returncode, 0, stdout)
+            self.assertIn(
+                "Issuance input changed during validation (public config)",
+                stderr,
             )
-            self.assertNotEqual(
-                receipt["core"]["reviewDocuments"]["BRAZIL_COMPLIANCE.md"],
-                public_review_document_digest(
-                    "BRAZIL_COMPLIANCE.md",
-                    swapped_brazil_text,
+            self.assertFalse(output.exists())
+
+    def test_issuance_input_cas_rejects_isolated_live_mode_flip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            output = folder / "public-live-receipt.js"
+            barrier = folder / "receipt-live-mode-flip"
+            process = start_paused_receipt_issuance(
+                config, external, revenue, output, barrier
+            )
+            try:
+                release_marker = wait_for_snapshot_barrier(process, barrier)
+                source = config.read_text(encoding="utf-8")
+                self.assertIn('"liveMode": false', source)
+                config.write_text(
+                    source.replace('"liveMode": false', '"liveMode": true', 1),
+                    encoding="utf-8",
+                )
+                release_marker.write_text("release\n", encoding="utf-8")
+                stdout, stderr = process.communicate(timeout=30)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.communicate()
+
+            self.assertNotEqual(process.returncode, 0, stdout)
+            self.assertIn(
+                "Issuance input changed during validation (public config)",
+                stderr,
+            )
+            self.assertFalse(output.exists())
+
+    def test_public_config_expression_cannot_read_private_issuance_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            closure = folder / "LIVE_REVIEW_CLOSURE.local.json"
+            output = folder / "public-live-receipt.js"
+            canary = folder / "private-issuance-leak.txt"
+            expression = (
+                '(() => { const fs = process.getBuiltinModule("fs"); '
+                f"fs.writeFileSync({json.dumps(str(canary))}, "
+                f"fs.readFileSync({json.dumps(str(closure))})); "
+                "return false; })()"
+            )
+            config.write_text(
+                "window.PUBLIC_ORDER_CONFIG = { "
+                f"liveMode: {expression} "
+                "};\n",
+                encoding="utf-8",
+            )
+
+            result = run_exporter(*generation_args(config, external, revenue, output))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(output.exists())
+            self.assertFalse(canary.exists())
+            self.assertNotIn(
+                "PRIVATE_CLOSURE_OPERATOR_CANARY_5T",
+                result.stdout + result.stderr,
+            )
+
+    def test_issuance_input_cas_rejects_isolated_closure_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            closure = folder / "LIVE_REVIEW_CLOSURE.local.json"
+            output = folder / "public-live-receipt.js"
+            barrier = folder / "receipt-closure-drift"
+            process = start_paused_receipt_issuance(
+                config, external, revenue, output, barrier
+            )
+            try:
+                release_marker = wait_for_snapshot_barrier(process, barrier)
+                closure.write_bytes(closure.read_bytes() + b"\n")
+                release_marker.write_text("release\n", encoding="utf-8")
+                stdout, stderr = process.communicate(timeout=30)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.communicate()
+
+            self.assertNotEqual(process.returncode, 0, stdout)
+            self.assertIn(
+                "Issuance input changed during validation (LIVE_REVIEW_CLOSURE)",
+                stderr,
+            )
+            self.assertFalse(output.exists())
+
+    def test_issuance_input_cas_rejects_isolated_review_document_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            documents = copy_review_documents(folder)
+            document_root = documents["TERMOS.md"].parent
+            write_json(
+                folder,
+                "LIVE_REVIEW_CLOSURE.local.json",
+                ready_live_review_closure(
+                    ready_public_config(live_mode=False),
+                    document_overrides=documents,
                 ),
             )
+            output = folder / "public-live-receipt.js"
+            barrier = folder / "receipt-document-drift"
+            process = start_paused_receipt_issuance(
+                config,
+                external,
+                revenue,
+                output,
+                barrier,
+                "--document-root",
+                str(document_root),
+            )
+            try:
+                release_marker = wait_for_snapshot_barrier(process, barrier)
+                document = documents["BRAZIL_COMPLIANCE.md"]
+                document.write_bytes(document.read_bytes() + b"\n")
+                release_marker.write_text("release\n", encoding="utf-8")
+                stdout, stderr = process.communicate(timeout=30)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.communicate()
+
+            self.assertNotEqual(process.returncode, 0, stdout)
+            self.assertIn(
+                "Issuance input changed during validation "
+                "(public review document BRAZIL_COMPLIANCE.md)",
+                stderr,
+            )
+            self.assertFalse(output.exists())
+
+    def test_issuance_input_cas_rejects_each_private_packet_drift(self) -> None:
+        packets = {
+            "EXTERNAL_LIVE_PACKET.local.json": "EXTERNAL_LIVE_PACKET",
+            "REVENUE_SETUP_EVIDENCE_INDEX.local.json": "REVENUE_SETUP_EVIDENCE_INDEX",
+            "REVIEWER_CANDIDATE_TRACKER.local.json": "REVIEWER_CANDIDATE_TRACKER",
+            "DELIVERY_REVIEW_CHECKLIST.local.json": "DELIVERY_REVIEW_CHECKLIST",
+        }
+        for packet_name, label in packets.items():
+            with self.subTest(packet=packet_name), tempfile.TemporaryDirectory() as tmp:
+                folder = pathlib.Path(tmp)
+                config, external, revenue = ready_files(folder)
+                output = folder / "public-live-receipt.js"
+                barrier = folder / f"receipt-{packet_name}-drift"
+                process = start_paused_receipt_issuance(
+                    config, external, revenue, output, barrier
+                )
+                try:
+                    release_marker = wait_for_snapshot_barrier(process, barrier)
+                    packet = folder / packet_name
+                    packet.write_bytes(b"{}\n")
+                    release_marker.write_text("release\n", encoding="utf-8")
+                    stdout, stderr = process.communicate(timeout=30)
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                        process.communicate()
+
+                self.assertNotEqual(process.returncode, 0, stdout)
+                self.assertIn(
+                    f"Issuance input changed during validation ({label})",
+                    stderr,
+                )
+                self.assertFalse(output.exists())
 
     def test_export_fails_closed_when_live_review_closure_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1137,6 +1308,91 @@ class PublicLiveReceiptTests(unittest.TestCase):
             self.assertEqual(receipt["schemaVersion"], 4)
             self.assertEqual(receipt["generation"], 3)
             self.assertEqual(receipt["status"], ACTIVE_STATUS)
+
+    def test_inflight_reissue_cannot_overwrite_newer_revocation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            output = folder / "public-live-receipt.js"
+            issued = run_exporter(*generation_args(config, external, revenue, output))
+            self.assertEqual(issued.returncode, 0, issued.stderr)
+            self.assertEqual(read_receipt(output)["generation"], 1)
+
+            barrier = folder / "reissue-revoke-race"
+            process = start_paused_receipt_issuance(
+                config, external, revenue, output, barrier
+            )
+            try:
+                release_marker = wait_for_snapshot_barrier(process, barrier)
+                revoked = run_exporter(
+                    "--revoke",
+                    "--public-config",
+                    str(config),
+                    "--output",
+                    str(output),
+                )
+                self.assertEqual(revoked.returncode, 0, revoked.stderr)
+                revoked_receipt = read_receipt(output)
+                self.assertEqual(revoked_receipt["generation"], 2)
+                self.assertEqual(revoked_receipt["status"], "not_issued")
+
+                release_marker.write_text("release\n", encoding="utf-8")
+                stdout, stderr = process.communicate(timeout=30)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.communicate()
+
+            self.assertNotEqual(process.returncode, 0, stdout)
+            self.assertIn("Receipt output changed during issuance validation", stderr)
+            final_receipt = read_receipt(output)
+            self.assertEqual(final_receipt["generation"], 2)
+            self.assertEqual(final_receipt["status"], "not_issued")
+
+    def test_two_inflight_reissues_allow_only_one_commit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            output = folder / "public-live-receipt.js"
+            issued = run_exporter(*generation_args(config, external, revenue, output))
+            self.assertEqual(issued.returncode, 0, issued.stderr)
+
+            barriers = [folder / "issuer-one", folder / "issuer-two"]
+            processes = [
+                start_paused_receipt_issuance(
+                    config, external, revenue, output, barrier
+                )
+                for barrier in barriers
+            ]
+            results: list[tuple[int, str, str]] = []
+            try:
+                release_markers = [
+                    wait_for_snapshot_barrier(process, barrier)
+                    for process, barrier in zip(processes, barriers)
+                ]
+                for release_marker in release_markers:
+                    release_marker.write_text("release\n", encoding="utf-8")
+                for process in processes:
+                    stdout, stderr = process.communicate(timeout=30)
+                    results.append((process.returncode, stdout, stderr))
+            finally:
+                for process in processes:
+                    if process.poll() is None:
+                        process.kill()
+                        process.communicate()
+
+            self.assertEqual(sum(code == 0 for code, _, _ in results), 1, results)
+            failed_outputs = "\n".join(
+                f"{stdout}\n{stderr}" for code, stdout, stderr in results if code != 0
+            )
+            self.assertTrue(
+                "Receipt output changed during issuance validation" in failed_outputs
+                or "Receipt mutation lock already exists" in failed_outputs,
+                failed_outputs,
+            )
+            final_receipt = read_receipt(output)
+            self.assertEqual(final_receipt["generation"], 2)
+            self.assertEqual(final_receipt["status"], ACTIVE_STATUS)
 
     def test_schema_three_placeholder_is_migration_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

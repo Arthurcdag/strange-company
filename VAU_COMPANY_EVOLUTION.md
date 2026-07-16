@@ -132,7 +132,7 @@ The current public config has support verification recorded, but the Google
 Form route and review dates remain unverified and `liveMode` is false. That means the useful evolution
 path is:
 
-1. complete the document-bound human/legal/privacy/Brazil/AI review closure, then publish only its review dates,
+1. complete the document-bound human/legal/privacy/Brazil/AI review closure, then bind only its four review dates and a matching fail-closed receipt placeholder with `node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json`,
 2. prepare private payment/fiscal evidence,
 3. validate the separate external support/Google/Stripe/bank live packet,
 4. finish the 4-reviewer bench,

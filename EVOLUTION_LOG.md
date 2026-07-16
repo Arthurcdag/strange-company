@@ -560,3 +560,74 @@ same-origin rollback or an intentional current-main revert cannot infer a newer
 state, so external Form shutdown remains the first stop rule. No external
 review, legal, tax, payment, privacy, fiscal, or launch gate was claimed
 complete, and tracked `liveMode` remains false.
+
+## 2026-07-16 - Revocation-Dominant Review Closure Binding
+
+Objective: replace the manual unbound-to-bound review-date handoff with one
+plan-token transaction and ensure that concurrent input drift, revocation, or a
+competing issuer cannot produce or restore a stale active receipt.
+
+Changed:
+
+- Added `tools/bind_live_review_closure.js` with a non-mutating default plan,
+  explicit `--apply --expect-plan-id` consent, exact four-field config binding,
+  and a generation-advanced `not_issued` receipt staged while `liveMode` stays
+  false.
+- Bound the local-only plan ID to the exact config, private closure evidence,
+  reviewed documents, receipt baseline, and binder/validator/exporter source;
+  reported apply arguments preserve every effective path override, while the
+  plan and PLAN_ID remain private because they commit to local closure evidence.
+- Serialized binder and exporter receipt writes through the same output lock,
+  used receipt-first atomic per-file replacement, revalidated exact final bytes
+  inside both locks, and made the receipt-ahead interruption state fail-closed
+  and resumable rather than claiming impossible two-file atomicity.
+- Made receipt issuance validate private snapshot copies, then compare every
+  exact issuance input and the output baseline under the final receipt lock
+  before writing. Config changes including a `liveMode`-only flip, closure or
+  reviewed-document drift, private-packet drift, revocation, and competing
+  issuance now abort without mutating the newer receipt.
+- Replaced every tool-side `node:vm` public-config/archive evaluation path with
+  the shared data-only `tools/strict_public_data.js` parser. It accepts only the
+  constrained config assignment or exact frozen-JSON wrapper, enforces resource
+  limits, and rejects executable expressions, getters, computed/spread syntax,
+  suffix code, duplicate or decoded-alias keys, and prototype-polluting keys
+  before private closure or issuance snapshots can be exposed.
+- Extended closure conformance to execute a disposable binder plan/apply and
+  re-observe `config_bound_ready` across local status, evolution status, the
+  next-action packet, and VAU. Added lock, interruption, exact-argv, stale-plan,
+  input-drift, competing-issuer, and cross-tool revocation race regressions.
+- Routed README, human/operator handoffs, the private Operations console, the
+  external-gap packet, VAU, status surfaces, CI, Pages, public-bundle checks,
+  preflight, functionality audit, and survival checks through the same binder;
+  the old date renderer remains preview-only.
+- Documented repository and Pages governance as external human controls. No
+  branch rule, required reviewer, environment protection, or external trust
+  anchor is claimed by repo-local checks.
+
+Verified with:
+
+- `node --check tools\bind_live_review_closure.js`
+- `node --check tools\export_public_live_receipt.js`
+- `node --check tools\check_live_review_closure_conformance.js`
+- `python -m py_compile tools\vau_company_evolution.py`
+- `python -m unittest tests.test_bind_live_review_closure`
+- `python -m unittest tests.test_strict_public_data_parser`
+- `python -m unittest tests.test_public_live_receipt`
+- `python -m unittest tests.test_live_review_closure_conformance`
+- `python -m unittest discover -s tests`
+- Full discovery result: 290 tests passed; 1 skipped.
+- `node tools\export_public_live_receipt.js --check-public-js`
+- `node tools\check_live_review_closure_conformance.js --json`
+- `node tools\audit_evolution_log.js`
+- `node tools\preflight_public_launch.js --deployment`
+- `node tools\audit_company_functionality.js`
+- `node tools\build_public_site.js --check --output .public-site-build.local --force`
+- `node tools\survival_check.js`
+- `git diff --check`
+
+Result: review closure now has one replayable, fail-closed transition, and a
+validated issuer cannot overwrite a later binder placeholder or revocation.
+These are local process-integrity and race-resistance controls, not a signature,
+global monotonic anchor, legal review, payment proof, privacy approval, fiscal
+approval, or launch authorization. External gates remain open and tracked
+`liveMode` remains false.

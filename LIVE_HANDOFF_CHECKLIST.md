@@ -27,6 +27,8 @@ Use [ONLINE_ASAP.md](ONLINE_ASAP.md) for the fastest safe launch sequence.
 
 - [ ] Clone or pull the latest `main` from `https://github.com/Arthurcdag/strange-company`.
 - [ ] Confirm `main` includes commit `f3f4da5` or newer.
+- [ ] Confirm a GitHub ruleset protects `main`, requires pull requests and `static-checks`, and prevents direct or force pushes without the documented emergency path.
+- [ ] Confirm the `github-pages` environment requires a non-self approving reviewer and does not allow an administrator bypass for ordinary releases.
 - [ ] Run JavaScript syntax checks:
 
 ```bash
@@ -90,10 +92,9 @@ Edit `public-config.js` only after sections 2 and 3 are complete.
 - [ ] Set `googleFormVerified: true`.
 - [ ] Confirm `jurisdiction: "BR"`.
 - [ ] Keep `aiGeneratedLegalDocsRequireHumanReview: true`.
-- [ ] Set `termsReviewedAt` to `YYYY-MM-DD`.
-- [ ] Set `privacyReviewedAt` to `YYYY-MM-DD`.
-- [ ] Set `brazilComplianceReviewedAt` to `YYYY-MM-DD`.
-- [ ] Set `aiHandoffReviewedAt` to `YYYY-MM-DD`.
+- [ ] Validate `LIVE_REVIEW_CLOSURE.local.json`, render the binder plan, inspect its exact four-date delta, and apply only the unchanged plan ID; do not edit the four review dates separately.
+- [ ] Keep the binder plan and PLAN_ID local because they commit to private
+  closure evidence; execute only the exact `applyArguments` it reports.
 - [ ] Confirm service names, descriptions, and prices are the approved public offer.
 - [ ] Keep `liveMode: false` through evidence validation, receipt export, preflight, and status review.
 - [ ] Keep external Google Form response collection disabled and record
@@ -104,7 +105,11 @@ Edit `public-config.js` only after sections 2 and 3 are complete.
 Then run:
 
 ```bash
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --apply --expect-plan-id <PLAN_ID>
 node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
+node tools/export_public_live_receipt.js --check-public-js
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
 node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
 node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
@@ -123,7 +128,7 @@ and live config together, verify Pages, and only then enable external Form respo
 ## 5. Publish
 
 - [ ] Commit only the intended config and documentation changes.
-- [ ] Push to `main` or open a PR and merge it after checks pass.
+- [ ] Open a PR, obtain the required non-self approval, and merge only after protected checks pass; do not push the live release directly to `main`.
 - [ ] Wait for the `Deploy static site to Pages` workflow to complete successfully.
 - [ ] Open `https://arthurcdag.github.io/strange-company/`.
 - [ ] Confirm the public readiness banner shows live intake configured.

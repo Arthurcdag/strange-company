@@ -58,6 +58,19 @@ class LiveReviewClosureConformanceTests(unittest.TestCase):
             self.assertEqual(row["closureBlocked"], not should_be_ready)
             self.assertEqual(row["selectedHandoffAdvanced"], should_be_ready)
 
+        transition = report["bindingTransition"]
+        self.assertEqual(transition["fromPhase"], "document_ready_unbound")
+        self.assertEqual(transition["toPhase"], "config_bound_ready")
+        self.assertEqual(transition["transition"], "bind_and_revoke")
+        self.assertEqual(transition["stagedReceiptStatus"], "not_issued")
+        self.assertEqual(transition["appliedReceiptStatus"], "not_issued")
+        self.assertTrue(transition["planWasNonMutating"])
+        self.assertTrue(transition["exactApplyArgumentsUsed"])
+        self.assertTrue(transition["exactPlanIdConsumed"])
+        self.assertTrue(transition["allStatusSurfacesReobserved"])
+        self.assertTrue(transition["closureBlockerCleared"])
+        self.assertTrue(transition["vauClosureReady"])
+
     def test_text_report_is_concise_and_public_safe(self) -> None:
         result = run_checker()
 
@@ -65,6 +78,10 @@ class LiveReviewClosureConformanceTests(unittest.TestCase):
         self.assertIn("Live review closure conformance passed.", result.stdout)
         for phase in EXPECTED_PHASES:
             self.assertIn(f"- {phase}: {phase}", result.stdout)
+        self.assertIn(
+            "- binding transition: document_ready_unbound -> config_bound_ready",
+            result.stdout,
+        )
         self.assertNotIn("documentDigests", result.stdout)
         self.assertNotIn("fixture-reviewer", result.stdout)
         self.assertNotIn("strange-company-live-review-conformance-", result.stdout)
@@ -77,8 +94,13 @@ class LiveReviewClosureConformanceTests(unittest.TestCase):
             "tools/evolution_goal_status.js",
             "tools/generate_evolution_next_packet.js",
             "tools/vau_company_evolution.py",
+            "tools/export_public_live_receipt.js",
+            "tools/bind_live_review_closure.js",
         ):
             self.assertIn(command, source)
+        self.assertIn("planWasNonMutating", source)
+        self.assertIn("plan.applyArguments.slice(1)", source)
+        self.assertIn("inspectWrittenFixture", source)
         self.assertIn("fs.mkdtempSync", source)
         self.assertIn("fs.rmSync", source)
         self.assertNotIn("--write-local", source)

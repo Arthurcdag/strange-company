@@ -76,7 +76,7 @@ If any of these are needed, follow `HUMAN_REVENUE_INSTRUCTIONS.md` and close the
 Use the simulator to demonstrate the satellite revenue model and to rehearse the receipt-chain flow before the first paid customer. Stop using simulator output the moment a real customer interaction begins. For real customers:
 
 - Fill `REVENUE_SETUP_EVIDENCE_INDEX.local.json` with real evidence references (the `.local.json` file is gitignored).
-- Copy the reviewed public dates into `public-config.js` and keep `liveMode: false`.
+- Put real reviewed dates in `LIVE_REVIEW_CLOSURE.local.json`, validate its exact document digests, and use `bind_live_review_closure.js` plan/apply to bind all four dates and the matching fail-closed placeholder while keeping `liveMode: false`; never copy dates manually.
 - Run the config-bound revenue and external validators plus the reviewer and delivery readiness validators, export and check `public-live-receipt.js`, then run `node tools/preflight_public_launch.js`, `node tools/evolution_goal_status.js --json`, and `node tools/survival_check.js`.
 - Only after every check passes with external Form responses disabled may a
   human make the separate `liveMode: true` change; run

@@ -32,7 +32,7 @@ Use this decision table before changing `public-config.js`.
 
 | Condition | Action |
 | --- | --- |
-| Public site must be visible now | Push to `main`; Pages deploys `public.html` automatically. |
+| Public site must be visible now | Push a release branch, open a PR, obtain the required non-self approval and protected checks, then let Pages deploy the approved `main` merge. |
 | Support inbox, Google Form, terms, privacy, Stripe, and bank are not verified | Keep `liveMode: false`. |
 | Support inbox and Google Form are verified, but Stripe/bank are not ready | Keep packet-only mode; do not send payment traffic. |
 | All external controls are verified | Complete the bound validators, issue/check the public receipt, run preflight/status with `liveMode: false`, then require a separate human flip. |
@@ -61,7 +61,8 @@ Expected result before external setup is complete:
 
 ## Satellite Live Config
 
-Only edit `public-config.js` after the real outside evidence exists.
+Only update non-review public fields in `public-config.js` after the real outside
+evidence exists. Bind the four review dates only through the closure binder.
 
 Required values:
 
@@ -70,10 +71,7 @@ supportEmail: "real monitored inbox",
 googleFormUrl: "https://docs.google.com/forms/...",
 supportInboxVerified: true,
 googleFormVerified: true,
-termsReviewedAt: "YYYY-MM-DD",
-privacyReviewedAt: "YYYY-MM-DD",
-brazilComplianceReviewedAt: "YYYY-MM-DD",
-aiHandoffReviewedAt: "YYYY-MM-DD",
+// The closure binder writes the four reviewed-at fields transactionally.
 liveMode: false
 ```
 
@@ -85,7 +83,15 @@ intended post-decision target; every other bound field must match, including
 
 Then run:
 
+Keep the binder plan and PLAN_ID local because they commit to private closure
+evidence.
+
 ```bash
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --apply --expect-plan-id <PLAN_ID>
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
+node tools/export_public_live_receipt.js --check-public-js
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
 node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
 node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
@@ -125,12 +131,10 @@ and still works after the Form URL is cleared.
 
 ## Publish
 
-```bash
-git status --short
-git add README.md LIVE_HANDOFF_CHECKLIST.md OPERATIONS_START_PACKET.md OPERATOR_FAST_START.md ONLINE_ASAP.md tools/audit_company_functionality.js
-git commit -m "Add online ASAP launch instructions"
-git push origin main
-```
+Commit only the intended release files on a non-`main` branch, push that branch,
+and open a PR. Obtain the required non-self approval and protected checks; do
+not push the release directly to `main` and do not bypass the protected Pages
+environment.
 
 After push:
 
@@ -153,6 +157,8 @@ The satellite is not live while any of these remain true:
 - Stripe Hosted Invoice route is not verified,
 - business bank route is not verified.
 
-The fastest next non-code work is to produce those eight pieces of evidence, then update `public-config.js` and rerun the live-required audit.
+The fastest next non-code work is to produce those eight pieces of evidence,
+bind the four review dates through the local closure plan, update only the other
+documented public-safe fields, and rerun the live-required audit.
 
 Use [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md) for the exact developer/operator instructions to create the support inbox, Google Form, Sheet ledger, terms and privacy review dates, Stripe Hosted Invoice route, and private bank-route evidence.

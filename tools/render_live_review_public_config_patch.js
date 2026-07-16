@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
-const vm = require("vm");
+const { parsePublicOrderConfig } = require("./strict_public_data");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
@@ -30,9 +30,7 @@ function readJson(filePath) {
 }
 
 function readPublicConfig(filePath) {
-  const sandbox = { window: {} };
-  vm.runInNewContext(fs.readFileSync(filePath, "utf8"), sandbox, { filename: filePath });
-  return sandbox.window.PUBLIC_ORDER_CONFIG || {};
+  return parsePublicOrderConfig(fs.readFileSync(filePath, "utf8"), filePath);
 }
 
 function validateReadyPacket(filePath) {
@@ -77,12 +75,15 @@ function buildPlan(packet, currentConfig) {
 
   return {
     system: "LIVE_REVIEW_PUBLIC_CONFIG_PATCH",
+    previewOnly: true,
+    mutatesFiles: false,
     sourcePacket: path.relative(root, packetPath).replace(/\\/g, "/"),
     publicConfigPath: path.relative(root, publicConfigPath).replace(/\\/g, "/"),
     liveModeRemainsFalse: true,
     changes,
     replacementSnippet: renderSnippet(patch),
     nextValidation: [
+      "node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json",
       "node tools/preflight_public_launch.js",
       "node tools/audit_company_functionality.js",
       "node tools/evolution_goal_status.js --json",
@@ -90,6 +91,7 @@ function buildPlan(packet, currentConfig) {
       "node tools/survival_check.js",
     ],
     stopRules: [
+      "Do not apply this preview manually; use bind_live_review_closure.js and its plan-token apply flow for the config/receipt transition.",
       "Do not copy private reviewer notes, CPF/CNPJ, bank data, payment dashboard URLs, credentials, or customer-private material into public-config.js.",
       "Do not set liveMode true from this review-date patch.",
       "Do not treat this patch as external live readiness or payment/fiscal evidence.",

@@ -72,6 +72,7 @@ class PublicSiteBundleTests(unittest.TestCase):
                 "tools/vau_company_evolution.py",
                 "tools/validate_live_review_closure.js",
                 "tools/render_live_review_public_config_patch.js",
+                "tools/bind_live_review_closure.js",
                 "tools/render_public_live_shutdown_patch.js",
                 "tools/export_public_live_receipt.js",
                 "tools/validate_delivery_review_checklist.js",

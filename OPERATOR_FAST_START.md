@@ -20,11 +20,10 @@ For exact Google Form questions, Sheet headers, support inbox checks, Stripe evi
    - keep `aiGeneratedLegalDocsRequireHumanReview: true`,
    - set `supportInboxVerified: true` after sending and receiving a test email,
    - set `googleFormVerified: true` after a test response lands in the Sheet,
-   - set `termsReviewedAt` and `privacyReviewedAt`,
-   - set `brazilComplianceReviewedAt` and `aiHandoffReviewedAt`,
+   - leave the four review-date fields to the closure binder below,
    - keep `liveMode: false` through validation, receipt export, preflight, and status review,
    - adjust service names and prices if the offer changed.
-5. Run `node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js` and stop if any reviewed document digest or public review date is stale.
+5. Run `node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready`, then `node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json`. Keep the plan and PLAN_ID local because they commit to private closure evidence. Review the exact four-date delta and execute only the unchanged plan's exact `applyArguments`. Finally run the config-bound closure validator and `node tools/export_public_live_receipt.js --check-public-js`; stop if any reviewed document, input, date, plan ID, or fail-closed placeholder is stale.
 6. Run `node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js`.
 7. Run `node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js`.
 8. Run `node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready`.

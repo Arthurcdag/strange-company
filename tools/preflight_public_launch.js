@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
-const vm = require("vm");
+const { parsePublicOrderConfig } = require("./strict_public_data");
 
 const root = path.resolve(__dirname, "..");
 const failures = [];
@@ -33,10 +33,13 @@ function assert(condition, message) {
 }
 
 function compileJavaScript(relativePath) {
-  try {
-    new vm.Script(read(relativePath), { filename: relativePath });
-  } catch (error) {
-    fail(`${relativePath} does not parse: ${error.message}`);
+  const result = spawnSync(process.execPath, ["--check", relativePath], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) {
+    const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
+    fail(`${relativePath} does not parse${output ? `:\n${output}` : "."}`);
   }
 }
 
@@ -79,10 +82,8 @@ function checkPublicLiveReceipt() {
 }
 
 function loadPublicConfig() {
-  const sandbox = { window: {} };
   try {
-    vm.runInNewContext(read("public-config.js"), sandbox, { filename: "public-config.js" });
-    return sandbox.window.PUBLIC_ORDER_CONFIG || {};
+    return parsePublicOrderConfig(read("public-config.js"), "public-config.js");
   } catch (error) {
     fail(`public-config.js could not be loaded: ${error.message}`);
     return {};
@@ -1271,7 +1272,8 @@ function checkEvolutionGoalStatusContract() {
     ["status live shutdown renderer", statusTool, "render_public_live_shutdown_patch.js"],
     ["status review closure actions", statusTool, "reviewClosureActions"],
     ["status review closure local packet", statusTool, "LIVE_REVIEW_CLOSURE.local.json"],
-    ["status review closure renderer", statusTool, "render_live_review_public_config_patch.js"],
+    ["status review closure binder", statusTool, "bind_live_review_closure.js"],
+    ["status phase-specific closure validator", statusTool, "phaseValidatorCommands"],
     ["status review closure phase", statusTool, "liveReviewClosurePhase"],
     ["status config-bound closure validator", statusTool, "--require-ready --public-config public-config.js"],
     ["status local evidence command", statusTool, "tools/local_evidence_status.js"],
@@ -1390,6 +1392,8 @@ function checkLiveReviewClosureContract() {
   const template = read("LIVE_REVIEW_CLOSURE.template.json");
   const draft = read("tools/draft_live_review_closure.js");
   const renderer = read("tools/render_live_review_public_config_patch.js");
+  const binder = read("tools/bind_live_review_closure.js");
+  const strictDataParser = read("tools/strict_public_data.js");
   const validator = read("tools/validate_live_review_closure.js");
   const conformance = read("tools/check_live_review_closure_conformance.js");
   const receiptExporter = read("tools/export_public_live_receipt.js");
@@ -1408,11 +1412,14 @@ function checkLiveReviewClosureContract() {
     ["README live review draft tool", readme, "tools/draft_live_review_closure.js"],
     ["README live review validator", readme, "tools/validate_live_review_closure.js"],
     ["README live review renderer", readme, "tools/render_live_review_public_config_patch.js"],
+    ["README live review binder", readme, "tools/bind_live_review_closure.js"],
     ["README live review conformance checker", readme, "tools/check_live_review_closure_conformance.js"],
     ["human review live closure local packet", humanReview, "LIVE_REVIEW_CLOSURE.local.json"],
     ["human review live closure ready command", humanReview, "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready"],
     ["human review config-bound closure command", humanReview, "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js"],
     ["human review live closure render command", humanReview, "node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json"],
+    ["human review live closure binder plan", humanReview, "node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json"],
+    ["human review live closure binder apply", humanReview, "--apply --expect-plan-id <PLAN_ID>"],
     ["human review live shutdown command", humanReview, "node tools/render_public_live_shutdown_patch.js"],
     ["evolution log live review entry", evolutionLog, "Live Review Closure Packet"],
     ["live review template schema", template, '"schemaVersion": 2'],
@@ -1424,6 +1431,16 @@ function checkLiveReviewClosureContract() {
     ["live review renderer system name", renderer, "LIVE_REVIEW_PUBLIC_CONFIG_PATCH"],
     ["live review renderer validates ready packet", renderer, "validate_live_review_closure.js"],
     ["live review renderer keeps liveMode false", renderer, "liveModeRemainsFalse"],
+    ["live review binder system", binder, "STRANGE_COMPANY_LIVE_REVIEW_BIND_PLAN"],
+    ["live review binder plan domain", binder, "STRANGE_COMPANY_LIVE_REVIEW_BIND_PLAN_V1"],
+    ["live review binder stale-plan guard", binder, "--expect-plan-id"],
+    ["live review binder exact fields", binder, "REVIEW_FIELDS"],
+    ["live review binder fail-closed receipt", binder, "not_issued"],
+    ["live review binder atomic replacement", binder, "atomicReplace"],
+    ["strict public config parser", strictDataParser, "parsePublicOrderConfig"],
+    ["strict frozen public archive parser", strictDataParser, "parseFrozenWindowJson"],
+    ["strict parser duplicate-key rejection", strictDataParser, "duplicate object key"],
+    ["strict parser unsafe-key rejection", strictDataParser, "unsafe object key"],
     ["live review validator ready gate", validator, "--require-ready"],
     ["live review validator digest domain", validator, "STRANGE_COMPANY_REVIEW_DOCUMENT_V1"],
     ["live review validator public config binding", validator, "--public-config"],
@@ -1445,6 +1462,10 @@ function checkLiveReviewClosureContract() {
     ["public receipt schema v4 placeholder", publicReceipt, '"schemaVersion": 4'],
     ["public receipt monotonic generation", receiptExporter, "nextReceiptGeneration"],
     ["public receipt mutation lock", receiptExporter, "withReceiptMutationLock"],
+    ["public receipt issuance input snapshot", receiptExporter, "createIssuanceSnapshot"],
+    ["public receipt issuance input compare-and-swap", receiptExporter, "assertIssuanceInputsMatchSnapshot"],
+    ["public receipt issuance output baseline", receiptExporter, "captureReceiptOutputBaseline"],
+    ["public receipt issuance compare-and-swap", receiptExporter, "assertReceiptOutputMatchesBaseline"],
     ["public receipt placeholder generation", publicReceipt, '"generation"'],
     ["public receipt nine-document core", receiptExporter, "reviewDocuments"],
     ["public browser nine-document core", publicJs, "reviewDocuments"],
@@ -1463,6 +1484,10 @@ function checkLiveReviewClosureContract() {
     ["live review template unignored", gitignore, "!LIVE_REVIEW_CLOSURE.template.json"],
     ["live review draft syntax workflow", validateWorkflow, "node --check tools/draft_live_review_closure.js"],
     ["live review renderer syntax workflow", validateWorkflow, "node --check tools/render_live_review_public_config_patch.js"],
+    ["live review binder syntax workflow", validateWorkflow, "node --check tools/bind_live_review_closure.js"],
+    ["strict parser syntax workflow", validateWorkflow, "node --check tools/strict_public_data.js"],
+    ["strict parser Pages syntax", pagesWorkflow, "node --check tools/strict_public_data.js"],
+    ["live review binder Pages syntax", pagesWorkflow, "node --check tools/bind_live_review_closure.js"],
     ["live review validator syntax workflow", validateWorkflow, "node --check tools/validate_live_review_closure.js"],
     ["live review validator CI template check", validateWorkflow, "node tools/validate_live_review_closure.js --template-ok"],
     ["live review conformance CI syntax", validateWorkflow, "node --check tools/check_live_review_closure_conformance.js"],
@@ -1472,6 +1497,11 @@ function checkLiveReviewClosureContract() {
     ["live review public bundle copy", builder, "LIVE_REVIEW_CLOSURE.template.json"],
     ["live review validator public bundle copy", builder, "tools/validate_live_review_closure.js"],
     ["live review renderer public bundle copy", builder, "tools/render_live_review_public_config_patch.js"],
+    ["live review binder public bundle copy", builder, "tools/bind_live_review_closure.js"],
+    ["strict parser public bundle copy", builder, "tools/strict_public_data.js"],
+    ["Operations conditional closure preparation", read("script.js"), "Only if LIVE_REVIEW_CLOSURE.local.json is absent"],
+    ["gap packet conditional closure preparation", read("tools/generate_external_live_gap_packet.js"), "preparationCondition"],
+    ["gap packet exact binder apply handoff", read("tools/generate_external_live_gap_packet.js"), "exact applyArguments"],
     ["live review conformance public bundle copy", builder, "tools/check_live_review_closure_conformance.js"],
     ["VAU public bundle copy", builder, "tools/vau_company_evolution.py"],
     ["public bundle reviewed-document size parity", builder, "sourceBytes.length !== bundledBytes.length"],
@@ -1484,6 +1514,18 @@ function checkLiveReviewClosureContract() {
 
   for (const [label, contents, snippet] of required) {
     assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+
+  const executableDataParserPattern = new RegExp(
+    ["runInNew", "Context|runIn", "Context|require\\([\"'](?:node:)?v", "m[\"']\\)|new\\s+v", "m\\.Script"].join("")
+  );
+  for (const toolName of fs.readdirSync(path.join(root, "tools"))) {
+    if (!toolName.endsWith(".js")) continue;
+    const source = read(`tools/${toolName}`);
+    assert(
+      !executableDataParserPattern.test(source),
+      `tools/${toolName} must not execute public data through node:vm.`
+    );
   }
 
   for (const documentPath of PUBLIC_REVIEW_DOCUMENT_PATHS) {
@@ -1562,8 +1604,10 @@ compileJavaScript("tools/evolution_goal_status.js");
 compileJavaScript("tools/generate_evolution_next_packet.js");
 compileJavaScript("tools/local_evidence_status.js");
 compileJavaScript("tools/check_live_review_closure_conformance.js");
+compileJavaScript("tools/strict_public_data.js");
 compileJavaScript("tools/draft_live_review_closure.js");
 compileJavaScript("tools/render_live_review_public_config_patch.js");
+compileJavaScript("tools/bind_live_review_closure.js");
 compileJavaScript("tools/render_public_live_shutdown_patch.js");
 compileJavaScript("tools/export_public_live_receipt.js");
 compileJavaScript("tools/build_public_site.js");

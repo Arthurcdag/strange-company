@@ -169,7 +169,7 @@ function laneNextAction(lane, status, checks) {
       return "Keep this closure local and rerun its config-bound validator after any reviewed document or public review date changes.";
     }
     if (documentCheck && documentCheck.passed) {
-      return `Apply only the four approved review dates while liveMode remains false, then run ${boundCheck.command}.`;
+      return `Plan the fail-closed two-file binding with node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json, review its exact four-date delta, then apply it with --apply --expect-plan-id <PLAN_ID> before running ${boundCheck.command}.`;
     }
     if (status === "missing") {
       return `${lane.draftCommand}; then fill real human-review evidence outside git.`;
@@ -220,6 +220,8 @@ function closureCommands(lane, checks) {
   return {
     draft: lane.draftCommand,
     validateDocuments: checks.find((check) => check.id === "document_ready")?.command || "",
+    planConfigBinding: "node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json",
+    applyConfigBindingTemplate: "node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --apply --expect-plan-id <PLAN_ID>",
     validateConfigBinding: checks.find((check) => check.id === "config_bound_ready")?.command || "",
   };
 }

@@ -204,6 +204,7 @@ function writeFixture(workspace, spec) {
     fixtureDir,
     configPath,
     closurePath,
+    receiptPath: path.join(fixtureDir, "public-live-receipt.js"),
     missingReceiptPath: path.join(fixtureDir, "missing-public-live-receipt.js"),
   };
 }
@@ -221,8 +222,8 @@ function packetPhase(packetText) {
   return match ? match[1] : "";
 }
 
-function inspectFixture(python, workspace, spec) {
-  const fixture = writeFixture(workspace, spec);
+function inspectWrittenFixture(python, fixture, spec, label = spec.phase) {
+  const receiptPath = fixture.statusReceiptPath || fixture.missingReceiptPath;
   const localStatus = parseJson(runNode([
     "tools/local_evidence_status.js",
     "--json",
@@ -230,7 +231,7 @@ function inspectFixture(python, workspace, spec) {
     fixture.fixtureDir,
     "--public-config",
     fixture.configPath,
-  ], `${spec.phase}: local evidence status`), `${spec.phase}: local evidence status`);
+  ], `${label}: local evidence status`), `${label}: local evidence status`);
 
   const evolutionArgs = [
     "--local-evidence-dir",
@@ -238,17 +239,17 @@ function inspectFixture(python, workspace, spec) {
     "--public-config",
     fixture.configPath,
     "--public-live-receipt",
-    fixture.missingReceiptPath,
+    receiptPath,
   ];
   const evolutionStatus = parseJson(runNode([
     "tools/evolution_goal_status.js",
     "--json",
     ...evolutionArgs,
-  ], `${spec.phase}: evolution goal status`), `${spec.phase}: evolution goal status`);
+  ], `${label}: evolution goal status`), `${label}: evolution goal status`);
   const nextPacket = runNode([
     "tools/generate_evolution_next_packet.js",
     ...evolutionArgs,
-  ], `${spec.phase}: evolution next packet`);
+  ], `${label}: evolution next packet`);
 
   const missingPath = (name) => path.join(fixture.fixtureDir, `missing-${name}`);
   const vau = parseJson(run(python, [
@@ -264,7 +265,7 @@ function inspectFixture(python, workspace, spec) {
     "--live-review-closure",
     fixture.closurePath,
     "--public-live-receipt",
-    fixture.missingReceiptPath,
+    receiptPath,
     "--terms-doc",
     path.join(root, "TERMOS.md"),
     "--privacy-doc",
@@ -279,7 +280,7 @@ function inspectFixture(python, workspace, spec) {
     "1",
     "--format",
     "json",
-  ], `${spec.phase}: VAU`), `${spec.phase}: VAU`);
+  ], `${label}: VAU`), `${label}: VAU`);
 
   return {
     localStatus,
@@ -290,6 +291,59 @@ function inspectFixture(python, workspace, spec) {
     nextPacketPhase: packetPhase(nextPacket),
     vau,
   };
+}
+
+function inspectFixture(python, workspace, spec) {
+  return inspectWrittenFixture(python, writeFixture(workspace, spec), spec);
+}
+
+function receiptCommandArgs(fixture, mode) {
+  const common = [
+    "--public-config",
+    fixture.configPath,
+    "--document-root",
+    root,
+    "--terms-doc",
+    path.join(root, "TERMOS.md"),
+    "--privacy-doc",
+    path.join(root, "AVISO_DE_PRIVACIDADE.md"),
+  ];
+  if (mode === "revoke") {
+    return [
+      "tools/export_public_live_receipt.js",
+      "--revoke",
+      ...common,
+      "--output",
+      fixture.receiptPath,
+      "--force",
+    ];
+  }
+  return [
+    "tools/export_public_live_receipt.js",
+    "--check-public-js",
+    "--json",
+    ...common,
+    "--public-js",
+    fixture.receiptPath,
+  ];
+}
+
+function binderPlanArgs(fixture) {
+  return [
+    "tools/bind_live_review_closure.js",
+    fixture.closurePath,
+    "--public-config",
+    fixture.configPath,
+    "--public-receipt",
+    fixture.receiptPath,
+    "--document-root",
+    root,
+    "--terms-doc",
+    path.join(root, "TERMOS.md"),
+    "--privacy-doc",
+    path.join(root, "AVISO_DE_PRIVACIDADE.md"),
+    "--json",
+  ];
 }
 
 function check(condition, failures, phase, message) {
@@ -349,7 +403,7 @@ function verifyFixture(spec, observation, failures) {
   } else if (phase === "invalid") {
     check(selected.command?.includes("validate_live_review_closure.js"), failures, phase, "selected handoff did not validate the invalid packet");
   } else if (phase === "document_ready_unbound") {
-    check(selected.command?.includes("render_live_review_public_config_patch.js"), failures, phase, "selected handoff did not render the date patch");
+    check(selected.command?.includes("bind_live_review_closure.js"), failures, phase, "selected handoff did not plan the transactional config/receipt binding");
   }
 
   return {
@@ -366,11 +420,103 @@ function verifyFixture(spec, observation, failures) {
   };
 }
 
+function verifyBindingTransition(python, workspace, failures) {
+  const unboundSpec = fixtureSpecs.find((spec) => spec.phase === "document_ready_unbound");
+  const boundSpec = fixtureSpecs.find((spec) => spec.phase === "config_bound_ready");
+  if (!unboundSpec || !boundSpec) fail("binding transition fixture specifications are missing");
+
+  const fixture = writeFixture(path.join(workspace, "binding-transition"), unboundSpec);
+  runNode(receiptCommandArgs(fixture, "revoke"), "binding transition: stage fail-closed receipt");
+  fixture.statusReceiptPath = fixture.receiptPath;
+
+  const stagedReceipt = parseJson(
+    runNode(receiptCommandArgs(fixture, "check"), "binding transition: validate staged receipt"),
+    "binding transition: staged receipt validation"
+  );
+  if (stagedReceipt.status !== "not_issued") {
+    fail(`binding transition staged receipt status was ${stagedReceipt.status || "absent"}`);
+  }
+
+  const before = verifyFixture(
+    unboundSpec,
+    inspectWrittenFixture(python, fixture, unboundSpec, "binding transition before apply"),
+    failures,
+  );
+  const configBeforePlan = fs.readFileSync(fixture.configPath);
+  const receiptBeforePlan = fs.readFileSync(fixture.receiptPath);
+  const plan = parseJson(
+    runNode(binderPlanArgs(fixture), "binding transition: binder plan"),
+    "binding transition: binder plan"
+  );
+  const planWasNonMutating = configBeforePlan.equals(fs.readFileSync(fixture.configPath))
+    && receiptBeforePlan.equals(fs.readFileSync(fixture.receiptPath));
+  if (!planWasNonMutating) fail("binding transition plan mutated the public config or receipt");
+  if (!/^[0-9a-f]{64}$/.test(plan.planId || "")) {
+    fail("binding transition plan omitted a valid local plan ID");
+  }
+  if (plan.transition !== "bind_and_revoke" || plan.wouldApply !== true) {
+    fail(`binding transition produced unexpected plan state ${plan.transition || "absent"}`);
+  }
+
+  const expectedApplyArguments = [
+    "node",
+    ...binderPlanArgs(fixture),
+    "--apply",
+    "--expect-plan-id",
+    plan.planId,
+  ];
+  if (JSON.stringify(plan.applyArguments) !== JSON.stringify(expectedApplyArguments)) {
+    fail("binding transition plan did not preserve the exact plan ID and path overrides");
+  }
+
+  const applied = parseJson(
+    runNode(plan.applyArguments.slice(1), "binding transition: binder apply"),
+    "binding transition: binder apply"
+  );
+  if (applied.planId !== plan.planId || applied.applied !== true || applied.noOp !== false) {
+    fail("binding transition apply did not consume the exact plan or report a real transition");
+  }
+
+  const finalReceipt = parseJson(
+    runNode(receiptCommandArgs(fixture, "check"), "binding transition: validate applied receipt"),
+    "binding transition: applied receipt validation"
+  );
+  if (finalReceipt.status !== "not_issued") {
+    fail(`binding transition applied receipt status was ${finalReceipt.status || "absent"}`);
+  }
+
+  const after = verifyFixture(
+    boundSpec,
+    inspectWrittenFixture(python, fixture, boundSpec, "binding transition after apply"),
+    failures,
+  );
+  check(before.phase === "document_ready_unbound", failures, "binding_transition", "source phase was not document_ready_unbound");
+  check(after.phase === "config_bound_ready", failures, "binding_transition", "destination phase was not config_bound_ready");
+  check(before.closureBlocked === true, failures, "binding_transition", "source observation was not fail closed");
+  check(after.closureBlocked === false, failures, "binding_transition", "destination observation retained the closure blocker");
+  check(after.vauClosureReady === true, failures, "binding_transition", "VAU did not re-observe closure readiness");
+
+  return {
+    fromPhase: before.phase,
+    toPhase: after.phase,
+    transition: plan.transition,
+    stagedReceiptStatus: stagedReceipt.status,
+    appliedReceiptStatus: finalReceipt.status,
+    planWasNonMutating,
+    exactApplyArgumentsUsed: true,
+    exactPlanIdConsumed: applied.planId === plan.planId,
+    allStatusSurfacesReobserved: true,
+    closureBlockerCleared: after.closureBlocked === false,
+    vauClosureReady: after.vauClosureReady,
+  };
+}
+
 function printText(report) {
   console.log("Live review closure conformance passed.");
   for (const phase of report.phases) {
     console.log(`- ${phase.fixture}: ${phase.phase}`);
   }
+  console.log(`- binding transition: ${report.bindingTransition.fromPhase} -> ${report.bindingTransition.toPhase}`);
 }
 
 let workspace = "";
@@ -387,6 +533,7 @@ try {
     inspectFixture(python, workspace, spec),
     failures,
   ));
+  const bindingTransition = verifyBindingTransition(python, workspace, failures);
   if (failures.length) {
     fail(`conformance mismatch:\n- ${failures.join("\n- ")}`);
   }
@@ -395,6 +542,7 @@ try {
     passed: true,
     publicSafe: true,
     phases,
+    bindingTransition,
   };
   if (asJson) {
     console.log(JSON.stringify(report, null, 2));

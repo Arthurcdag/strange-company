@@ -128,10 +128,16 @@ class RenderLiveReviewPublicConfigPatchTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         data = json.loads(result.stdout)
         self.assertEqual(data["system"], "LIVE_REVIEW_PUBLIC_CONFIG_PATCH")
+        self.assertTrue(data["previewOnly"])
+        self.assertFalse(data["mutatesFiles"])
         self.assertTrue(data["liveModeRemainsFalse"])
         self.assertIn('termsReviewedAt: "2026-06-12"', data["replacementSnippet"])
         self.assertIn("liveMode: false", data["replacementSnippet"])
         self.assertIn("node tools/preflight_public_launch.js", data["nextValidation"])
+        self.assertIn(
+            "node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json",
+            data["nextValidation"],
+        )
 
     def test_renderer_rejects_template_packet(self) -> None:
         result = run_renderer(str(TEMPLATE), "--public-config", str(write_public_config()))

@@ -45,12 +45,16 @@ The first three commands should pass. The final command should fail until the ex
 ## Manual Closeout Order
 
 1. Review `TERMOS.md`, `AVISO_DE_PRIVACIDADE.md`, `SUPPORT.md`, `BRAZIL_COMPLIANCE.md`, `AI_LEGAL_HANDOFF.md`, `HUMAN_REVIEW_PACKET.md`, and `REVIEW_READY_PACKET.md` with a responsible human reviewer.
-2. Record real `YYYY-MM-DD` review dates for terms, privacy, Brazil compliance, and AI handoff, then copy only those public-safe dates into `public-config.js` while keeping `liveMode: false`.
+2. Record the real `YYYY-MM-DD` dates in `LIVE_REVIEW_CLOSURE.local.json`, validate its exact document digests, inspect the closure binder's local-only plan, then apply only that unchanged plan. The binder owns all four date edits, keeps `liveMode: false`, and stages a matching fail-closed receipt; never copy the dates manually.
 3. Create or verify the Stripe Hosted Invoice route and business bank/payout route outside the repo.
 4. Fill `EXTERNAL_LIVE_PACKET.local.json`, `REVENUE_SETUP_EVIDENCE_INDEX.local.json`, `REVIEWER_CANDIDATE_TRACKER.local.json`, and `DELIVERY_REVIEW_CHECKLIST.local.json` without committing private account, tax, reviewer, or customer data.
 5. Run:
 
 ```bash
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --apply --expect-plan-id <PLAN_ID>
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
 node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
 node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
@@ -63,7 +67,9 @@ node tools/evolution_goal_status.js --json
 
 6. Confirm the status reports no hard, public-route, or operational blockers and review the issued public-only receipt.
 7. Only after a separate human decision, change only `liveMode` to `true`, then run `node tools/preflight_public_launch.js --deployment` to validate the live config against the issued receipt.
-8. Push to `main` and smoke-test the public order desk.
+8. Push a release branch, open a PR, obtain the required non-self approval and
+   protected checks, merge through the protected path, then smoke-test the
+   public order desk. Never push the live release directly to `main`.
 
 ## First Money Rule
 

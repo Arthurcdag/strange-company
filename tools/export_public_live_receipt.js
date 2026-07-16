@@ -3,7 +3,11 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
-const vm = require("vm");
+const {
+  parseFrozenWindowJson,
+  parsePublicOrderConfig,
+  parseStrictJson,
+} = require("./strict_public_data");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
@@ -255,12 +259,7 @@ function readPublicAssetText(filePath, label) {
 
 function loadPublicConfigSource(source, filePath) {
   try {
-    const sandbox = { window: {} };
-    vm.runInNewContext(source, sandbox, { filename: filePath });
-    if (!isPlainObject(sandbox.window.PUBLIC_ORDER_CONFIG)) {
-      fail(`${filePath} must assign window.PUBLIC_ORDER_CONFIG.`);
-    }
-    return sandbox.window.PUBLIC_ORDER_CONFIG;
+    return parsePublicOrderConfig(source, filePath);
   } catch (error) {
     fail(`Could not load public config ${filePath}: ${error.message}`);
   }
@@ -441,19 +440,67 @@ function sameDigestableCore(left, right) {
   return JSON.stringify(digestableCore(left)) === JSON.stringify(digestableCore(right));
 }
 
-function readPrivateSnapshotText(filePath, label) {
+function readIssuanceInput(filePath, label, { publicText = false } = {}) {
   if (!fs.existsSync(filePath)) fail(`${label} is missing: ${filePath}`);
   try {
-    return fs.readFileSync(filePath, "utf8");
+    const contents = fs.readFileSync(filePath);
+    if (publicText) {
+      enforcePublicAssetTextLength(contents.toString("utf8"), label);
+    }
+    return { filePath, label, contents };
   } catch (error) {
     fail(`Could not read ${label} ${filePath}: ${error.message}`);
   }
 }
 
 function createIssuanceSnapshot() {
-  const configSource = readPublicAssetText(publicConfigPath, "public config");
-  const closureSource = readPrivateSnapshotText(liveReviewClosurePath, "LIVE_REVIEW_CLOSURE");
-  const documentContents = readReviewDocumentContents();
+  const configInput = readIssuanceInput(publicConfigPath, "public config", {
+    publicText: true,
+  });
+  const closureInput = readIssuanceInput(
+    liveReviewClosurePath,
+    "LIVE_REVIEW_CLOSURE"
+  );
+  const documentInputs = REVIEW_DOCUMENT_SPECS.map((spec) => ({
+    ...readIssuanceInput(
+      spec.filePath,
+      `public review document ${spec.publicPath}`,
+      { publicText: true }
+    ),
+    publicPath: spec.publicPath,
+  }));
+  const externalInput = readIssuanceInput(
+    externalPacketPath,
+    "EXTERNAL_LIVE_PACKET"
+  );
+  const revenueInput = readIssuanceInput(
+    revenueIndexPath,
+    "REVENUE_SETUP_EVIDENCE_INDEX"
+  );
+  const reviewerInput = readIssuanceInput(
+    reviewerTrackerPath,
+    "REVIEWER_CANDIDATE_TRACKER"
+  );
+  const deliveryInput = readIssuanceInput(
+    deliveryReviewChecklistPath,
+    "DELIVERY_REVIEW_CHECKLIST"
+  );
+  const inputs = [
+    configInput,
+    closureInput,
+    ...documentInputs,
+    externalInput,
+    revenueInput,
+    reviewerInput,
+    deliveryInput,
+  ];
+  const configSource = configInput.contents.toString("utf8");
+  const documentContents = Object.fromEntries(
+    documentInputs.map((input) => [
+      input.publicPath,
+      input.contents.toString("utf8"),
+    ])
+  );
   const snapshotDir = fs.mkdtempSync(path.join(os.tmpdir(), "strange-company-live-receipt-"));
   try {
     try {
@@ -463,21 +510,52 @@ function createIssuanceSnapshot() {
     }
     const snapshotConfigPath = path.join(snapshotDir, "public-config.js");
     const snapshotClosurePath = path.join(snapshotDir, "LIVE_REVIEW_CLOSURE.local.json");
-    fs.writeFileSync(snapshotConfigPath, configSource, "utf8");
-    fs.writeFileSync(snapshotClosurePath, closureSource, "utf8");
-    for (const documentPath of REVIEW_DOCUMENT_PATHS) {
-      fs.writeFileSync(path.join(snapshotDir, documentPath), documentContents[documentPath], "utf8");
+    const snapshotExternalPath = path.join(snapshotDir, "EXTERNAL_LIVE_PACKET.local.json");
+    const snapshotRevenuePath = path.join(snapshotDir, "REVENUE_SETUP_EVIDENCE_INDEX.local.json");
+    const snapshotReviewerPath = path.join(snapshotDir, "REVIEWER_CANDIDATE_TRACKER.local.json");
+    const snapshotDeliveryPath = path.join(snapshotDir, "DELIVERY_REVIEW_CHECKLIST.local.json");
+    fs.writeFileSync(snapshotConfigPath, configInput.contents);
+    fs.writeFileSync(snapshotClosurePath, closureInput.contents);
+    for (const input of documentInputs) {
+      fs.writeFileSync(path.join(snapshotDir, input.publicPath), input.contents);
     }
+    fs.writeFileSync(snapshotExternalPath, externalInput.contents);
+    fs.writeFileSync(snapshotRevenuePath, revenueInput.contents);
+    fs.writeFileSync(snapshotReviewerPath, reviewerInput.contents);
+    fs.writeFileSync(snapshotDeliveryPath, deliveryInput.contents);
     return {
       dir: snapshotDir,
       configPath: snapshotConfigPath,
       configSource,
       closurePath: snapshotClosurePath,
       documentContents,
+      externalPath: snapshotExternalPath,
+      revenuePath: snapshotRevenuePath,
+      reviewerPath: snapshotReviewerPath,
+      deliveryPath: snapshotDeliveryPath,
+      inputs,
     };
   } catch (error) {
     fs.rmSync(snapshotDir, { recursive: true, force: true });
     throw error;
+  }
+}
+
+function assertIssuanceInputsMatchSnapshot(snapshot) {
+  for (const input of snapshot.inputs) {
+    let current;
+    try {
+      current = fs.readFileSync(input.filePath);
+    } catch (error) {
+      fail(
+        `Issuance input changed during validation (${input.label}); refusing to issue a receipt: ${error.message}`
+      );
+    }
+    if (!current.equals(input.contents)) {
+      fail(
+        `Issuance input changed during validation (${input.label}); refusing to issue a receipt. Rerun issuance from the current inputs.`
+      );
+    }
   }
 }
 
@@ -592,17 +670,52 @@ function loadPublicReceipt(filePath) {
   try {
     const source = readPublicAssetText(filePath, "public live receipt");
     if (filePath.toLowerCase().endsWith(".json")) {
-      return JSON.parse(source);
+      return parseStrictJson(source, filePath);
     }
-    const sandbox = { window: {}, Object };
-    vm.runInNewContext(
+    return parseFrozenWindowJson(
       source,
-      sandbox,
-      { filename: filePath }
+      "PUBLIC_LIVE_RECEIPT",
+      filePath
     );
-    return sandbox.window.PUBLIC_LIVE_RECEIPT;
   } catch (error) {
     fail(`Could not load public live receipt ${filePath}: ${error.message}`);
+  }
+}
+
+function captureReceiptOutputBaseline(filePath) {
+  if (!filePath) return { tracked: false, exists: false, contents: null };
+  try {
+    if (!fs.existsSync(filePath)) {
+      return { tracked: true, exists: false, contents: null };
+    }
+    return {
+      tracked: true,
+      exists: true,
+      contents: fs.readFileSync(filePath),
+    };
+  } catch (error) {
+    fail(`Could not capture receipt output baseline ${filePath}: ${error.message}`);
+  }
+}
+
+function assertReceiptOutputMatchesBaseline(filePath, baseline) {
+  if (!baseline.tracked) return;
+  let current;
+  try {
+    if (!fs.existsSync(filePath)) {
+      current = { exists: false, contents: null };
+    } else {
+      current = { exists: true, contents: fs.readFileSync(filePath) };
+    }
+  } catch (error) {
+    fail(`Could not recheck receipt output ${filePath}: ${error.message}`);
+  }
+  const unchanged = current.exists === baseline.exists
+    && (!current.exists || current.contents.equals(baseline.contents));
+  if (!unchanged) {
+    fail(
+      "Receipt output changed during issuance validation; refusing to overwrite a newer issue or revocation. Rerun issuance from the current receipt state."
+    );
   }
 }
 
@@ -931,6 +1044,7 @@ try {
       console.log(`Public live receipt revoked to a fail-closed placeholder: ${outputPath}`);
     }
   } else {
+    const outputBaseline = captureReceiptOutputBaseline(outputPath);
     issuanceSnapshot = createIssuanceSnapshot();
     waitAtSnapshotBarrierForTest();
     const currentCore = buildPublicCore(
@@ -960,28 +1074,30 @@ try {
     runValidator(
       "EXTERNAL_LIVE_PACKET",
       "validate_external_live_packet.js",
-      externalPacketPath,
+      issuanceSnapshot.externalPath,
       ["--require-live", "--public-config", issuanceSnapshot.configPath]
     );
     runValidator(
       "REVENUE_SETUP_EVIDENCE_INDEX",
       "validate_revenue_setup_evidence_index.js",
-      revenueIndexPath,
+      issuanceSnapshot.revenuePath,
       ["--require-all", "--public-config", issuanceSnapshot.configPath]
     );
     runValidator(
       "REVIEWER_CANDIDATE_TRACKER",
       "validate_reviewer_candidate_tracker.js",
-      reviewerTrackerPath,
+      issuanceSnapshot.reviewerPath,
       ["--require-ready"]
     );
     runValidator(
       "DELIVERY_REVIEW_CHECKLIST",
       "validate_delivery_review_checklist.js",
-      deliveryReviewChecklistPath,
+      issuanceSnapshot.deliveryPath,
       ["--require-ready"]
     );
     const receipt = withReceiptMutationLock(outputPath, () => {
+      assertReceiptOutputMatchesBaseline(outputPath, outputBaseline);
+      assertIssuanceInputsMatchSnapshot(issuanceSnapshot);
       const nextReceipt = buildReceipt(currentCore, nextReceiptGeneration(outputPath));
       if (outputPath) writeReceipt(outputPath, nextReceipt);
       return nextReceipt;

@@ -1,6 +1,6 @@
 ﻿const fs = require("fs");
 const path = require("path");
-const vm = require("vm");
+const { parsePublicOrderConfig } = require("./strict_public_data");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
@@ -27,9 +27,7 @@ function read(relativePath) {
 
 function loadPublicConfig() {
   try {
-    const sandbox = { window: {} };
-    vm.runInNewContext(read("public-config.js"), sandbox, { filename: "public-config.js" });
-    return sandbox.window.PUBLIC_ORDER_CONFIG || {};
+    return parsePublicOrderConfig(read("public-config.js"), "public-config.js");
   } catch (_error) {
     return {};
   }

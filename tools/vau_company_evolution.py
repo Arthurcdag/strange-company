@@ -1043,10 +1043,11 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
                     "bound to the current canonical reviewed documents."
                 ),
                 next_action=(
-                    "Complete LIVE_REVIEW_CLOSURE.local.json with current documentDigests, copy its exact four "
-                    "review dates into public-config.js, then run "
-                    "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json "
-                    "--require-ready --public-config public-config.js, and keep liveMode false."
+                    "Complete LIVE_REVIEW_CLOSURE.local.json with current documentDigests, then run "
+                    "node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json, review its exact "
+                    "four-date delta, apply the same plan ID transactionally while liveMode remains false, and "
+                    "confirm node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json "
+                    "--require-ready --public-config public-config.js."
                 ),
             )
         )

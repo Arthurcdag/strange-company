@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
-const vm = require("vm");
+const { parsePublicOrderConfig } = require("./strict_public_data");
 
 const root = path.resolve(__dirname, "..");
 const failures = [];
@@ -44,9 +44,7 @@ function runNode(args) {
 }
 
 function loadPublicConfig() {
-  const sandbox = { window: {} };
-  vm.runInNewContext(read("public-config.js"), sandbox, { filename: "public-config.js" });
-  return sandbox.window.PUBLIC_ORDER_CONFIG || {};
+  return parsePublicOrderConfig(read("public-config.js"), "public-config.js");
 }
 
 function externalLiveBlockers(config) {
@@ -91,6 +89,8 @@ function checkStaticSurvivalSurface() {
   const publicAnswers = read("public-ama-answers.js");
   const receiptExporter = read("tools/export_public_live_receipt.js");
   const publicSiteBuilder = read("tools/build_public_site.js");
+  const liveReviewBinder = read("tools/bind_live_review_closure.js");
+  const strictPublicData = read("tools/strict_public_data.js");
   const shutdownRenderer = read("tools/render_public_live_shutdown_patch.js");
   const pagesWorkflow = read(".github/workflows/pages.yml");
   const validateWorkflow = read(".github/workflows/validate.yml");
@@ -134,7 +134,7 @@ function checkStaticSurvivalSurface() {
   assert(read("tools/local_evidence_status.js").includes("document_ready_unbound") && read("tools/local_evidence_status.js").includes("config_bound_ready"), "local evidence status must distinguish document-ready from config-bound closure.", "local evidence status closure phases", "tools/local_evidence_status.js");
   assert(read("tools/check_live_review_closure_conformance.js").includes("STRANGE_COMPANY_LIVE_REVIEW_CLOSURE_CONFORMANCE"), "live review closure conformance must be executable.", "live review closure conformance", "tools/check_live_review_closure_conformance.js");
   assert(read("tools/check_live_review_closure_conformance.js").includes("tools/local_evidence_status.js") && read("tools/check_live_review_closure_conformance.js").includes("tools/evolution_goal_status.js") && read("tools/check_live_review_closure_conformance.js").includes("tools/generate_evolution_next_packet.js") && read("tools/check_live_review_closure_conformance.js").includes("tools/vau_company_evolution.py"), "live review closure conformance must exercise every operator status surface.", "live review closure conformance surfaces", "tools/check_live_review_closure_conformance.js");
-  assert(publicSiteBuilder.includes("tools/check_live_review_closure_conformance.js") && publicSiteBuilder.includes("tools/vau_company_evolution.py"), "the public bundle must package the executable closure conformance stack.", "public bundle closure conformance stack", "tools/build_public_site.js");
+  assert(publicSiteBuilder.includes("tools/check_live_review_closure_conformance.js") && publicSiteBuilder.includes("tools/vau_company_evolution.py") && publicSiteBuilder.includes("tools/bind_live_review_closure.js"), "the public bundle must package the executable closure conformance and transactional binding stack.", "public bundle closure binding stack", "tools/build_public_site.js");
   assert(publicSiteBuilder.includes("tools/render_public_live_shutdown_patch.js"), "the public bundle must package the output-only live shutdown renderer.", "public bundle live shutdown renderer", "tools/build_public_site.js");
   assert(read("tools/local_evidence_status.js").includes("REVENUE_SETUP_EVIDENCE_INDEX.local.json"), "local evidence status tool must track revenue setup evidence.", "local evidence status revenue lane", "tools/local_evidence_status.js");
   assert(evolutionLog.includes("Local Evidence Status Matrix"), "EVOLUTION_LOG.md must record the local evidence status pass.", "local evidence status log", "EVOLUTION_LOG.md");
@@ -147,10 +147,28 @@ function checkStaticSurvivalSurface() {
   assert(read("tools/validate_live_review_closure.js").includes("--require-ready"), "live review closure validator must expose a ready gate.", "live review closure validator", "tools/validate_live_review_closure.js");
   assert(read("tools/validate_live_review_closure.js").includes("STRANGE_COMPANY_REVIEW_DOCUMENT_V1"), "live review closure validator must use domain-separated document digests.", "live review closure digest domain", "tools/validate_live_review_closure.js");
   assert(read("tools/render_live_review_public_config_patch.js").includes("LIVE_REVIEW_PUBLIC_CONFIG_PATCH"), "live review public config patch renderer must be executable.", "live review patch renderer", "tools/render_live_review_public_config_patch.js");
+  assert(liveReviewBinder.includes("STRANGE_COMPANY_LIVE_REVIEW_BIND_PLAN") && liveReviewBinder.includes("--expect-plan-id") && liveReviewBinder.includes("atomicReplace"), "live review binding must be plan-token guarded, atomic per file, receipt-first, and fail closed between its two output replacements.", "live review transactional binder", "tools/bind_live_review_closure.js");
+  assert(strictPublicData.includes("parsePublicOrderConfig") && strictPublicData.includes("parseFrozenWindowJson") && strictPublicData.includes("duplicate object key") && strictPublicData.includes("unsafe object key"), "public config and frozen public archives must use one strict non-executing data parser.", "strict public data parser", "tools/strict_public_data.js");
+  assert(publicSiteBuilder.includes("tools/strict_public_data.js") && pagesWorkflow.includes("node --check tools/strict_public_data.js") && validateWorkflow.includes("node --check tools/strict_public_data.js"), "the public bundle and both workflows must carry and syntax-check the strict parser.", "strict parser distribution", "tools/build_public_site.js, .github/workflows/pages.yml, .github/workflows/validate.yml");
+  const executableDataParserPattern = new RegExp(
+    ["runInNew", "Context|runIn", "Context|require\\([\"'](?:node:)?v", "m[\"']\\)|new\\s+v", "m\\.Script"].join("")
+  );
+  const executableDataParsers = fs.readdirSync(path.join(root, "tools"))
+    .filter((name) => name.endsWith(".js"))
+    .filter((name) => executableDataParserPattern.test(read(`tools/${name}`)));
+  assert(executableDataParsers.length === 0, "tools must not execute public data through node:vm.", "non-executing public data boundary", executableDataParsers.join(", ") || "tools/*.js");
   assert(humanReviewPacket.includes("node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready"), "HUMAN_REVIEW_PACKET.md must include the live-review closure ready command.", "human review closure ready command", "HUMAN_REVIEW_PACKET.md");
   assert(humanReviewPacket.includes("node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js"), "HUMAN_REVIEW_PACKET.md must include the config-bound closure command.", "human review config-bound closure command", "HUMAN_REVIEW_PACKET.md");
   assert(humanReviewPacket.includes("node tools/check_live_review_closure_conformance.js"), "HUMAN_REVIEW_PACKET.md must include the closure conformance command.", "human review closure conformance command", "HUMAN_REVIEW_PACKET.md");
   assert(humanReviewPacket.includes("node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json"), "HUMAN_REVIEW_PACKET.md must include the live-review patch render command.", "human review patch render command", "HUMAN_REVIEW_PACKET.md");
+  assert(humanReviewPacket.includes("node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json") && humanReviewPacket.includes("--apply --expect-plan-id <PLAN_ID>"), "HUMAN_REVIEW_PACKET.md must use the plan-token closure binder for the actual two-file transition.", "human review transactional binder command", "HUMAN_REVIEW_PACKET.md");
+  assert(script.includes("bind_live_review_closure.js") && read("tools/generate_external_live_gap_packet.js").includes("bind_live_review_closure.js"), "both Operations live-evidence surfaces must route reviewed dates through the transactional binder.", "live evidence closure binder handoff", "script.js, tools/generate_external_live_gap_packet.js");
+  assert(script.includes("Only if LIVE_REVIEW_CLOSURE.local.json is absent") && script.includes("exact applyArguments") && read("tools/generate_external_live_gap_packet.js").includes("preparationCondition") && read("tools/generate_external_live_gap_packet.js").includes("exact applyArguments"), "live-evidence packets must distinguish conditional preparation from the exact plan-reported apply arguments.", "executable closure handoff", "script.js, tools/generate_external_live_gap_packet.js");
+  assert(read("tools/evolution_goal_status.js").includes("phaseValidatorCommands"), "evolution status must choose both closure action and validator by phase.", "phase-specific closure status", "tools/evolution_goal_status.js");
+  for (const file of ["ONLINE_ASAP.md", "OPERATIONS_START_PACKET.md", "FIRST_REVENUE_CLOSEOUT.md"]) {
+    const contents = read(file);
+    assert(!/^\s*(?:- \[ \] )?Push to `main`\.|git push origin main|Public site must be visible now \| Push to `main`/m.test(contents), `${file} must not instruct a direct-main release.`, "protected release handoff", file);
+  }
   assert(humanReviewPacket.includes("node tools/render_public_live_shutdown_patch.js"), "HUMAN_REVIEW_PACKET.md must include the fail-closed live shutdown command.", "human review live shutdown command", "HUMAN_REVIEW_PACKET.md");
   assert(read("HUMAN_REVENUE_INSTRUCTIONS.md").includes("node tools\\render_public_live_shutdown_patch.js"), "HUMAN_REVENUE_INSTRUCTIONS.md must include the fail-closed live shutdown command.", "human revenue live shutdown command", "HUMAN_REVENUE_INSTRUCTIONS.md");
   assert(read("OPERATOR_FAST_START.md").includes("node tools/render_public_live_shutdown_patch.js"), "OPERATOR_FAST_START.md must include the fail-closed live shutdown command.", "operator fast-start shutdown command", "OPERATOR_FAST_START.md");
@@ -174,9 +192,11 @@ function checkStaticSurvivalSurface() {
   assert(publicJs.includes("liveReviewClosureValidatorPassed"), "the browser must require the public-safe human-review validator attestation.", "public receipt browser review gate", "public.js");
   assert(receiptExporter.includes("schemaVersion: 4") && publicReceipt.includes('"schemaVersion": 4'), "the exporter and placeholder must use generation-aware public receipt schema v4.", "public receipt schema v4", "tools/export_public_live_receipt.js, public-live-receipt.js");
   assert(receiptExporter.includes("nextReceiptGeneration") && receiptExporter.includes("withReceiptMutationLock") && publicJs.includes("HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION") && publicJs.includes("HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY"), "receipt mutations must serialize, and the open browser must enforce monotonic generations plus same-generation identity.", "public receipt anti-rollback generation", "tools/export_public_live_receipt.js, public.js");
+  assert(receiptExporter.includes("createIssuanceSnapshot") && receiptExporter.includes("assertIssuanceInputsMatchSnapshot") && receiptExporter.includes("captureReceiptOutputBaseline") && receiptExporter.includes("assertReceiptOutputMatchesBaseline"), "receipt issuance must compare-and-swap every exact issuance input and its pre-validation output so drift or a newer revocation remains dominant.", "public receipt revocation dominance", "tools/export_public_live_receipt.js");
   assert(receiptExporter.includes("STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V4") && publicJs.includes("STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V4"), "the exporter and browser must share the schema-v4 envelope digest domain.", "public receipt envelope v4", "tools/export_public_live_receipt.js, public.js");
   assert(pagesWorkflow.includes("cancel-in-progress: true") && pagesWorkflow.includes("github.ref == 'refs/heads/main'") && pagesWorkflow.includes("origin/main"), "Pages must cancel stale runs, reject non-main dispatches, and verify the current main head before deploy.", "Pages deployment freshness", ".github/workflows/pages.yml");
   assert(pagesWorkflow.includes("node tools/render_public_live_shutdown_patch.js --json") && validateWorkflow.includes("node tools/render_public_live_shutdown_patch.js --json"), "both validation workflows must execute the output-only shutdown renderer.", "shutdown renderer workflow execution", ".github/workflows/pages.yml, .github/workflows/validate.yml");
+  assert(pagesWorkflow.includes("node --check tools/bind_live_review_closure.js") && validateWorkflow.includes("node --check tools/bind_live_review_closure.js"), "both workflows must syntax-check the transactional closure binder.", "closure binder workflow syntax", ".github/workflows/pages.yml, .github/workflows/validate.yml");
   assert(receiptExporter.includes("reviewDocuments") && publicJs.includes("reviewDocuments"), "the exporter and browser must use the nine-document reviewDocuments core.", "public receipt nine-document core", "tools/export_public_live_receipt.js, public.js");
   assert(receiptExporter.includes("STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1") && publicJs.includes("STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1"), "the exporter and browser must share the review-document digest domain.", "review-document digest domain", "STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1");
   assert(receiptExporter.includes("STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2") && publicJs.includes("STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2"), "the exporter and browser must share the v2 public core digest domain.", "public core digest domain", "STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2");

@@ -1,7 +1,7 @@
 const fs = require("fs");
 const crypto = require("crypto");
 const path = require("path");
-const vm = require("vm");
+const { parsePublicOrderConfig } = require("./strict_public_data");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
@@ -38,9 +38,7 @@ function read(relativePath) {
 
 function loadPublicConfig() {
   try {
-    const sandbox = { window: {} };
-    vm.runInNewContext(read("public-config.js"), sandbox, { filename: "public-config.js" });
-    return sandbox.window.PUBLIC_ORDER_CONFIG || {};
+    return parsePublicOrderConfig(read("public-config.js"), "public-config.js");
   } catch (_error) {
     return {};
   }
@@ -132,7 +130,7 @@ function buildDraft(template, publicConfig) {
       "Do not store private reviewer notes, CPF/CNPJ, bank data, payment dashboard URLs, credentials, or customer-private material in git.",
       "Do not use this packet to set liveMode true.",
       "Run: node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready",
-      "After a ready packet passes, copy only the four public-safe dates into public-config.js and keep liveMode false until the external live and revenue evidence gates pass."
+      "After a ready packet passes, run node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json, review its exact four-date plan, and apply only that plan ID transactionally while liveMode remains false."
     ]
   };
 }

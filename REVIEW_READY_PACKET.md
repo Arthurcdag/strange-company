@@ -2,7 +2,11 @@
 
 Generated: 2026-05-24
 
-This packet is AI-prepared. It does not approve legal, tax, privacy, support, payment, or Brazil compliance decisions. A responsible human must review and accept, change, or reject the drafts before dates can be written into `public-config.js`.
+This packet is AI-prepared. It does not approve legal, tax, privacy, support,
+payment, or Brazil compliance decisions. A responsible human must review and
+accept, change, or reject the drafts before real dates can be recorded in the
+local closure packet and bound through its plan-token transaction. Dates must
+not be written into `public-config.js` manually.
 
 ## Closed Evidence
 
@@ -87,16 +91,18 @@ aiHandoffReviewedAt: "YYYY-MM-DD"
 Update only public-safe fields:
 
 ```js
-termsReviewedAt: "YYYY-MM-DD",
-privacyReviewedAt: "YYYY-MM-DD",
-brazilComplianceReviewedAt: "YYYY-MM-DD",
-aiHandoffReviewedAt: "YYYY-MM-DD",
+// The closure binder writes the four reviewed-at fields transactionally.
 liveMode: false
 ```
 
 Keep `liveMode` false until Stripe Hosted Invoice and bank/payout evidence are complete in `EXTERNAL_LIVE_PACKET.local.json` and:
 
 ```bash
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --apply --expect-plan-id <PLAN_ID>
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
+node tools/export_public_live_receipt.js --check-public-js
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
 node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
 node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
@@ -106,6 +112,9 @@ node tools/export_public_live_receipt.js --check-public-js --require-issued
 node tools/preflight_public_launch.js
 node tools/evolution_goal_status.js --json
 ```
+
+Keep the binder plan and PLAN_ID local because they commit to private closure
+evidence.
 
 all pass while `liveMode` remains false, the ready config remains unpublished,
 and external Form responses are disabled. After reviewing the receipt and

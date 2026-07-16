@@ -4,7 +4,8 @@ This is the developer/operator handoff for creating the outside routes that must
 
 The developer can prepare the repo and verify URLs. The operator or account owner must create and approve the support inbox, Google Form, Stripe account, bank route, terms review, and privacy review. Do not store private keys, bank numbers, tax documents, customer secrets, or payment credentials in this repo.
 
-Use `HUMAN_REVIEW_PACKET.md` as the manual close sheet before editing `public-config.js`.
+Use `HUMAN_REVIEW_PACKET.md` as the manual close sheet before binding reviewed
+dates into `public-config.js`.
 
 ## Output Values
 
@@ -56,7 +57,7 @@ Run the gate regression that proves an otherwise-complete live packet still fail
 node tools/check_external_live_packet_gate.js
 ```
 
-Copy only the reviewed public-safe values and review dates into `public-config.js` first and keep its `liveMode: false`. The revenue packet must match that pre-live snapshot exactly. The external-live packet must match every public field except its local `publicConfig.liveMode`, which is `true` because `--require-live` validates the intended post-decision target; the binding deliberately ignores only this one phase field. The tracked config and receipt remain `false` until the separate human flip. Then validate both packets:
+Bind the four reviewed dates with `node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json`, inspect its non-mutating plan, then apply the unchanged plan with `--apply --expect-plan-id <PLAN_ID>`. This transaction keeps `liveMode: false` and advances the receipt to a matching fail-closed placeholder. Copy the other reviewed public-safe values into `public-config.js` only through their documented evidence steps. The revenue packet must match that pre-live snapshot exactly. The external-live packet must match every public field except its local `publicConfig.liveMode`, which is `true` because `--require-live` validates the intended post-decision target; the binding deliberately ignores only this one phase field. The tracked config and receipt remain `false` until the separate human flip. Then validate both packets:
 
 ```bash
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
@@ -246,21 +247,25 @@ Minimum review questions:
 Before setting review dates, generate `LIVE_REVIEW_CLOSURE.local.json`, have the
 responsible humans review the exact files represented by its schema-v2
 path-bound digests, and run `node tools/validate_live_review_closure.js
-LIVE_REVIEW_CLOSURE.local.json --require-ready`. After copying the four review
-dates, rerun it with `--public-config public-config.js`. If any required document
+LIVE_REVIEW_CLOSURE.local.json --require-ready`. Then run the closure binder in
+plan mode, inspect its local-only plan, and apply only that exact plan with
+`--apply --expect-plan-id <PLAN_ID>`. Never copy the dates into the config by
+hand. Rerun the validator with `--public-config public-config.js`. If any required document
 changes, the digest check must fail until the packet is regenerated and the
 changed material is reviewed again. After closure validation, receipt issuance
 independently recomputes all nine public-domain digests from the canonical
 document bytes and stores them in the schema-v4 `reviewDocuments` core; it does
 not copy digest values out of the private closure packet. The deployed browser
-must be able to fetch all nine paths. Then set:
+must be able to fetch all nine paths. The binder owns these four fields and
+keeps `liveMode: false`:
 
 ```js
 termsReviewedAt: "YYYY-MM-DD",
 privacyReviewedAt: "YYYY-MM-DD",
 ```
 
-Only use the real review date.
+Only use real review dates in the local closure packet. Do not publish or commit
+the binder plan or PLAN_ID because it commits to private closure evidence.
 
 ## 5. Stripe Route
 
@@ -313,9 +318,12 @@ stripe_payout_test_status:
 reconciliation_owner:
 ```
 
-## 7. Public Config Patch
+## 7. Public Config Binding
 
-Only after all checks above are real:
+Only after all checks above are real may the public-safe config reach the
+following shape. The four review dates shown below are illustrative; bind their
+real values through `bind_live_review_closure.js`, never by manually applying
+this block:
 
 ```js
 window.PUBLIC_ORDER_CONFIG = {
@@ -354,6 +362,9 @@ Keep `supportEmail` set to the verified pilot inbox (`tuiidagnese+strangeworks@g
 Run:
 
 ```bash
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --apply --expect-plan-id <PLAN_ID>
 node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
 node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js

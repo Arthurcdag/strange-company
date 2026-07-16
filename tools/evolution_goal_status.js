@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
-const vm = require("vm");
+const { parsePublicOrderConfig } = require("./strict_public_data");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
@@ -22,15 +22,14 @@ const REVIEW_CLOSURE_FIELDS = ["termsReviewedAt", "privacyReviewedAt", "brazilCo
 const REVIEW_CLOSURE_EVIDENCE_BLOCKER = "humanReviewClosureEvidence";
 const REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND = "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready";
 const REVIEW_CLOSURE_VALIDATOR_COMMAND = "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js";
+const REVIEW_CLOSURE_BINDER_PLAN_COMMAND = "node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json";
 
 function readText(filePath) {
   return fs.readFileSync(filePath, "utf8");
 }
 
 function loadPublicConfig(filePath) {
-  const sandbox = { window: {} };
-  vm.runInNewContext(readText(filePath), sandbox, { filename: filePath });
-  return sandbox.window.PUBLIC_ORDER_CONFIG || {};
+  return parsePublicOrderConfig(readText(filePath), filePath);
 }
 
 function isIsoDate(value) {
@@ -141,25 +140,25 @@ function liveGateRows(config) {
       id: "termsReviewedAt",
       label: "human terms review date",
       passed: isIsoDate(config.termsReviewedAt),
-      nextAction: "Record the real human terms review date in public-config.js only after review.",
+      nextAction: "Record the real terms review in LIVE_REVIEW_CLOSURE.local.json; after every closure document is ready, use the plan-token binder rather than editing public-config.js directly.",
     },
     {
       id: "privacyReviewedAt",
       label: "human privacy review date",
       passed: isIsoDate(config.privacyReviewedAt),
-      nextAction: "Record the real human privacy review date in public-config.js only after review.",
+      nextAction: "Record the real privacy review in LIVE_REVIEW_CLOSURE.local.json; after every closure document is ready, use the plan-token binder rather than editing public-config.js directly.",
     },
     {
       id: "brazilComplianceReviewedAt",
       label: "Brazil compliance review date",
       passed: isIsoDate(config.brazilComplianceReviewedAt),
-      nextAction: "Close CNPJ/fiscal/LGPD/payment support review with a responsible human.",
+      nextAction: "Close CNPJ/fiscal/LGPD/payment support review with a responsible human in LIVE_REVIEW_CLOSURE.local.json, then use the binder only after the full packet validates.",
     },
     {
       id: "aiHandoffReviewedAt",
       label: "AI handoff review date",
       passed: isIsoDate(config.aiHandoffReviewedAt),
-      nextAction: "Have a human review what AI prepared and record the real review date.",
+      nextAction: "Have a human review what AI prepared, record it in LIVE_REVIEW_CLOSURE.local.json, and let the binder apply the date only after the full packet validates.",
     },
     {
       id: "liveMode",
@@ -178,25 +177,25 @@ function reviewClosureActions(hardBlockers, phase) {
   }
   if (phase === "document_ready_unbound") {
     return [
-      "Render the date-only public config patch: node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json.",
-      "Copy only termsReviewedAt, privacyReviewedAt, brazilComplianceReviewedAt, and aiHandoffReviewedAt into public-config.js; keep liveMode false.",
-      `Confirm the config-bound closure: ${REVIEW_CLOSURE_VALIDATOR_COMMAND}.`,
+      `Render the receipt-first, atomic-per-file binding plan: ${REVIEW_CLOSURE_BINDER_PLAN_COMMAND}.`,
+      "Keep the private-evidence commitment and PLAN_ID local, then execute the exact applyArguments reported by that unchanged plan.",
+      `Confirm the config-bound closure and fail-closed receipt placeholder: ${REVIEW_CLOSURE_VALIDATOR_COMMAND}; node tools/export_public_live_receipt.js --check-public-js.`,
     ];
   }
   if (phase === "invalid") {
     return [
       "Inspect and repair the existing LIVE_REVIEW_CLOSURE.local.json with real human-review evidence; do not overwrite or fabricate it.",
       `Recheck the document-bound packet: ${REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND}.`,
-      "After document validation passes, render the date-only patch: node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json.",
-      "Copy only the four approved review dates into public-config.js while liveMode remains false.",
+      `After document validation passes, render the transactional binding plan: ${REVIEW_CLOSURE_BINDER_PLAN_COMMAND}.`,
+      "Keep the private-evidence commitment and PLAN_ID local, then execute the exact applyArguments reported by that unchanged plan.",
       `Confirm the final config binding: ${REVIEW_CLOSURE_VALIDATOR_COMMAND}.`,
     ];
   }
   return [
     "Draft LIVE_REVIEW_CLOSURE.local.json: node tools/draft_live_review_closure.js --write-local",
     `Fill or repair real human review evidence locally, including documentDigests for every canonical reviewed document, then run ${REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND}.`,
-    "Render the date-only public config patch: node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json.",
-    "Copy only termsReviewedAt, privacyReviewedAt, brazilComplianceReviewedAt, and aiHandoffReviewedAt into public-config.js; keep liveMode false until external live and revenue gates pass.",
+    `After document validation passes, render the transactional binding plan: ${REVIEW_CLOSURE_BINDER_PLAN_COMMAND}.`,
+    "Keep the private-evidence commitment and PLAN_ID local, then execute the exact applyArguments reported by that unchanged plan.",
     `Confirm the final config binding: ${REVIEW_CLOSURE_VALIDATOR_COMMAND}.`,
   ];
 }
@@ -242,6 +241,11 @@ function laneHandoff(localEvidence, options) {
   } else if (laneStatus === "ready" && options.readyCommand) {
     command = options.readyCommand;
   }
+  const validatorCommand = lanePhase
+    && options.phaseValidatorCommands
+    && options.phaseValidatorCommands[lanePhase]
+    ? options.phaseValidatorCommands[lanePhase]
+    : options.validatorCommand;
   return {
     blockerId: options.blockerId,
     laneId: options.laneId,
@@ -249,7 +253,7 @@ function laneHandoff(localEvidence, options) {
     lanePhase,
     priority: options.priority,
     command,
-    validatorCommand: options.validatorCommand,
+    validatorCommand,
     progressAuditCommand: "node tools/evolution_goal_status.js --json",
     requiresRealEvidence: true,
     liveModeRemainsFalse: true,
@@ -307,11 +311,16 @@ function selectHandoff({
       priority: "hard_gate",
       draftCommand: "node tools/draft_live_review_closure.js --write-local",
       validatorCommand: REVIEW_CLOSURE_VALIDATOR_COMMAND,
-      readyCommand: "node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json",
+      readyCommand: REVIEW_CLOSURE_BINDER_PLAN_COMMAND,
       phaseCommands: {
         missing: "node tools/draft_live_review_closure.js --write-local",
         invalid: REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND,
-        document_ready_unbound: "node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json",
+        document_ready_unbound: REVIEW_CLOSURE_BINDER_PLAN_COMMAND,
+      },
+      phaseValidatorCommands: {
+        missing: REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND,
+        invalid: REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND,
+        document_ready_unbound: REVIEW_CLOSURE_VALIDATOR_COMMAND,
       },
       whyNow: "Document-bound human review closure evidence must validate and its four dates must match public-config.js before any other live-readiness handoff.",
     });
@@ -450,6 +459,18 @@ function buildStatus(config, logText, localEvidence, publicLiveReceiptReady) {
   const closureLane = evidenceLane(localEvidenceSummary, "liveReviewClosure");
   const closurePhase = closureLane ? closureLane.phase : "missing";
   const closureEvidenceReady = closurePhase === "config_bound_ready";
+  const closureCommandsByPhase = {
+    missing: "node tools/draft_live_review_closure.js --write-local",
+    invalid: REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND,
+    document_ready_unbound: REVIEW_CLOSURE_BINDER_PLAN_COMMAND,
+    config_bound_ready: REVIEW_CLOSURE_VALIDATOR_COMMAND,
+  };
+  const closureValidatorsByPhase = {
+    missing: REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND,
+    invalid: REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND,
+    document_ready_unbound: REVIEW_CLOSURE_VALIDATOR_COMMAND,
+    config_bound_ready: REVIEW_CLOSURE_VALIDATOR_COMMAND,
+  };
   const publicConfigGateRows = liveGateRows(config).filter((row) => row.id !== "liveMode");
   const evidenceRows = [
     ...publicConfigGateRows,
@@ -457,9 +478,9 @@ function buildStatus(config, logText, localEvidence, publicLiveReceiptReady) {
       id: REVIEW_CLOSURE_EVIDENCE_BLOCKER,
       label: "document-bound human review closure evidence matching the public review dates",
       passed: closureEvidenceReady,
-      command: "node tools/draft_live_review_closure.js --write-local",
-      validatorCommand: REVIEW_CLOSURE_VALIDATOR_COMMAND,
-      nextAction: "Validate LIVE_REVIEW_CLOSURE.local.json against every canonical reviewed document, then make the four public review dates exactly match its publicConfigPatch while liveMode remains false.",
+      command: closureCommandsByPhase[closurePhase] || REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND,
+      validatorCommand: closureValidatorsByPhase[closurePhase] || REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND,
+      nextAction: "Validate LIVE_REVIEW_CLOSURE.local.json against every canonical reviewed document, then use bind_live_review_closure.js to plan and apply the exact four-date plus fail-closed-placeholder transition while liveMode remains false.",
     },
     {
       id: "publicLiveReceipt",

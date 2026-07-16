@@ -119,7 +119,10 @@ Use ISO dates: `YYYY-MM-DD`. The date is the actual human review date, not the c
 
 ## Public Config Rule
 
-Only public-safe fields may go into `public-config.js`:
+Only public-safe fields may go into `public-config.js`. The four review dates
+below are binder-owned: record real dates in `LIVE_REVIEW_CLOSURE.local.json`,
+validate its exact reviewed-document digests, inspect the local-only binder
+plan, and apply only that unchanged plan. Never copy these dates manually.
 
 ```js
 googleFormUrl: "https://docs.google.com/forms/...",
@@ -139,6 +142,10 @@ Run all commands from the repo root:
 
 ```bash
 node tools/check_external_live_packet_gate.js
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --apply --expect-plan-id <PLAN_ID>
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
 node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
 node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
@@ -150,9 +157,10 @@ node tools/evolution_goal_status.js --json
 node tools/survival_check.js
 ```
 
-Run this sequence only after the reviewed public dates are in an unpublished
-local `public-config.js` with `liveMode: false` and external Form responses
-disabled. If any command fails, conka8 must keep `liveMode: false` and report
+Run this sequence only with an unpublished local `public-config.js`,
+`liveMode: false`, and external Form responses disabled. The binder plan and
+PLAN_ID remain local because they commit to private closure evidence. If any
+command fails, conka8 must keep `liveMode: false` and report
 the blockers. If all pass, a human may make the separate live-flag change, then
 must run `node tools/preflight_public_launch.js --deployment`, publish the
 issued receipt and live config together, and enable Form responses only after
