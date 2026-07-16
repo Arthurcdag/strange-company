@@ -23,7 +23,7 @@ ACTIVE_STATUS = "local_packet_validators_passed"
 PUBLIC_REVIEW_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1"
 REVIEW_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_REVIEW_DOCUMENT_V1"
 PUBLIC_LIVE_CORE_DIGEST_DOMAIN = "STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2"
-PUBLIC_LIVE_RECEIPT_DIGEST_DOMAIN = "STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3"
+PUBLIC_LIVE_RECEIPT_DIGEST_DOMAIN = "STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V4"
 REVIEW_DOCUMENT_PATHS = (
     "TERMOS.md",
     "TERMS.md",
@@ -60,6 +60,7 @@ def recompute_public_receipt_digests(
     ).hexdigest()
     envelope = {
         "schemaVersion": receipt["schemaVersion"],
+        "generation": receipt["generation"],
         "mode": receipt["mode"],
         "status": receipt["status"],
         "issuedAt": receipt["issuedAt"],
@@ -75,6 +76,31 @@ def recompute_public_receipt_digests(
         f"{PUBLIC_LIVE_RECEIPT_DIGEST_DOMAIN}\n{envelope_json}".encode("utf-8")
     ).hexdigest()
     return receipt
+
+
+def convert_to_legacy_v3(receipt: dict[str, object]) -> dict[str, object]:
+    legacy = json.loads(json.dumps(receipt))
+    legacy["schemaVersion"] = 3
+    legacy.pop("generation", None)
+    core = json.loads(json.dumps(legacy["core"]))
+    core["flags"].pop("liveMode", None)
+    envelope = {
+        "schemaVersion": legacy["schemaVersion"],
+        "mode": legacy["mode"],
+        "status": legacy["status"],
+        "issuedAt": legacy["issuedAt"],
+        "validUntil": legacy["validUntil"],
+        "core": core,
+        "coreSha256": legacy["coreSha256"],
+        "attestations": legacy["attestations"],
+    }
+    envelope_json = json.dumps(
+        envelope, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    )
+    legacy["envelopeSha256"] = hashlib.sha256(
+        f"STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3\n{envelope_json}".encode("utf-8")
+    ).hexdigest()
+    return legacy
 
 
 def run_exporter(*args: str) -> subprocess.CompletedProcess[str]:
@@ -575,7 +601,9 @@ class PublicLiveReceiptTests(unittest.TestCase):
     def test_committed_placeholder_is_public_and_fail_closed(self) -> None:
         receipt = read_receipt(PUBLIC_RECEIPT)
 
-        self.assertEqual(receipt["schemaVersion"], 3)
+        self.assertEqual(receipt["schemaVersion"], 4)
+        self.assertIsInstance(receipt["generation"], int)
+        self.assertGreater(receipt["generation"], 0)
         self.assertEqual(receipt["status"], "not_issued")
         self.assertEqual(receipt["issuedAt"], "")
         self.assertEqual(receipt["validUntil"], "")
@@ -659,7 +687,8 @@ class PublicLiveReceiptTests(unittest.TestCase):
             stdout_receipt = json.loads(result.stdout)
             file_receipt = read_receipt(output)
             self.assertEqual(stdout_receipt, file_receipt)
-            self.assertEqual(file_receipt["schemaVersion"], 3)
+            self.assertEqual(file_receipt["schemaVersion"], 4)
+            self.assertEqual(file_receipt["generation"], 1)
             self.assertEqual(file_receipt["status"], ACTIVE_STATUS)
             self.assertRegex(file_receipt["coreSha256"], r"^[a-f0-9]{64}$")
             self.assertRegex(file_receipt["envelopeSha256"], r"^[a-f0-9]{64}$")
@@ -1014,6 +1043,7 @@ class PublicLiveReceiptTests(unittest.TestCase):
             output = folder / "public-live-receipt.js"
             generated = run_exporter(*generation_args(config, external, revenue, output))
             self.assertEqual(generated.returncode, 0, generated.stderr)
+            issued_generation = read_receipt(output)["generation"]
             for local_packet in (
                 external,
                 revenue,
@@ -1040,6 +1070,7 @@ class PublicLiveReceiptTests(unittest.TestCase):
             self.assertIn("revoked to a fail-closed placeholder", revoked.stdout)
             receipt = read_receipt(output)
             self.assertEqual(receipt["status"], "not_issued")
+            self.assertEqual(receipt["generation"], issued_generation + 1)
             self.assertEqual(receipt["core"]["form"]["url"], "")
             self.assertFalse(receipt["core"]["form"]["verified"])
             self.assertEqual(receipt["core"]["reviewDates"]["termsReviewedAt"], "2099-12-31")
@@ -1077,6 +1108,188 @@ class PublicLiveReceiptTests(unittest.TestCase):
             self.assertNotEqual(revoked.returncode, 0)
             self.assertIn("until public-config.js liveMode is false", revoked.stderr)
             self.assertEqual(read_receipt(output)["status"], ACTIVE_STATUS)
+
+    def test_generation_advances_across_issue_revoke_and_reissue(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            output = folder / "public-live-receipt.js"
+
+            issued = run_exporter(*generation_args(config, external, revenue, output))
+            self.assertEqual(issued.returncode, 0, issued.stderr)
+            self.assertEqual(read_receipt(output)["generation"], 1)
+
+            revoked = run_exporter(
+                "--revoke",
+                "--public-config",
+                str(config),
+                "--output",
+                str(output),
+            )
+            self.assertEqual(revoked.returncode, 0, revoked.stderr)
+            self.assertEqual(read_receipt(output)["generation"], 2)
+
+            reissued = run_exporter(
+                *generation_args(config, external, revenue, output, "--force")
+            )
+            self.assertEqual(reissued.returncode, 0, reissued.stderr)
+            receipt = read_receipt(output)
+            self.assertEqual(receipt["schemaVersion"], 4)
+            self.assertEqual(receipt["generation"], 3)
+            self.assertEqual(receipt["status"], ACTIVE_STATUS)
+
+    def test_schema_three_placeholder_is_migration_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, _, _ = ready_files(folder)
+            output = folder / "public-live-receipt.js"
+            legacy = read_receipt(PUBLIC_RECEIPT)
+            legacy["schemaVersion"] = 3
+            legacy.pop("generation", None)
+            output.write_text(render_receipt(legacy), encoding="utf-8")
+
+            checked = run_exporter(
+                "--check-public-js",
+                "--public-config",
+                str(config),
+                "--public-js",
+                str(output),
+            )
+            self.assertNotEqual(checked.returncode, 0)
+            self.assertIn("generation", checked.stderr)
+
+            migrated = run_exporter(
+                "--revoke",
+                "--public-config",
+                str(config),
+                "--output",
+                str(output),
+            )
+            self.assertEqual(migrated.returncode, 0, migrated.stderr)
+            receipt = read_receipt(output)
+            self.assertEqual(receipt["schemaVersion"], 4)
+            self.assertEqual(receipt["generation"], 1)
+
+    def test_emergency_revoke_migrates_schema_three_active_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            output = folder / "public-live-receipt.js"
+            issued = run_exporter(*generation_args(config, external, revenue, output))
+            self.assertEqual(issued.returncode, 0, issued.stderr)
+            legacy_active = convert_to_legacy_v3(read_receipt(output))
+            output.write_text(render_receipt(legacy_active), encoding="utf-8")
+
+            reissue = run_exporter(
+                *generation_args(config, external, revenue, output, "--force")
+            )
+            self.assertNotEqual(reissue.returncode, 0)
+            self.assertIn("schema-v3 not_issued placeholder", reissue.stderr)
+            self.assertEqual(read_receipt(output)["schemaVersion"], 3)
+
+            revoked = run_exporter(
+                "--revoke",
+                "--public-config",
+                str(config),
+                "--output",
+                str(output),
+            )
+            self.assertEqual(revoked.returncode, 0, revoked.stderr)
+            receipt = read_receipt(output)
+            self.assertEqual(receipt["schemaVersion"], 4)
+            self.assertEqual(receipt["generation"], 1)
+            self.assertEqual(receipt["status"], "not_issued")
+
+    def test_json_output_advances_generation_across_mutations(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            output = folder / "public-live-receipt.json"
+
+            issued = run_exporter(*generation_args(config, external, revenue, output))
+            self.assertEqual(issued.returncode, 0, issued.stderr)
+            receipt = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["generation"], 1)
+
+            checked = run_exporter(
+                "--check-public-js",
+                "--require-issued",
+                "--public-config",
+                str(config),
+                "--public-js",
+                str(output),
+            )
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+
+            revoked = run_exporter(
+                "--revoke",
+                "--public-config",
+                str(config),
+                "--output",
+                str(output),
+            )
+            self.assertEqual(revoked.returncode, 0, revoked.stderr)
+            self.assertEqual(
+                json.loads(output.read_text(encoding="utf-8"))["generation"],
+                2,
+            )
+
+            reissued = run_exporter(
+                *generation_args(config, external, revenue, output, "--force")
+            )
+            self.assertEqual(reissued.returncode, 0, reissued.stderr)
+            self.assertEqual(
+                json.loads(output.read_text(encoding="utf-8"))["generation"],
+                3,
+            )
+
+    def test_output_scoped_lock_refuses_concurrent_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            output = folder / "public-live-receipt.js"
+            lock = pathlib.Path(f"{output}.lock")
+            lock.write_text("held by another exporter\n", encoding="utf-8")
+
+            result = run_exporter(*generation_args(config, external, revenue, output))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Receipt mutation lock already exists", result.stderr)
+            self.assertTrue(lock.exists())
+            self.assertFalse(output.exists())
+
+    def test_standalone_checker_has_no_prior_generation_trust_anchor(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            output = folder / "public-live-receipt.js"
+            issued = run_exporter(*generation_args(config, external, revenue, output))
+            self.assertEqual(issued.returncode, 0, issued.stderr)
+            old_active = output.read_bytes()
+
+            revoked = run_exporter(
+                "--revoke",
+                "--public-config",
+                str(config),
+                "--output",
+                str(output),
+            )
+            self.assertEqual(revoked.returncode, 0, revoked.stderr)
+            self.assertEqual(read_receipt(output)["generation"], 2)
+
+            output.write_bytes(old_active)
+            checked = run_exporter(
+                "--check-public-js",
+                "--require-issued",
+                "--public-config",
+                str(config),
+                "--public-js",
+                str(output),
+            )
+            # A lone file has no trustworthy prior head. Open-page high-water
+            # state and deployment freshness, not this stateless checker, detect rollback.
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+            self.assertEqual(read_receipt(output)["generation"], 1)
 
     def test_check_rejects_stale_core_and_digest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1253,6 +1466,41 @@ class PublicLiveReceiptTests(unittest.TestCase):
             )
             self.assertNotEqual(changed.returncode, 0)
             self.assertIn("future", changed.stderr)
+
+    def test_v4_envelope_covers_generation_and_requires_safe_positive_integer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            output = folder / "public-live-receipt.js"
+            generated = run_exporter(*generation_args(config, external, revenue, output))
+            self.assertEqual(generated.returncode, 0, generated.stderr)
+
+            receipt = read_receipt(output)
+            receipt["generation"] += 1
+            output.write_text(render_receipt(receipt), encoding="utf-8")
+            changed = run_exporter(
+                "--check-public-js",
+                "--public-js",
+                str(output),
+                "--public-config",
+                str(config),
+                "--require-issued",
+            )
+            self.assertNotEqual(changed.returncode, 0)
+            self.assertIn("receipt envelope", changed.stderr)
+
+            receipt["generation"] = 0
+            recompute_public_receipt_digests(receipt)
+            output.write_text(render_receipt(receipt), encoding="utf-8")
+            invalid = run_exporter(
+                "--check-public-js",
+                "--public-js",
+                str(output),
+                "--public-config",
+                str(config),
+            )
+            self.assertNotEqual(invalid.returncode, 0)
+            self.assertIn("positive safe integer", invalid.stderr)
 
     def test_export_is_bound_to_current_public_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

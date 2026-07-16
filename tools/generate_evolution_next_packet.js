@@ -69,6 +69,12 @@ function selectedHandoff(status) {
   if (!handoff) {
     return "- unavailable";
   }
+  const liveModeState = typeof handoff.currentLiveMode === "boolean"
+    ? [
+      `- Current liveMode: ${handoff.currentLiveMode}`,
+      `- Target liveMode: ${handoff.targetLiveMode}`,
+    ]
+    : [`- liveMode remains false: ${handoff.liveModeRemainsFalse}`];
   return [
     `- Blocker: ${handoff.blockerId}`,
     `- Evidence lane: ${handoff.laneId || "none"}`,
@@ -80,7 +86,7 @@ function selectedHandoff(status) {
     `- Recheck: \`${handoff.progressAuditCommand}\``,
     `- Why now: ${handoff.whyNow}`,
     `- Requires real evidence: ${handoff.requiresRealEvidence}`,
-    `- liveMode remains false: ${handoff.liveModeRemainsFalse}`,
+    ...liveModeState,
   ].join("\n");
 }
 
@@ -100,6 +106,14 @@ function packet(status) {
   const reviewClosureWorkflow = status.reviewClosureActions && status.reviewClosureActions.length
     ? checklist(status.reviewClosureActions)
     : "- none";
+  const liveRecoveryWorkflow = status.liveRecoveryActions && status.liveRecoveryActions.length
+    ? checklist(status.liveRecoveryActions)
+    : "- none";
+  const liveModeStopRule = status.liveMode
+    ? status.liveRecoveryActions && status.liveRecoveryActions.length
+      ? "Do not issue or replace a receipt while liveMode is true; complete the ordered fail-closed recovery first."
+      : "Do not reissue the public receipt until reissuance readiness is true; keep monitoring the active public receipt and runtime gates."
+    : "Do not set `liveMode: true` from this packet.";
   const latest = status.latestPass
     ? `${status.latestPass.date} - ${status.latestPass.title}`
     : "none";
@@ -115,6 +129,8 @@ function packet(status) {
     `Next loop: ${status.nextLoop}`,
     `Goal status: ${status.goalStatus}`,
     `Public live ready: ${status.publicLiveReady}`,
+    `Public runtime ready: ${status.publicRuntimeReady}`,
+    `Reissuance ready: ${status.reissuanceReady}`,
     `Company operational ready: ${status.companyOperationalReady}`,
     `liveMode: ${status.liveMode}`,
     `Live review closure phase: ${status.liveReviewClosurePhase}`,
@@ -123,6 +139,10 @@ function packet(status) {
     "## Do This Next",
     "",
     selectedHandoff(status),
+    "",
+    "## Live Recovery Workflow",
+    "",
+    liveRecoveryWorkflow,
     "",
     "## Current Hard Blockers",
     "",
@@ -182,7 +202,7 @@ function packet(status) {
     "## Stop Rules",
     "",
     checklist([
-      "Do not set `liveMode: true` from this packet.",
+      liveModeStopRule,
       "Do not put CPF, CNPJ, bank data, payment dashboard URLs, credentials, private reviewer notes, or customer-private material in git.",
       "Do not mark any legal, tax, fiscal, payment, privacy, or launch gate complete from AI output alone.",
       "Do not treat this packet as evidence that a real external blocker is closed.",

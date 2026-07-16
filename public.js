@@ -37,6 +37,18 @@ const PUBLIC_ORDER_CONFIG = {
 };
 const PUBLIC_LIVE_RECEIPT = window.PUBLIC_LIVE_RECEIPT || {};
 let CURRENT_PUBLIC_LIVE_RECEIPT = PUBLIC_LIVE_RECEIPT;
+const PUBLIC_LIVE_RECEIPT_KEYS = Object.freeze([
+  "schemaVersion",
+  "generation",
+  "mode",
+  "status",
+  "issuedAt",
+  "validUntil",
+  "core",
+  "coreSha256",
+  "attestations",
+  "envelopeSha256"
+]);
 const PUBLIC_REVIEW_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1";
 const PUBLIC_REVIEW_DOCUMENT_PATHS = Object.freeze([
   "TERMOS.md",
@@ -49,6 +61,59 @@ const PUBLIC_REVIEW_DOCUMENT_PATHS = Object.freeze([
   "AI_LEGAL_HANDOFF.md",
   "HUMAN_REVIEW_PACKET.md"
 ]);
+
+function publicLiveReceiptGeneration(receipt) {
+  if (!(
+    receipt
+    && hasExactKeys(receipt, PUBLIC_LIVE_RECEIPT_KEYS)
+    && receipt.schemaVersion === 4
+    && receipt.mode === "public"
+    && ["local_packet_validators_passed", "not_issued"].includes(receipt.status)
+    && Number.isSafeInteger(receipt.generation)
+    && receipt.generation > 0
+  )) {
+    return 0;
+  }
+  return receipt.generation;
+}
+
+// This high-water mark prevents rollback inside one open document. A new client
+// served a complete older same-origin artifact still needs deployment freshness
+// controls because this public static page has no independent trust anchor.
+let HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION = publicLiveReceiptGeneration(PUBLIC_LIVE_RECEIPT);
+let HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY = HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION > 0
+  ? `${PUBLIC_LIVE_RECEIPT.status}:${String(PUBLIC_LIVE_RECEIPT.envelopeSha256 || "")}`
+  : "";
+
+function publicLiveReceiptGenerationIdentity(receipt) {
+  return `${String(receipt.status || "")}:${String(receipt.envelopeSha256 || "")}`;
+}
+
+function publicLiveReceiptMatchesGenerationHead(receipt) {
+  const generation = publicLiveReceiptGeneration(receipt);
+  if (generation === 0 || generation < HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION) {
+    return false;
+  }
+  return !(
+    generation === HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION
+    && HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY
+    && publicLiveReceiptGenerationIdentity(receipt) !== HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY
+  );
+}
+
+function observePublicLiveReceiptGeneration(receipt) {
+  const generation = publicLiveReceiptGeneration(receipt);
+  if (!publicLiveReceiptMatchesGenerationHead(receipt)) {
+    return false;
+  }
+  if (generation > HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION) {
+    HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION = generation;
+    HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY = publicLiveReceiptGenerationIdentity(receipt);
+  } else if (generation > 0 && !HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY) {
+    HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY = publicLiveReceiptGenerationIdentity(receipt);
+  }
+  return generation > 0;
+}
 
 const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -222,6 +287,7 @@ async function fetchCurrentPublicLiveReceipt() {
 function receiptEnvelopePayload(receipt, receiptCore) {
   return {
     schemaVersion: receipt.schemaVersion,
+    generation: receipt.generation,
     mode: receipt.mode,
     status: receipt.status,
     issuedAt: receipt.issuedAt,
@@ -274,9 +340,12 @@ async function publicLiveReceiptEnvelopeReady(config, receipt, now = Date.now())
       : null;
     if (!(
       receipt
-      && hasExactKeys(receipt, ["schemaVersion", "mode", "status", "issuedAt", "validUntil", "core", "coreSha256", "attestations", "envelopeSha256"])
+      && hasExactKeys(receipt, PUBLIC_LIVE_RECEIPT_KEYS)
       && hasExactKeys(attestations, ["publicOnly", "privatePacketDataExcluded", "privatePacketHashesExcluded", "localPacketValidatorsPassed", "liveReviewClosureValidatorPassed", "reviewerCandidateTrackerReady", "deliveryReviewChecklistReady", "operationalValidatorsPassed", "digestCoversCanonicalPublicCoreExceptLiveMode", "digestCoversReceiptEnvelopeExceptLiveMode"])
-      && receipt.schemaVersion === 3
+      && receipt.schemaVersion === 4
+      && Number.isSafeInteger(receipt.generation)
+      && receipt.generation > 0
+      && publicLiveReceiptMatchesGenerationHead(receipt)
       && receipt.mode === "public"
       && receipt.status === "local_packet_validators_passed"
       && publicLiveReceiptFresh(receipt, now)
@@ -315,7 +384,7 @@ async function publicLiveReceiptEnvelopeReady(config, receipt, now = Date.now())
       return false;
     }
     const expectedEnvelopeDigest = await sha256Hex(
-      `STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3\n${stableSerialize(receiptEnvelopePayload(receipt, digestablePublicCore(receiptCore)))}`
+      `STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V4\n${stableSerialize(receiptEnvelopePayload(receipt, digestablePublicCore(receiptCore)))}`
     );
     return expectedEnvelopeDigest === receipt.envelopeSha256;
   } catch {
@@ -380,12 +449,21 @@ async function performPublicLiveReceiptRefresh(forceDocumentCheck) {
   let latestReceipt = {};
   try {
     latestReceipt = await fetchCurrentPublicLiveReceipt();
+    const latestGeneration = publicLiveReceiptGeneration(latestReceipt);
+    if (latestReceipt.status === "not_issued" && latestGeneration > 0) {
+      observePublicLiveReceiptGeneration(latestReceipt);
+      PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED = false;
+      clearPublicReviewDocumentVerificationCache();
+      applyPublicLiveReceiptState(latestReceipt, false);
+      return false;
+    }
     if (!await publicLiveReceiptEnvelopeReady(PUBLIC_ORDER_CONFIG, latestReceipt)) {
       PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED = false;
       clearPublicReviewDocumentVerificationCache();
       applyPublicLiveReceiptState(latestReceipt, false);
       return false;
     }
+    observePublicLiveReceiptGeneration(latestReceipt);
 
     if (PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED) {
       PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED = false;

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import copy
 import pathlib
+import re
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -69,6 +72,7 @@ class PublicSiteBundleTests(unittest.TestCase):
                 "tools/vau_company_evolution.py",
                 "tools/validate_live_review_closure.js",
                 "tools/render_live_review_public_config_patch.js",
+                "tools/render_public_live_shutdown_patch.js",
                 "tools/export_public_live_receipt.js",
                 "tools/validate_delivery_review_checklist.js",
                 "tools/export_public_ama_answers.js",
@@ -159,6 +163,18 @@ class PublicSiteBundleTests(unittest.TestCase):
             self.assertIn("stale public core", receipt_check.stderr)
 
     def test_deployment_preflight_supports_the_separate_live_flip(self) -> None:
+        from tests.test_public_live_receipt import (
+            read_receipt,
+            ready_delivery_checklist,
+            ready_external_packet,
+            ready_live_review_closure,
+            ready_public_config,
+            ready_revenue_index,
+            ready_reviewer_tracker,
+            write_json,
+            write_public_config,
+        )
+
         preflight = PREFLIGHT.read_text(encoding="utf-8")
         self.assertIn('process.argv.includes("--deployment")', preflight)
         self.assertIn('receiptArgs.push("--require-issued")', preflight)
@@ -175,17 +191,126 @@ class PublicSiteBundleTests(unittest.TestCase):
             PAGES_WORKFLOW.read_text(encoding="utf-8"),
         )
 
-        for extra in ([], ["--deployment"]):
-            with self.subTest(extra=extra):
-                result = subprocess.run(
-                    ["node", str(PREFLIGHT.relative_to(ROOT)), *extra],
-                    cwd=ROOT,
+        with tempfile.TemporaryDirectory() as workspace:
+            isolated_root = pathlib.Path(workspace) / "repo"
+            shutil.copytree(
+                ROOT,
+                isolated_root,
+                ignore=shutil.ignore_patterns(
+                    ".git",
+                    ".public-site-build.local",
+                    "_site",
+                    "__pycache__",
+                    "*.local.json",
+                    "MEI_*",
+                ),
+            )
+
+            support_match = re.search(
+                r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
+                (ROOT / "SUPPORT_INBOX_EVIDENCE.md").read_text(encoding="utf-8"),
+            )
+            self.assertIsNotNone(support_match)
+            config = ready_public_config(live_mode=False)
+            config["supportEmail"] = support_match.group(0)
+            config_path = write_public_config(isolated_root, config)
+            external = write_json(
+                isolated_root,
+                "EXTERNAL_LIVE_PACKET.local.json",
+                ready_external_packet(config),
+            )
+            revenue = write_json(
+                isolated_root,
+                "REVENUE_SETUP_EVIDENCE_INDEX.local.json",
+                ready_revenue_index(config),
+            )
+            reviewer = write_json(
+                isolated_root,
+                "REVIEWER_CANDIDATE_TRACKER.local.json",
+                ready_reviewer_tracker(),
+            )
+            delivery = write_json(
+                isolated_root,
+                "DELIVERY_REVIEW_CHECKLIST.local.json",
+                ready_delivery_checklist(),
+            )
+            closure = write_json(
+                isolated_root,
+                "LIVE_REVIEW_CLOSURE.local.json",
+                ready_live_review_closure(config),
+            )
+            receipt_path = isolated_root / "public-live-receipt.js"
+
+            def run_isolated(*args: str) -> subprocess.CompletedProcess[str]:
+                return subprocess.run(
+                    list(args),
+                    cwd=isolated_root,
                     check=False,
                     encoding="utf-8",
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
+                    timeout=180,
                 )
-                self.assertEqual(result.returncode, 0, result.stderr)
+
+            issued = run_isolated(
+                "node",
+                "tools/export_public_live_receipt.js",
+                "--live-review-closure",
+                str(closure),
+                "--external-live-packet",
+                str(external),
+                "--revenue-index",
+                str(revenue),
+                "--reviewer-tracker",
+                str(reviewer),
+                "--delivery-review-checklist",
+                str(delivery),
+                "--public-config",
+                str(config_path),
+                "--output",
+                str(receipt_path),
+                "--force",
+            )
+            self.assertEqual(issued.returncode, 0, issued.stderr)
+            issued_digest = read_receipt(receipt_path)["coreSha256"]
+
+            live_config = copy.deepcopy(config)
+            live_config["liveMode"] = True
+            write_public_config(isolated_root, live_config)
+
+            receipt_check = run_isolated(
+                "node",
+                "tools/export_public_live_receipt.js",
+                "--check-public-js",
+                "--require-issued",
+            )
+            self.assertEqual(receipt_check.returncode, 0, receipt_check.stderr)
+            self.assertEqual(read_receipt(receipt_path)["coreSha256"], issued_digest)
+
+            normal_preflight = run_isolated("node", "tools/preflight_public_launch.js")
+            self.assertNotEqual(normal_preflight.returncode, 0)
+            self.assertIn(
+                "must keep liveMode false by default; use --deployment",
+                normal_preflight.stderr,
+            )
+
+            deployment_preflight = run_isolated(
+                "node",
+                "tools/preflight_public_launch.js",
+                "--deployment",
+            )
+            self.assertEqual(deployment_preflight.returncode, 0, deployment_preflight.stderr)
+
+            bundle = run_isolated(
+                "node",
+                "tools/build_public_site.js",
+                "--check",
+                "--output",
+                str(isolated_root / "_site"),
+                "--force",
+            )
+            self.assertEqual(bundle.returncode, 0, bundle.stderr)
+            self.assertIn("Public site build check passed", bundle.stdout)
 
 
 if __name__ == "__main__":

@@ -359,17 +359,21 @@ must run `node tools/preflight_public_launch.js --deployment` before publication
 Publish the issued receipt and live config together; enable external Form
 responses only after the live Pages deployment is verified.
 
-If a stop rule or receipt expiry occurs, disable Form responses first. Then set
-`liveMode: false`, clear `googleFormUrl`, set `googleFormVerified: false`, and run:
+If a stop rule or receipt expiry occurs, disable Form responses first. Capture
+the full recovery sequence below and finish it without rerunning status midway:
 
 ```powershell
+node tools\render_public_live_shutdown_patch.js
+# Apply only googleFormUrl: "", googleFormVerified: false, and liveMode: false.
 node tools\export_public_live_receipt.js --revoke --public-config public-config.js --output public-live-receipt.js
 node tools\preflight_public_launch.js --deployment
+node tools\build_public_site.js --check --output .public-site-build.local --force
 ```
 
-Publish that closed config and placeholder together. The revoke path does not
-require the private packets; a receipt in an already open tab is rechecked from
-the server and fails closed.
+Publish that closed config and placeholder together, verify Pages remains
+closed, and only then rerun status from the closed state before repair or
+reissuance. The revoke path does not require the private packets; a receipt in
+an already open tab is rechecked from the server and fails closed.
 
 ## First Paid Pilot Procedure
 

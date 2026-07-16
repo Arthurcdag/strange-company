@@ -110,16 +110,18 @@ and validates the issued public receipt.
 ## Fail-Closed Rollback
 
 The static receipt cannot turn off a Google Form reached directly. On expiry or
-any stop rule, first disable external Form responses. Then set `liveMode: false`,
-clear `googleFormUrl`, set `googleFormVerified: false`, and run:
+any stop rule, first disable external Form responses. Then render and apply the
+exact fail-closed public patch before revocation:
 
 ```bash
+node tools/render_public_live_shutdown_patch.js
 node tools/export_public_live_receipt.js --revoke --public-config public-config.js --output public-live-receipt.js
 node tools/preflight_public_launch.js --deployment
 ```
 
-Publish the closed config and fail-closed placeholder together. Revocation does
-not need the four private packets and still works after the Form URL is cleared.
+Publish the closed config and fail-closed placeholder together. Revocation
+advances the public receipt generation, does not need the five private packets,
+and still works after the Form URL is cleared.
 
 ## Publish
 

@@ -289,7 +289,10 @@ class EvolutionGoalStatusTests(unittest.TestCase):
         self.assertGreaterEqual(data["localEvidence"]["laneCount"], 6)
         self.assertTrue(any(lane["id"] == "liveReviewClosure" for lane in data["localEvidence"]["lanes"]))
         self.assertGreaterEqual(data["evolutionPassCount"], 3)
-        self.assertEqual(data["latestPass"]["title"], "Atomic Review Closure Control Plane")
+        self.assertEqual(
+            data["latestPass"]["title"],
+            "Fail-Closed Live Recovery and Deployment Freshness",
+        )
 
     def test_text_output_names_latest_pass(self) -> None:
         with tempfile.TemporaryDirectory() as workspace:
@@ -543,8 +546,16 @@ class EvolutionGoalStatusTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         data = json.loads(result.stdout)
-        self.assertEqual(data["mode"], "burn_down_hard_blockers")
+        self.assertEqual(data["mode"], "recover_fail_closed")
         self.assertFalse(data["publicLiveReady"])
+        self.assertEqual(
+            data["selectedHandoff"]["blockerId"],
+            "liveModeRecoveryRequired",
+        )
+        self.assertNotIn(
+            "export_public_live_receipt.js --external-live-packet",
+            data["selectedHandoff"]["command"],
+        )
         live_row = next(row for row in data["publicGateRows"] if row["id"] == "liveMode")
         self.assertFalse(live_row["passed"])
 
@@ -718,11 +729,114 @@ class EvolutionGoalStatusTests(unittest.TestCase):
         data = json.loads(result.stdout)
         self.assertEqual(data["mode"], "operate_measure_adapt")
         self.assertTrue(data["publicLiveReady"])
+        self.assertTrue(data["publicRuntimeReady"])
+        self.assertTrue(data["reissuanceReady"])
         self.assertTrue(data["companyOperationalReady"])
         live_row = next(row for row in data["publicGateRows"] if row["id"] == "liveMode")
         self.assertTrue(live_row["passed"])
         self.assertEqual(data["selectedHandoff"]["blockerId"], "liveOperationsReview")
         self.assertFalse(data["selectedHandoff"]["liveModeRemainsFalse"])
+
+    def test_live_mode_with_valid_receipt_operates_without_local_reissuance_packets(self) -> None:
+        issuance_config = write_temp_config(
+            terms="2026-06-12",
+            privacy="2026-06-12",
+            brazil="2026-06-12",
+            ai_handoff="2026-06-12",
+        )
+        runtime_config = write_temp_config(
+            terms="2026-06-12",
+            privacy="2026-06-12",
+            brazil="2026-06-12",
+            ai_handoff="2026-06-12",
+            live_mode="true",
+        )
+        with tempfile.TemporaryDirectory() as workspace:
+            root = pathlib.Path(workspace)
+            write_ready_local_lanes(workspace, reviewers=True, delivery=True)
+            receipt = issue_public_live_receipt(workspace, issuance_config)
+            for evidence_path in root.glob("*.local.json"):
+                evidence_path.unlink()
+            result = run_status(
+                "--json",
+                "--public-config",
+                str(runtime_config),
+                "--local-evidence-dir",
+                workspace,
+                "--public-live-receipt",
+                str(receipt),
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        self.assertTrue(data["liveMode"])
+        self.assertTrue(data["publicRuntimeReady"])
+        self.assertFalse(data["reissuanceReady"])
+        self.assertTrue(data["publicLiveReady"])
+        self.assertTrue(data["companyOperationalReady"])
+        self.assertEqual(data["mode"], "operate_measure_adapt")
+        self.assertEqual(data["selectedHandoff"]["blockerId"], "liveOperationsReview")
+        self.assertEqual(data["liveRecoveryActions"], [])
+        self.assertEqual(data["publicRouteBlockers"], [])
+        self.assertEqual(
+            set(data["hardBlockers"]),
+            {
+                "humanReviewClosureEvidence",
+                "privatePaymentFiscalEvidence",
+                "privateExternalLiveEvidence",
+            },
+        )
+        self.assertEqual(
+            {blocker["id"] for blocker in data["operationalBlockers"]},
+            {"humanReviewerCapacity", "deliveryReviewLoop"},
+        )
+        live_row = next(row for row in data["publicGateRows"] if row["id"] == "liveMode")
+        self.assertTrue(live_row["passed"])
+
+    def test_live_mode_with_missing_receipt_selects_fail_closed_recovery(self) -> None:
+        config = write_temp_config(
+            terms="2026-06-12",
+            privacy="2026-06-12",
+            brazil="2026-06-12",
+            ai_handoff="2026-06-12",
+            live_mode="true",
+        )
+        with tempfile.TemporaryDirectory() as workspace:
+            root = pathlib.Path(workspace)
+            write_ready_local_lanes(workspace, reviewers=True, delivery=True)
+            result = run_status(
+                "--json",
+                "--public-config",
+                str(config),
+                "--local-evidence-dir",
+                workspace,
+                "--public-live-receipt",
+                str(root / "missing-public-live-receipt.js"),
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        handoff = data["selectedHandoff"]
+        self.assertEqual(data["mode"], "recover_fail_closed")
+        self.assertTrue(data["liveMode"])
+        self.assertFalse(data["publicLiveReady"])
+        self.assertFalse(data["publicRuntimeReady"])
+        self.assertFalse(data["reissuanceReady"])
+        self.assertEqual(data["publicRouteBlockers"], ["publicLiveReceipt"])
+        self.assertEqual(handoff["blockerId"], "liveModeRecoveryRequired")
+        self.assertEqual(handoff["priority"], "safety_recovery")
+        self.assertEqual(handoff["command"], "node tools/render_public_live_shutdown_patch.js")
+        self.assertNotIn("--live-review-closure", handoff["command"])
+        self.assertTrue(handoff["currentLiveMode"])
+        self.assertFalse(handoff["targetLiveMode"])
+        self.assertFalse(handoff["liveModeRemainsFalse"])
+        self.assertEqual(data["nextActions"][:7], data["liveRecoveryActions"])
+        self.assertIn("Disable external Google Form responses", data["liveRecoveryActions"][0])
+        self.assertIn("render_public_live_shutdown_patch.js", data["liveRecoveryActions"][1])
+        self.assertIn("--revoke", data["liveRecoveryActions"][3])
+        live_row = next(row for row in data["publicGateRows"] if row["id"] == "liveMode")
+        self.assertFalse(live_row["passed"])
+        self.assertIn("fail-closed", live_row["nextAction"])
 
     def test_missing_public_route_cannot_reach_human_decision_mode(self) -> None:
         config = write_temp_config(

@@ -127,15 +127,15 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 
 - [public.html](public.html): public GitHub Pages documentation and AMA surface; the paid desk stays hidden and disabled until strict live readiness passes.
 - [public-config.js](public-config.js): public support inbox, Google Form URL, service names, and prices.
-- [public-live-receipt.js](public-live-receipt.js): public-only fail-closed schema-v3 lease; its `reviewDocuments` core binds all nine canonical reviewed documents, and paid intake stays closed until the document-bound review closure and all four other private readiness and operating-capacity validators pass, the receipt envelope is issued, and its seven-day validity has not expired.
+- [public-live-receipt.js](public-live-receipt.js): public-only fail-closed schema-v4 lease; its monotonic `generation` and `reviewDocuments` core bind revocation order plus all nine canonical reviewed documents, and paid intake stays closed until the document-bound review closure and all four other private readiness and operating-capacity validators pass, the receipt envelope is issued, and its seven-day validity has not expired.
 - [public-ama-answers.js](public-ama-answers.js): public-safe AMA answer archive loaded by the static page; empty until approved answers are exported.
 - [public.js](public.js): payment-safe public request packet builder.
 - [tools/build_public_site.js](tools/build_public_site.js): cross-platform builder/checker for the GitHub Pages public bundle.
-- [tools/export_public_live_receipt.js](tools/export_public_live_receipt.js): two-phase exporter that validates the document-bound human-review closure plus revenue, external-live, reviewer-capacity, and delivery-review packets, then emits a public-only, config-bound schema-v3 seven-day receipt whose exact `reviewDocuments` map covers all nine reviewed paths while `liveMode` remains false; `--revoke` replaces any lease with a closed placeholder without private packets.
+- [tools/export_public_live_receipt.js](tools/export_public_live_receipt.js): two-phase exporter that validates the document-bound human-review closure plus revenue, external-live, reviewer-capacity, and delivery-review packets, then emits a public-only, config-bound schema-v4 seven-day receipt whose exact `reviewDocuments` map covers all nine reviewed paths while `liveMode` remains false; issuance and `--revoke` both advance the public generation, and revocation replaces any lease with a closed placeholder without private packets.
 - [tools/preflight_public_launch.js](tools/preflight_public_launch.js): launch preflight for public/private separation, URL allowlists, live-mode config, and sensitive-data guard coverage.
 - [tools/audit_company_functionality.js](tools/audit_company_functionality.js): repo-level audit for Strange Company, the satellite operator, and the external live-operation gate.
 - [tools/audit_evolution_log.js](tools/audit_evolution_log.js): public-safe audit for `EVOLUTION_LOG.md`, requiring objective, changed artifacts, verification commands, and a result for each evolution pass.
-- [tools/evolution_goal_status.js](tools/evolution_goal_status.js): public-safe active-goal status report with one deterministic `selectedHandoff`; it consumes the same explicit review-closure phase as local evidence status, and strict readiness requires config-bound closure, revenue/external evidence, reviewer and delivery capacity, and an issued public live receipt.
+- [tools/evolution_goal_status.js](tools/evolution_goal_status.js): public-safe active-goal status report with one deterministic `selectedHandoff`; it consumes the same explicit review-closure phase as local evidence status, separates currently attested public-runtime safety from local reissuance readiness, and selects fail-closed recovery only when a live config or current issued receipt is invalid—not merely because ignored packets are unavailable in a clean checkout.
 - [tools/generate_evolution_next_packet.js](tools/generate_evolution_next_packet.js): local packet generator for `EVOLUTION_NEXT_ACTION.local.md`, putting the selected handoff first and retaining the remaining blocker backlog.
 - [tools/local_evidence_status.js](tools/local_evidence_status.js): public-safe status report for ignored local evidence lanes; the review-closure lane exposes `missing`, `invalid`, `document_ready_unbound`, or `config_bound_ready` while no private packet contents are printed.
 - [tools/check_live_review_closure_conformance.js](tools/check_live_review_closure_conformance.js): executable four-scenario contract proving the three status surfaces share the closure phase and VAU agrees on closure readiness, blocking, and first hard-gate priority.
@@ -145,6 +145,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [tools/draft_live_review_closure.js](tools/draft_live_review_closure.js): local draft generator for `LIVE_REVIEW_CLOSURE.local.json`; it snapshots normalized, path-bound SHA-256 digests for every document that must receive human review.
 - [tools/validate_live_review_closure.js](tools/validate_live_review_closure.js): local validator for the ignored live-review closure packet; `--require-ready` recomputes every required document digest, while adding `--public-config public-config.js` is the authoritative final config-bound readiness gate.
 - [tools/render_live_review_public_config_patch.js](tools/render_live_review_public_config_patch.js): renders the public-safe review-date patch from a ready `LIVE_REVIEW_CLOSURE.local.json` while keeping `liveMode` false.
+- [tools/render_public_live_shutdown_patch.js](tools/render_public_live_shutdown_patch.js): output-only emergency renderer for the exact fail-closed public config patch; status selects it before evidence repair whenever `liveMode` is true and a readiness gate is open.
 - [tools/draft_reviewer_candidate_tracker.js](tools/draft_reviewer_candidate_tracker.js): local draft generator for `REVIEWER_CANDIDATE_TRACKER.local.json`.
 - [tools/draft_revenue_setup_evidence_index.js](tools/draft_revenue_setup_evidence_index.js): local draft generator for `REVENUE_SETUP_EVIDENCE_INDEX.local.json`.
 - [tools/draft_public_ama_queue.js](tools/draft_public_ama_queue.js): local draft generator for `PUBLIC_AMA_QUEUE.local.json`.
@@ -163,7 +164,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [styles.css](styles.css): interface design for the prototype.
 - [script.js](script.js): treasury allocation, launch readiness, private order requests, revenue pilot, satellite profit model, revenue start board, Brazil compliance agents, growth review, operations console, external signals, execution packets, outcome receipts, outcome evidence reviews, capital routing, resilience drills, cooldown lanes, local receipt chain, logs, and operating loop animation.
 
-Open `index.html` directly in a browser for private/local operation. Open `public.html` to test the public request surface. No build step is required.
+Open `index.html` directly in a browser for private/local operation. A direct open of `public.html` is sufficient for the closed, packet-only interface, but not for live-receipt readiness: the live gate must fetch the current receipt and all nine reviewed documents over HTTP. To test the live public surface locally, run `node tools/build_public_site.js --check --output .public-site-build.local --force`, serve that directory (for example, `python -m http.server 8000 --directory .public-site-build.local`), and open `http://localhost:8000/`; alternatively, verify the deployed Pages URL.
 
 Before turning on `liveMode` or merging public config changes, run:
 
@@ -231,7 +232,7 @@ four other private validators pass while
 separate human flip last, and run `node tools/preflight_public_launch.js
 --deployment`. The receipt carries no private packet data or hashes. Its core
 and full envelope have independent SHA-256 integrity checks, the browser
-recomputes both, and the lease expires after seven days. The schema-v3 core's
+recomputes both, and the lease expires after seven days. The schema-v4 core's
 exact `reviewDocuments` map binds the normalized UTF-8 contents of `TERMOS.md`,
 `TERMS.md`, `AVISO_DE_PRIVACIDADE.md`, `PRIVACY.md`, `BRAZIL_COMPLIANCE.md`,
 `BRAZIL_COMPLIANCE_AGENTS.md`, `CONKA8_LAW_INSTRUCTIONS.md`,
@@ -248,10 +249,18 @@ The receipt gates the static bundle only; it cannot disable a Google Form opened
 through a direct or previously shared link. Closed releases therefore keep the
 Form URL blank and response collection disabled. After a verified live deploy,
 the human operator may enable responses. On expiry or any stop rule, disable
-responses first, set `liveMode: false`, clear the Form URL/verified flag, run
+responses first. Run `node tools/render_public_live_shutdown_patch.js`, apply
+only its three public config values, then run
 `node tools/export_public_live_receipt.js --revoke --public-config
 public-config.js --output public-live-receipt.js`, run the deployment preflight,
-and publish the closed config plus placeholder together.
+and publish the closed config plus placeholder together. Schema v4 advances a
+monotonic generation on issue and revoke, and an output-scoped exclusive lock
+serializes local receipt mutations. An open browser rejects a lower generation
+or a different receipt identity at the same observed generation. Pages also
+rejects non-main or stale-main deploys. A new client served a complete
+same-origin rollback has no independent trust anchor, and a current-main revert
+is still current, so disabling the external Form first remains the authoritative
+emergency stop.
 
 To close the repeatable delivery-review loop without exposing customer evidence, complete `DELIVERY_REVIEW_CHECKLIST.local.json` from `DELIVERY_REVIEW_CHECKLIST.template.json`:
 
@@ -263,7 +272,9 @@ python tools/vau_company_evolution.py --delivery-review-checklist DELIVERY_REVIE
 
 Pull requests run the full test suite, syntax checks, and public launch preflight
 through the `Validate static site` workflow. The Pages deployment independently
-runs the full test suite again before it can upload or deploy `main`.
+runs the full test suite again, accepts only `main`, cancels an older in-progress
+run, and rechecks that its checkout is still the current `origin/main` before
+deployment.
 
 The GitHub repository deploys `public.html` as the GitHub Pages homepage from `main`. The private command center is not the public homepage and should not be treated as live autonomous business operation.
 

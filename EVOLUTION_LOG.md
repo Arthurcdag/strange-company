@@ -491,3 +491,72 @@ their readiness and blocker state and keeps closure first until it is bound.
 This is control-plane conformance evidence only; no external review, legal, tax,
 payment, privacy, fiscal, or launch gate was claimed complete, and `liveMode`
 remains false.
+
+## 2026-07-16 - Fail-Closed Live Recovery and Deployment Freshness
+
+Objective: make every post-flip failure select an executable shutdown path and
+prevent locally concurrent, already-observed, or stale Pages receipt state from
+silently reopening paid intake.
+
+Changed:
+
+- Added the output-only `render_public_live_shutdown_patch.js` and made status,
+  next-action packets, and VAU prioritize its complete close/revoke/deploy
+  sequence whenever a live public config or current issued receipt is invalid.
+- Split `publicRuntimeReady` from `reissuanceReady`, so a valid live config and
+  issued receipt remain operational in a clean CI/Pages checkout even when the
+  ignored private packets needed for a future reissue are unavailable.
+- Upgraded the public lease to schema v4 with a positive monotonic generation
+  covered by the envelope digest; issuance and revocation advance it, emergency
+  revocation can close a legacy schema-v3 active lease, and JSON and JavaScript
+  outputs share the same generation rules.
+- Serialized local receipt mutations with an output-scoped exclusive lock and
+  made the browser pin both the highest observed generation and its receipt
+  identity, rejecting lower generations and equal-generation forks while still
+  accepting an exact repeat or a valid higher generation.
+- Hardened Pages deployment to run only from `main`, cancel an older in-progress
+  run, and compare the checkout to current `origin/main` immediately before
+  deployment; both CI paths execute the shutdown renderer as well as syntax and
+  full tests.
+- Repaired the composed operator transition and every shutdown entrypoint:
+  issue while closed, make only the separate human flag flip, use deployment
+  preflight over HTTP, and on failure disable the external Form before finishing
+  the captured config, revoke, bundle, deploy, closed-Page verification, and
+  closed-state status sequence.
+- Propagated the recovery, schema, generation, workflow, and claim-boundary
+  contracts through README, human/operations handoffs, VAU guidance, preflight,
+  functionality audit, survival checks, the public bundle, and regression tests.
+
+Verified with:
+
+- `node --check public.js`
+- `node --check tools\export_public_live_receipt.js`
+- `node --check tools\render_public_live_shutdown_patch.js`
+- `node --check tools\evolution_goal_status.js`
+- `node --check tools\generate_evolution_next_packet.js`
+- `python -m py_compile tools\vau_company_evolution.py`
+- `python -m unittest tests.test_render_public_live_shutdown_patch tests.test_evolution_goal_status tests.test_evolution_next_packet tests.test_vau_company_evolution`
+- Recovery/status result: 65 tests passed.
+- `python -m unittest tests.test_public_live_receipt tests.test_public_ama tests.test_pages_deployment_workflow`
+- Receipt/browser/workflow result: 46 tests passed.
+- `python -m unittest tests.test_public_site_bundle`
+- Composed transition result: 3 tests passed.
+- `python -m unittest discover -s tests`
+- Full discovery result: 268 tests passed; 1 skipped.
+- `node tools\audit_evolution_log.js`
+- `node tools\preflight_public_launch.js --deployment`
+- `node tools\audit_company_functionality.js`
+- `node tools\build_public_site.js --check --output .public-site-build.local --force`
+- `node tools\survival_check.js`
+- `git diff --check`
+
+Result: unsafe live runtime state now selects one fail-closed recovery before
+repair or reissuance, while missing ignored packets alone do not trigger a false
+emergency. Schema-v4 generation, same-generation identity pinning, serialized
+local mutations, and current-main deployment checks resist the reproduced
+rollback paths. This is open-document and deployment-process integrity, not a
+signature or global monotonic trust anchor: a new client served a complete
+same-origin rollback or an intentional current-main revert cannot infer a newer
+state, so external Form shutdown remains the first stop rule. No external
+review, legal, tax, payment, privacy, fiscal, or launch gate was claimed
+complete, and tracked `liveMode` remains false.

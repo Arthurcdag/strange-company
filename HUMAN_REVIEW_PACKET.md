@@ -16,8 +16,11 @@ Keep `EXTERNAL_LIVE_PACKET.local.json` local and uncommitted.
 Keep `LIVE_REVIEW_CLOSURE.local.json` local and uncommitted. Its schema-v2
 document digests bind each approval to the exact normalized bytes reviewed;
 regenerate and repeat human review whenever a required document changes.
-The resulting public receipt uses schema v3 and replaces the former two-file
+The resulting public receipt uses schema v4 and replaces the former two-file
 legal core with an exact `reviewDocuments` map for all nine canonical paths.
+Its monotonic public generation advances on issuance and revocation; local
+mutations are serialized, and an open browser cannot accept an older generation
+or a different receipt identity at the same observed generation.
 Each runtime digest uses `STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1`, the
 canonical path, and BOM-stripped, LF-normalized UTF-8 text. The map contains
 only public document digests; it never contains private packet hashes.
@@ -25,7 +28,7 @@ only public document digests; it never contains private packet hashes.
 ## Nine-Document Runtime Ledger
 
 Every file below must be present in the deployed bundle, match the human-review
-closure, and match the browser-recomputed schema-v3 receipt digest:
+closure, and match the browser-recomputed schema-v4 receipt digest:
 
 - `TERMOS.md`
 - `TERMS.md`
@@ -196,6 +199,12 @@ Use this section every time the project advances one review gate:
 
 If any item fails, keep `liveMode: false`, record the failure, and repeat the same checklist.
 
+If a gate fails after `liveMode` is already true, disable external Form
+responses first. Run `node tools/render_public_live_shutdown_patch.js`, apply
+only its blank `googleFormUrl`, false `googleFormVerified`, and false `liveMode`
+values, revoke the receipt, run the deployment preflight, and publish the closed
+config plus placeholder together before repairing or reissuing evidence.
+
 Use ISO dates: `YYYY-MM-DD`. Review dates must be the real human review dates and
 cannot be in the future. Support received/replied and Google Form test times must
 be ISO-8601 UTC timestamps ending in `Z`, correctly ordered, and no older than 30
@@ -255,7 +264,7 @@ If any command fails, keep `liveMode: false`. If all pass and status has no hard
 
 Stop and keep live intake closed if:
 
-- any of the nine required review documents changed after review and the schema-v2 closure digest plus schema-v3 public receipt were not regenerated and re-reviewed,
+- any of the nine required review documents changed after review and the schema-v2 closure digest plus schema-v4 public receipt were not regenerated and re-reviewed,
 - CNPJ/entity, NFS-e, fiscal receipt, payment, or LGPD route is uncertain,
 - Stripe or bank evidence is missing,
 - AI-generated legal/compliance text is being treated as final human approval,

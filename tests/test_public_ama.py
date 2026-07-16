@@ -235,6 +235,7 @@ def recompute_receipt_digests(receipt: dict[str, object]) -> dict[str, object]:
     ).hexdigest()
     envelope = {
         "schemaVersion": receipt["schemaVersion"],
+        "generation": receipt["generation"],
         "mode": receipt["mode"],
         "status": receipt["status"],
         "issuedAt": receipt["issuedAt"],
@@ -245,12 +246,14 @@ def recompute_receipt_digests(receipt: dict[str, object]) -> dict[str, object]:
     }
     envelope_json = json.dumps(envelope, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
     receipt["envelopeSha256"] = hashlib.sha256(
-        f"STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3\n{envelope_json}".encode("utf-8")
+        f"STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V4\n{envelope_json}".encode("utf-8")
     ).hexdigest()
     return receipt
 
 
-def issued_receipt(config: dict[str, object]) -> dict[str, object]:
+def issued_receipt(
+    config: dict[str, object], generation: int = 1
+) -> dict[str, object]:
     core = {
         "operatorName": config["operatorName"],
         "jurisdiction": config["jurisdiction"],
@@ -275,7 +278,8 @@ def issued_receipt(config: dict[str, object]) -> dict[str, object]:
     issued_at = datetime.now(timezone.utc).replace(microsecond=0)
     valid_until = issued_at + timedelta(days=7)
     receipt = {
-        "schemaVersion": 3,
+        "schemaVersion": 4,
+        "generation": generation,
         "mode": "public",
         "status": "local_packet_validators_passed",
         "issuedAt": issued_at.isoformat(timespec="milliseconds").replace("+00:00", "Z"),
@@ -296,6 +300,26 @@ def issued_receipt(config: dict[str, object]) -> dict[str, object]:
         },
     }
     return recompute_receipt_digests(receipt)
+
+
+def placeholder_receipt(
+    config: dict[str, object], generation: int
+) -> dict[str, object]:
+    receipt = issued_receipt(config, generation)
+    receipt["status"] = "not_issued"
+    receipt["issuedAt"] = ""
+    receipt["validUntil"] = ""
+    receipt["coreSha256"] = ""
+    receipt["envelopeSha256"] = ""
+    for field in (
+        "localPacketValidatorsPassed",
+        "liveReviewClosureValidatorPassed",
+        "reviewerCandidateTrackerReady",
+        "deliveryReviewChecklistReady",
+        "operationalValidatorsPassed",
+    ):
+        receipt["attestations"][field] = False
+    return receipt
 
 
 class PublicAmaTests(unittest.TestCase):
@@ -342,9 +366,10 @@ class PublicAmaTests(unittest.TestCase):
         self.assertIn("5000", js)
         self.assertIn('"STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1"', js)
         self.assertIn("Promise.all(PUBLIC_REVIEW_DOCUMENT_PATHS.map", js)
-        self.assertIn("receipt.schemaVersion === 3", js)
+        self.assertIn("receipt.schemaVersion === 4", js)
+        self.assertIn("HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION", js)
         self.assertIn("STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2", js)
-        self.assertIn("STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3", js)
+        self.assertIn("STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V4", js)
         self.assertIn("window.PUBLIC_AMA_ANSWERS", PUBLIC_AMA_ANSWERS_JS.read_text(encoding="utf-8"))
 
     def test_paid_order_desk_fails_closed_and_hands_off_to_ama(self) -> None:
@@ -608,10 +633,140 @@ class PublicAmaTests(unittest.TestCase):
         self.assertFalse(after_revalidation["receiptReady"])
         self.assertFalse(after_revalidation["liveReady"])
 
+    def test_open_page_generation_high_water_rejects_post_revoke_replay(self) -> None:
+        config = ready_public_config(live_mode=True)
+        active_one = issued_receipt(config, generation=1)
+        revoked_two = placeholder_receipt(config, generation=2)
+        active_three = issued_receipt(config, generation=3)
+
+        outcome = run_browser_refresh_probe(
+            [active_one, revoked_two, active_one, active_three],
+            """
+              await context.refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+              const afterIssue = context.publicReadinessModel();
+              await context.refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+              const afterRevoke = context.publicReadinessModel();
+              await context.refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+              const afterReplay = context.publicReadinessModel();
+              await context.refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+              const afterNewIssue = context.publicReadinessModel();
+              const highWater = vm.runInContext("HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION", context);
+              process.stdout.write(JSON.stringify({
+                afterIssue,
+                afterRevoke,
+                afterReplay,
+                afterNewIssue,
+                highWater,
+                receiptFetches,
+                documentFetches
+              }));
+            """,
+            config=config,
+        )
+
+        self.assertTrue(outcome["afterIssue"]["liveReady"])
+        self.assertFalse(outcome["afterRevoke"]["liveReady"])
+        self.assertFalse(outcome["afterReplay"]["receiptReady"])
+        self.assertFalse(outcome["afterReplay"]["liveReady"])
+        self.assertTrue(outcome["afterNewIssue"]["liveReady"])
+        self.assertEqual(outcome["highWater"], 3)
+        self.assertEqual(outcome["receiptFetches"], 4)
+        self.assertEqual(outcome["documentFetches"], 18)
+
+    def test_loaded_placeholder_generation_blocks_older_and_same_generation_active_receipts(self) -> None:
+        config = ready_public_config(live_mode=True)
+        revoked_two = placeholder_receipt(config, generation=2)
+        active_one = issued_receipt(config, generation=1)
+        active_two = issued_receipt(config, generation=2)
+        active_three = issued_receipt(config, generation=3)
+
+        outcome = run_browser_refresh_probe(
+            [revoked_two, active_one, active_two, active_three],
+            """
+              await context.refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+              const afterLoadedPlaceholder = context.publicReadinessModel();
+              await context.refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+              const afterOldActive = context.publicReadinessModel();
+              await context.refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+              const afterSameGenerationActive = context.publicReadinessModel();
+              await context.refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+              const afterNewActive = context.publicReadinessModel();
+              const highWater = vm.runInContext("HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION", context);
+              process.stdout.write(JSON.stringify({
+                afterLoadedPlaceholder,
+                afterOldActive,
+                afterSameGenerationActive,
+                afterNewActive,
+                highWater,
+                receiptFetches,
+                documentFetches
+              }));
+            """,
+            config=config,
+        )
+
+        self.assertFalse(outcome["afterLoadedPlaceholder"]["liveReady"])
+        self.assertFalse(outcome["afterOldActive"]["receiptReady"])
+        self.assertFalse(outcome["afterOldActive"]["liveReady"])
+        self.assertFalse(outcome["afterSameGenerationActive"]["receiptReady"])
+        self.assertFalse(outcome["afterSameGenerationActive"]["liveReady"])
+        self.assertTrue(outcome["afterNewActive"]["liveReady"])
+        self.assertEqual(outcome["highWater"], 3)
+        self.assertEqual(outcome["receiptFetches"], 4)
+        self.assertEqual(outcome["documentFetches"], 9)
+
+    def test_same_generation_active_fork_is_rejected_but_exact_repeat_is_allowed(self) -> None:
+        config = ready_public_config(live_mode=True)
+        active_one = issued_receipt(config, generation=1)
+        fork_one = issued_receipt(config, generation=1)
+        fork_time = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(minutes=3)
+        fork_one["issuedAt"] = fork_time.isoformat(timespec="milliseconds").replace(
+            "+00:00", "Z"
+        )
+        fork_one["validUntil"] = (fork_time + timedelta(days=7)).isoformat(
+            timespec="milliseconds"
+        ).replace("+00:00", "Z")
+        recompute_receipt_digests(fork_one)
+        active_two = issued_receipt(config, generation=2)
+
+        outcome = run_browser_refresh_probe(
+            [active_one, active_one, fork_one, active_two],
+            """
+              await context.refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+              const afterInitial = context.publicReadinessModel();
+              await context.refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+              const afterExactRepeat = context.publicReadinessModel();
+              await context.refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+              const afterFork = context.publicReadinessModel();
+              await context.refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+              const afterHigherGeneration = context.publicReadinessModel();
+              const identity = vm.runInContext("HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY", context);
+              process.stdout.write(JSON.stringify({
+                afterInitial,
+                afterExactRepeat,
+                afterFork,
+                afterHigherGeneration,
+                identity,
+                receiptFetches,
+                documentFetches
+              }));
+            """,
+            config=config,
+        )
+
+        self.assertTrue(outcome["afterInitial"]["liveReady"])
+        self.assertTrue(outcome["afterExactRepeat"]["liveReady"])
+        self.assertFalse(outcome["afterFork"]["receiptReady"])
+        self.assertFalse(outcome["afterFork"]["liveReady"])
+        self.assertTrue(outcome["afterHigherGeneration"]["liveReady"])
+        self.assertTrue(outcome["identity"].endswith(active_two["envelopeSha256"]))
+        self.assertEqual(outcome["receiptFetches"], 4)
+        self.assertEqual(outcome["documentFetches"], 27)
+
     def test_receipt_refresh_coalesces_and_bounds_document_rechecks(self) -> None:
         config = ready_public_config(live_mode=True)
         active_receipt = issued_receipt(config)
-        changed_receipt = issued_receipt(config)
+        changed_receipt = issued_receipt(config, generation=2)
         changed_issued_at = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(minutes=2)
         changed_receipt["issuedAt"] = changed_issued_at.isoformat(timespec="milliseconds").replace("+00:00", "Z")
         changed_receipt["validUntil"] = (changed_issued_at + timedelta(days=7)).isoformat(

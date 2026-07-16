@@ -75,7 +75,7 @@ node tools/export_public_live_receipt.js --live-review-closure LIVE_REVIEW_CLOSU
 node tools/export_public_live_receipt.js --check-public-js --require-issued
 ```
 
-The receipt contains only the already-public config snapshot, process attestations, an exact schema-v3 `reviewDocuments` map of canonical-path SHA-256 hashes for all nine reviewed files, and integrity digests for both the public core and the full envelope. It contains neither private packet data nor hashes of private packets. The browser refetches and recomputes every reviewed document with the shared `STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1` path-bound domain; any missing file, extra or substituted map key, envelope edit, reviewed-copy drift, config change other than the final `liveMode` flip, or expiry after seven days closes the paid desk. This is a time-limited process receipt, not external certification, a signature, or proof that a particular operator ran the validators.
+The receipt contains only the already-public config snapshot, process attestations, a monotonic generation, an exact schema-v4 `reviewDocuments` map of canonical-path SHA-256 hashes for all nine reviewed files, and integrity digests for both the public core and the full envelope. It contains neither private packet data nor hashes of private packets. An output-scoped exclusive lock serializes local issue/revoke mutations. The browser refetches and recomputes every reviewed document with the shared `STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1` path-bound domain; any missing file, extra or substituted map key, lower already-observed generation, different identity at the same generation, envelope edit, reviewed-copy drift, config change other than the final `liveMode` flip, or expiry after seven days closes the paid desk. This is a time-limited process receipt, not external certification, a signature, or proof that a particular operator ran the validators.
 
 ## Launch Gate Evidence Panel
 
@@ -214,6 +214,10 @@ Response setup:
 Do not depend on Google Forms `entry.*` IDs in the public site. The public page should open the form and provide a copyable packet; it should not auto-submit customer data.
 The receipt gates only the static site. It cannot disable an external Form reached
 through a direct or previously shared URL, so the human operator owns that toggle.
+On any post-flip gate failure, disable Form responses first, run
+`node tools/render_public_live_shutdown_patch.js`, apply its three fail-closed
+public values, revoke the receipt, and deploy the closed config and placeholder
+together before rebuilding readiness.
 
 ## 4. Nine-Document Human Review Binding
 
@@ -247,7 +251,7 @@ dates, rerun it with `--public-config public-config.js`. If any required documen
 changes, the digest check must fail until the packet is regenerated and the
 changed material is reviewed again. After closure validation, receipt issuance
 independently recomputes all nine public-domain digests from the canonical
-document bytes and stores them in the schema-v3 `reviewDocuments` core; it does
+document bytes and stores them in the schema-v4 `reviewDocuments` core; it does
 not copy digest values out of the private closure packet. The deployed browser
 must be able to fetch all nine paths. Then set:
 

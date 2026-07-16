@@ -34,7 +34,7 @@ For exact Google Form questions, Sheet headers, support inbox checks, Stripe evi
 12. Run `node tools/preflight_public_launch.js`.
 13. Run `node tools/evolution_goal_status.js --json` and stop if any hard, public-route, or operational blocker remains.
 14. After a separate human decision, change only `liveMode` to `true`, then run `node tools/preflight_public_launch.js --deployment` before publication.
-15. Open `public.html` locally and confirm the readiness banner says `Live intake configured`.
+15. Build and serve the public bundle over HTTP: run `node tools/build_public_site.js --check --output .public-site-build.local --force`, then `python -m http.server 8000 --directory .public-site-build.local` and open `http://localhost:8000/`. Alternatively, verify the deployed Pages URL. Confirm the readiness banner says `Live intake configured`; a direct `file://` open cannot complete the receipt and reviewed-document fetch checks.
 16. Submit a safe test packet.
 17. Confirm the email draft uses the real inbox.
 18. Open the Google Form from the public packet output and paste the packet.
@@ -55,8 +55,11 @@ For exact Google Form questions, Sheet headers, support inbox checks, Stripe evi
 
 Do not use the public page for real customers if the support inbox, LGPD contact path, Google Form, ledger Sheet, terms review, privacy review, Brazilian entity/CNPJ route, tax/NFS-e route, payment provider, or business bank/payment account is missing.
 
-For a stop or receipt expiry, disable external Form responses first. Set
-`liveMode: false`, clear the Form URL/verified flag, run
+For a stop or receipt expiry, disable external Form responses first. Capture
+the complete sequence, run `node tools/render_public_live_shutdown_patch.js`,
+apply only its three fail-closed config values, then run
 `node tools/export_public_live_receipt.js --revoke --public-config
 public-config.js --output public-live-receipt.js`, run the deployment preflight,
-and publish the closed config plus placeholder together.
+build the public bundle, and publish the closed config plus placeholder
+together. Verify Pages is closed and only then rerun status from the closed
+state; do not pause for a mid-recovery status recommendation.

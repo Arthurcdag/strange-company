@@ -36,6 +36,7 @@ jobs:
           node --check tools/check_live_review_closure_conformance.js
           node --check tools/draft_live_review_closure.js
           node --check tools/render_live_review_public_config_patch.js
+          node --check tools/render_public_live_shutdown_patch.js
           node --check tools/export_public_live_receipt.js
           node --check tools/draft_reviewer_candidate_tracker.js
           node --check tools/draft_revenue_setup_evidence_index.js
@@ -73,6 +74,7 @@ jobs:
           node tools/evolution_goal_status.js --json
           node tools/local_evidence_status.js --json
           node tools/check_live_review_closure_conformance.js
+          node tools/render_public_live_shutdown_patch.js --json
           node tools/generate_evolution_next_packet.js
           node tools/build_public_site.js --check --output .public-site-build.local --force
           node tools/preflight_public_launch.js --deployment

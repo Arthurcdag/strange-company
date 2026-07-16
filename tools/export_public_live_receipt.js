@@ -208,6 +208,13 @@ function requireBoolean(value, label) {
   return value;
 }
 
+function requirePositiveSafeInteger(value, label) {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    fail(`${label} must be a positive safe integer.`);
+  }
+  return value;
+}
+
 function requireIsoDate(value, label, { allowFuture = false } = {}) {
   const text = requireText(value, label);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) fail(`${label} must be YYYY-MM-DD.`);
@@ -409,6 +416,7 @@ function coreDigest(core) {
 function digestableEnvelope(receipt) {
   return canonicalize({
     schemaVersion: receipt.schemaVersion,
+    generation: receipt.generation,
     mode: receipt.mode,
     status: receipt.status,
     issuedAt: receipt.issuedAt,
@@ -423,7 +431,7 @@ function envelopeDigest(receipt) {
   return crypto
     .createHash("sha256")
     .update(
-      `STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3\n${JSON.stringify(digestableEnvelope(receipt))}`,
+      `STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V4\n${JSON.stringify(digestableEnvelope(receipt))}`,
       "utf8"
     )
     .digest("hex");
@@ -513,10 +521,11 @@ function runValidator(label, scriptName, packetPath, validatorArgs) {
   }
 }
 
-function buildReceipt(core) {
+function buildReceipt(core, generation) {
   const issuedAt = new Date();
   const receipt = {
-    schemaVersion: 3,
+    schemaVersion: 4,
+    generation: requirePositiveSafeInteger(generation, "receipt.generation"),
     mode: "public",
     status: ACTIVE_STATUS,
     issuedAt: issuedAt.toISOString(),
@@ -544,9 +553,10 @@ function buildReceipt(core) {
   return completeReceipt;
 }
 
-function buildPlaceholder(core) {
+function buildPlaceholder(core, generation) {
   const receipt = {
-    schemaVersion: 3,
+    schemaVersion: 4,
+    generation: requirePositiveSafeInteger(generation, "receipt.generation"),
     mode: "public",
     status: PLACEHOLDER_STATUS,
     issuedAt: "",
@@ -580,15 +590,89 @@ function renderPublicJavaScript(receipt) {
 
 function loadPublicReceipt(filePath) {
   try {
+    const source = readPublicAssetText(filePath, "public live receipt");
+    if (filePath.toLowerCase().endsWith(".json")) {
+      return JSON.parse(source);
+    }
     const sandbox = { window: {}, Object };
     vm.runInNewContext(
-      readPublicAssetText(filePath, "public live receipt"),
+      source,
       sandbox,
       { filename: filePath }
     );
     return sandbox.window.PUBLIC_LIVE_RECEIPT;
   } catch (error) {
     fail(`Could not load public live receipt ${filePath}: ${error.message}`);
+  }
+}
+
+function nextReceiptGeneration(
+  filePath,
+  { allowLegacyActiveMigration = false } = {}
+) {
+  if (!filePath || !fs.existsSync(filePath)) return 1;
+  const existing = loadPublicReceipt(filePath);
+  let currentGeneration;
+  if (isPlainObject(existing) && existing.schemaVersion === 4) {
+    currentGeneration = requirePositiveSafeInteger(
+      existing.generation,
+      "existing receipt.generation"
+    );
+  } else if (
+    isPlainObject(existing)
+    && existing.schemaVersion === 3
+    && !Object.prototype.hasOwnProperty.call(existing, "generation")
+    && existing.mode === "public"
+    && existing.status === PLACEHOLDER_STATUS
+    && existing.issuedAt === ""
+    && existing.validUntil === ""
+    && existing.coreSha256 === ""
+    && existing.envelopeSha256 === ""
+  ) {
+    // One-time migration for the tracked schema-v3 fail-closed placeholder.
+    currentGeneration = 0;
+  } else if (
+    allowLegacyActiveMigration
+    && isPlainObject(existing)
+    && existing.schemaVersion === 3
+    && !Object.prototype.hasOwnProperty.call(existing, "generation")
+    && existing.mode === "public"
+    && existing.status === ACTIVE_STATUS
+  ) {
+    // Emergency fail-close migration: a legacy active lease has no generation,
+    // so revocation advances it from the migration base 0 to generation 1.
+    currentGeneration = 0;
+  } else {
+    fail(
+      "Existing receipt output must be schema v4, or the schema-v3 not_issued placeholder used for migration."
+    );
+  }
+  if (currentGeneration >= Number.MAX_SAFE_INTEGER) {
+    fail("Existing receipt generation cannot be incremented safely.");
+  }
+  return currentGeneration + 1;
+}
+
+function withReceiptMutationLock(filePath, operation) {
+  if (!filePath) return operation();
+  const lockPath = `${filePath}.lock`;
+  let descriptor;
+  try {
+    descriptor = fs.openSync(lockPath, "wx", 0o600);
+  } catch (error) {
+    if (error && error.code === "EEXIST") {
+      fail(`Receipt mutation lock already exists: ${lockPath}`);
+    }
+    fail(`Could not acquire receipt mutation lock ${lockPath}: ${error.message}`);
+  }
+  try {
+    return operation();
+  } finally {
+    try {
+      fs.closeSync(descriptor);
+    } finally {
+      fs.rmSync(lockPath, { force: true });
+    }
   }
 }
 
@@ -662,6 +746,7 @@ function validateReceipt(receipt, currentCore) {
     receipt,
     [
       "schemaVersion",
+      "generation",
       "mode",
       "status",
       "issuedAt",
@@ -673,7 +758,8 @@ function validateReceipt(receipt, currentCore) {
     ],
     "public live receipt"
   );
-  if (receipt.schemaVersion !== 3) fail("public live receipt schemaVersion must be 3.");
+  if (receipt.schemaVersion !== 4) fail("public live receipt schemaVersion must be 4.");
+  requirePositiveSafeInteger(receipt.generation, "receipt.generation");
   if (receipt.mode !== "public") fail("public live receipt mode must be public.");
   if (![PLACEHOLDER_STATUS, ACTIVE_STATUS].includes(receipt.status)) {
     fail(`public live receipt status must be ${PLACEHOLDER_STATUS} or ${ACTIVE_STATUS}.`);
@@ -830,9 +916,15 @@ try {
     if (currentCore.flags.liveMode !== false) {
       fail("Refusing to revoke the public live receipt until public-config.js liveMode is false.");
     }
-    const receipt = buildPlaceholder(currentCore);
-    validateReceipt(receipt, currentCore);
-    writeReceipt(outputPath, receipt, true);
+    const receipt = withReceiptMutationLock(outputPath, () => {
+      const nextGeneration = nextReceiptGeneration(outputPath, {
+        allowLegacyActiveMigration: true,
+      });
+      const nextReceipt = buildPlaceholder(currentCore, nextGeneration);
+      validateReceipt(nextReceipt, currentCore);
+      writeReceipt(outputPath, nextReceipt, true);
+      return nextReceipt;
+    });
     if (asJson) {
       process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
     } else {
@@ -889,8 +981,11 @@ try {
       deliveryReviewChecklistPath,
       ["--require-ready"]
     );
-    const receipt = buildReceipt(currentCore);
-    if (outputPath) writeReceipt(outputPath, receipt);
+    const receipt = withReceiptMutationLock(outputPath, () => {
+      const nextReceipt = buildReceipt(currentCore, nextReceiptGeneration(outputPath));
+      if (outputPath) writeReceipt(outputPath, nextReceipt);
+      return nextReceipt;
+    });
     if (asJson) {
       process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
     } else {

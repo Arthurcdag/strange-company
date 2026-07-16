@@ -19,14 +19,22 @@ from tools.vau_company_evolution import (
     live_review_dates_ready,
     operational_blockers,
     public_live_ready,
+    public_runtime_ready,
     recommended_next_actions,
+    reissuance_ready,
     run_cycle,
     generate_company_events,
     simulate_company_futures,
     update_futures_with_real_event,
     create_initial_future,
 )
-from tests.test_evolution_goal_status import live_review_ready_payload, valid_external_live_payload
+from tests.test_evolution_goal_status import (
+    issue_public_live_receipt,
+    live_review_ready_payload,
+    valid_external_live_payload,
+    write_ready_local_lanes,
+    write_temp_config,
+)
 from tests.test_revenue_setup_evidence_index import valid_evidence_payload
 from tests.test_reviewer_candidate_tracker import candidate as reviewer_candidate
 from tests.test_public_live_receipt import generation_args, ready_files, run_exporter
@@ -885,6 +893,101 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         self.assertFalse(public_live_ready(state))
         self.assertNotIn("controlled_pilot_request_qualified", event_names)
         self.assertNotIn("live_mode_ready_for_human_flip", event_names)
+
+    def test_live_valid_receipt_operates_without_local_reissuance_packets(self) -> None:
+        issuance_config = write_temp_config(
+            terms="2026-06-12",
+            privacy="2026-06-12",
+            brazil="2026-06-12",
+            ai_handoff="2026-06-12",
+        )
+        runtime_config = write_temp_config(
+            terms="2026-06-12",
+            privacy="2026-06-12",
+            brazil="2026-06-12",
+            ai_handoff="2026-06-12",
+            live_mode="true",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            write_ready_local_lanes(tmp, reviewers=True, delivery=True)
+            receipt = issue_public_live_receipt(tmp, issuance_config)
+            for evidence_path in folder.glob("*.local.json"):
+                evidence_path.unlink()
+            state = build_current_state(
+                runtime_config,
+                reviewer_tracker=folder / "REVIEWER_CANDIDATE_TRACKER.local.json",
+                revenue_evidence_index=folder / "REVENUE_SETUP_EVIDENCE_INDEX.local.json",
+                external_live_packet=folder / "EXTERNAL_LIVE_PACKET.local.json",
+                public_live_receipt=receipt,
+                delivery_review_checklist=folder / "DELIVERY_REVIEW_CHECKLIST.local.json",
+                live_review_closure=folder / "LIVE_REVIEW_CLOSURE.local.json",
+            )
+
+        events = generate_company_events(create_initial_future(state)[0])
+        event_names = {event.name for event in events}
+        result = run_cycle(state, depth=1, max_branches_to_keep=8)
+
+        self.assertTrue(public_runtime_ready(state))
+        self.assertFalse(reissuance_ready(state))
+        self.assertTrue(public_live_ready(state))
+        self.assertTrue(company_operational_ready(state))
+        self.assertIn("humanReviewClosureEvidence", hard_blockers(state))
+        self.assertIn("private payment/fiscal evidence", hard_blockers(state))
+        self.assertIn("private external live evidence", hard_blockers(state))
+        self.assertIn("4 human reviewers", operational_blockers(state))
+        self.assertIn("delivery review loop", operational_blockers(state))
+        self.assertEqual(continuous_evolution_goal(state)["current_mode"], "operate_measure_adapt")
+        self.assertNotIn("live_mode_recovery_required", event_names)
+        self.assertNotIn("public_live_receipt_issued", event_names)
+        self.assertTrue(result["public_runtime_ready"])
+        self.assertFalse(result["reissuance_ready"])
+        self.assertTrue(result["public_live_ready"])
+        self.assertNotEqual(
+            result["recommended_next_actions"][0]["events"],
+            ["live_mode_recovery_required"],
+        )
+
+    def test_live_mode_with_missing_receipt_prioritizes_fail_closed_recovery(self) -> None:
+        state = build_current_state(
+            write_public_config(
+                terms="2026-05-25",
+                privacy="2026-05-25",
+                brazil="2026-05-25",
+                ai_handoff="2026-05-25",
+            ),
+            write_reviewer_tracker([]),
+        )
+        state["gates"].update(
+            privatePaymentFiscalEvidenceReady=True,
+            privateExternalLiveEvidenceReady=True,
+            publicLiveReceiptReady=False,
+            liveReviewClosureReady=True,
+            humanReviewersReady=True,
+            deliveryReviewLoopReady=True,
+            liveMode=True,
+        )
+        state["evidence"]["liveReviewClosure"] = LIVE_REVIEW_CLOSURE_EVIDENCE
+        state["metrics"]["human_reviewers_found"] = 4
+
+        normalized = create_initial_future(state)[0]
+        events = generate_company_events(normalized)
+        event_names = {event.name for event in events}
+        recovery = next(event for event in events if event.name == "live_mode_recovery_required")
+        result = run_cycle(state, depth=1, max_branches_to_keep=8)
+
+        self.assertEqual(continuous_evolution_goal(state)["current_mode"], "recover_fail_closed")
+        self.assertIn("live_mode_recovery_required", event_names)
+        self.assertNotIn("public_live_receipt_issued", event_names)
+        self.assertNotIn("live_mode_correctly_stays_closed", event_names)
+        self.assertIn("top_priority", recovery.tags)
+        self.assertFalse(recovery.state_delta["gates.liveMode"])
+        self.assertIn("render_public_live_shutdown_patch.js", recovery.next_action)
+        self.assertTrue(result["recommended_next_actions"])
+        self.assertEqual(
+            result["recommended_next_actions"][0]["events"],
+            ["live_mode_recovery_required"],
+        )
 
     def test_legal_document_drift_invalidates_vau_receipt_gate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

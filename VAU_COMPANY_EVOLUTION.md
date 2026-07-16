@@ -10,7 +10,7 @@ The company-level loop models:
 - Brazil/legal/privacy/AI handoff review status
 - private payment and fiscal evidence readiness
 - private external support, Google, Stripe, bank, and review evidence readiness
-- public-only schema-v3 live receipt readiness, bound to the current public config plus the exact nine-path `reviewDocuments` digest map
+- public-only schema-v4 live receipt readiness, bound to the current public config plus the exact nine-path `reviewDocuments` digest map and a monotonic issue/revoke generation
 - delivery review loop readiness
 - revenue pilot flow
 - support, tooling, and risk pressure
@@ -29,6 +29,7 @@ The current mode changes with evidence:
 - `burn_down_hard_blockers`: real legal, tax, payment, privacy, Brazil, or AI handoff evidence is still missing.
 - `harden_operations`: hard blockers are closed, but reviewer capacity, delivery review, or support receipts still need hardening.
 - `ready_for_human_live_decision`: the system looks ready, but a human still has to decide before `liveMode` changes.
+- `recover_fail_closed`: `liveMode` is true while at least one readiness gate is open; disable external responses and deploy the closed config plus revoked receipt before any repair or reissuance.
 - `operate_measure_adapt`: live operation is already on, so every outcome must become a reviewed receipt before scaling.
 
 Constant evolution does not mean constant launch. If evidence is missing, the
@@ -103,6 +104,15 @@ Operational blockers also matter before scaling:
 
 If these are not complete, the correct VAU evolution is to keep `liveMode`
 closed and burn down blockers.
+
+If they become incomplete after `liveMode` is true, VAU suppresses receipt
+issuance and ranks `live_mode_recovery_required` first. Run
+`node tools/render_public_live_shutdown_patch.js`, apply its output, revoke and
+deploy the closed receipt/config state, then rerun VAU from `liveMode: false`.
+VAU treats the current live config plus valid public receipt/documents as
+`public_runtime_ready`; the ignored private packets remain a separate
+`reissuance_ready` concern. Their absence in a clean CI or Pages checkout alone
+does not trigger emergency shutdown.
 
 ## Reality Correction
 

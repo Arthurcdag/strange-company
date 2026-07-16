@@ -201,11 +201,15 @@ Pause intake and set `liveMode: false` if any of these happen:
 Record the event as an incident before resuming.
 
 Disable Google Form response collection before the rollback. Clear
-`googleFormUrl`, set `googleFormVerified: false`, run
+`googleFormUrl`, set `googleFormVerified: false`, and set `liveMode: false` by
+running `node tools/render_public_live_shutdown_patch.js` and applying only its
+three output values. Then run
 `node tools/export_public_live_receipt.js --revoke --public-config
 public-config.js --output public-live-receipt.js`, run
-`node tools/preflight_public_launch.js --deployment`, and publish the closed
-config plus placeholder together. The static receipt cannot close a direct
+`node tools/preflight_public_launch.js --deployment`, build the public bundle,
+and publish the closed config plus placeholder together. Verify Pages is closed
+and only then rerun status from the closed state. Finish this captured sequence
+without pausing after the config patch; the static receipt cannot close a direct
 external Form link by itself.
 
 ## Next Action

@@ -862,17 +862,39 @@ def operational_blockers(state: dict[str, Any]) -> list[str]:
     return blockers
 
 
-def public_live_ready(state: dict[str, Any]) -> bool:
+def public_runtime_ready(state: dict[str, Any]) -> bool:
     gates = state.get("gates", {})
-    return (
-        gates.get("supportInboxVerified", False)
-        and gates.get("googleFormVerified", False)
-        and not hard_blockers(state)
+    return all(
+        gates.get(gate, False)
+        for gate in (
+            "supportInboxVerified",
+            "googleFormVerified",
+            "termsReviewed",
+            "privacyReviewed",
+            "brazilComplianceReviewed",
+            "aiHandoffReviewed",
+            "publicLiveReceiptReady",
+        )
     )
 
 
+def reissuance_ready(state: dict[str, Any]) -> bool:
+    gates = state.get("gates", {})
+    return bool(
+        gates.get("supportInboxVerified", False)
+        and gates.get("googleFormVerified", False)
+        and not operational_blockers(state)
+    )
+
+
+def public_live_ready(state: dict[str, Any]) -> bool:
+    if bool(get_path(state, "gates.liveMode", False)):
+        return public_runtime_ready(state)
+    return reissuance_ready(state)
+
+
 def company_operational_ready(state: dict[str, Any]) -> bool:
-    return public_live_ready(state) and not operational_blockers(state)
+    return public_live_ready(state)
 
 
 def continuous_evolution_goal(state: dict[str, Any]) -> dict[str, Any]:
@@ -886,15 +908,25 @@ def continuous_evolution_goal(state: dict[str, Any]) -> dict[str, Any]:
     )
     live_mode = bool(get_path(state, "gates.liveMode", False))
 
-    if setup_hard:
+    if live_mode:
+        if not public_runtime_ready(state):
+            mode = "recover_fail_closed"
+            next_loop = (
+                "Disable external responses, deploy the fail-closed config and receipt, "
+                "then rebuild readiness."
+            )
+        else:
+            mode = "operate_measure_adapt"
+            next_loop = (
+                "Convert each live outcome into a reviewed receipt, rebuild reissuance "
+                "evidence as needed, then scale, revise, or kill the lane."
+            )
+    elif setup_hard:
         mode = "burn_down_hard_blockers"
         next_loop = "Close one real evidence gate, rerun VAU, and keep liveMode false."
     elif not public_routes_ready or operational:
         mode = "harden_operations"
         next_loop = "Improve public route verification, reviewer capacity, delivery review, or support receipts before scaling."
-    elif live_mode:
-        mode = "operate_measure_adapt"
-        next_loop = "Convert each live outcome into a reviewed receipt, then scale, revise, or kill the lane."
     else:
         mode = "ready_for_human_live_decision"
         next_loop = "Run the live audit and require a human operator decision before flipping liveMode."
@@ -905,7 +937,7 @@ def continuous_evolution_goal(state: dict[str, Any]) -> dict[str, Any]:
         "current_mode": mode,
         "next_loop": next_loop,
         "guardrails": [
-            "Do not set liveMode true until all hard blockers are closed with real evidence.",
+            "Do not set liveMode true until reissuance readiness passes; once live, fail closed only if public runtime readiness fails.",
             "Do not let simulations, templates, or AI outputs claim legal, tax, payment, privacy, or launch approval.",
             "Keep local evidence, credentials, private reviewer notes, and sealed-company material out of the public repo.",
             "Every evolution should leave an executable check, receipt, report, or documented next action.",
@@ -926,6 +958,30 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
     pilots = int(get_path(state, "metrics.pilot_requests", 0))
     tooling = int(get_path(state, "metrics.tooling_maturity", 2))
     live_mode = bool(get_path(state, "gates.liveMode", False))
+
+    if live_mode and not public_runtime_ready(state):
+        events.append(
+            CompanyEvent(
+                name="live_mode_recovery_required",
+                domain="governance",
+                probability_hint=0.99,
+                strategic_value=3.0,
+                tags=("top_priority", "safe_block", "governance", "manual", "recovery"),
+                state_delta={"gates.liveMode": False},
+                requires_real_evidence=True,
+                reason=(
+                    "A live config with an invalid public runtime gate or issued receipt "
+                    "must return to a deployed fail-closed state before evidence repair "
+                    "or receipt issuance."
+                ),
+                next_action=(
+                    "Disable external Google Form responses, run node "
+                    "tools/render_public_live_shutdown_patch.js, apply only its fail-closed "
+                    "public config values, revoke public-live-receipt.js, run the deployment "
+                    "preflight, and publish the closed config and receipt together."
+                ),
+            )
+        )
 
     if any(
         blocker in hard
@@ -1041,6 +1097,7 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
 
     if (
         "public live readiness receipt" in hard
+        and not live_mode
         and get_path(state, "gates.privatePaymentFiscalEvidenceReady", False)
         and get_path(state, "gates.privateExternalLiveEvidenceReady", False)
         and live_review_closure_config_bound(state)
@@ -1206,7 +1263,7 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
             )
         )
 
-    if blockers:
+    if blockers and not live_mode:
         events.append(
             CompanyEvent(
                 name="live_mode_correctly_stays_closed",
@@ -1524,6 +1581,8 @@ def run_cycle(
         "hard_blockers": hard_blockers(current_state),
         "operational_blockers": operational_blockers(current_state),
         "public_live_ready": public_live_ready(current_state),
+        "public_runtime_ready": public_runtime_ready(current_state),
+        "reissuance_ready": reissuance_ready(current_state),
         "company_operational_ready": company_operational_ready(current_state),
         "predicted_futures": [future.to_dict() for future in predicted],
         "recommended_next_actions": recommended_next_actions(predicted),
@@ -1603,6 +1662,8 @@ def main() -> int:
         print(f"  - {guardrail}")
     print("")
     print(f"Public live ready: {result['public_live_ready']}")
+    print(f"Public runtime ready: {result['public_runtime_ready']}")
+    print(f"Reissuance ready: {result['reissuance_ready']}")
     print(f"Company operational ready: {result['company_operational_ready']}")
     print("Hard blockers:")
     for blocker in result["hard_blockers"]:

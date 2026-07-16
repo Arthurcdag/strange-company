@@ -138,10 +138,11 @@ and live config together, verify Pages, and only then enable external Form respo
 ## 6. Stop Rule
 
 Immediately disable external Form responses and stop sending traffic if any of
-these fail. Then set `liveMode: false`, clear `googleFormUrl`, set
-`googleFormVerified: false`, and revoke the static lease:
+these fail. Then render and apply the exact fail-closed public patch and revoke
+the static lease:
 
 ```bash
+node tools/render_public_live_shutdown_patch.js
 node tools/export_public_live_receipt.js --revoke --public-config public-config.js --output public-live-receipt.js
 node tools/preflight_public_launch.js --deployment
 ```

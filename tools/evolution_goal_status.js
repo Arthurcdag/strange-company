@@ -266,7 +266,40 @@ function selectHandoff({
   operationalBlockers,
   localEvidence,
   liveMode,
+  publicRuntimeReady,
 }) {
+  if (liveMode) {
+    if (!publicRuntimeReady) {
+      return {
+        blockerId: "liveModeRecoveryRequired",
+        laneId: null,
+        laneStatus: "unsafe_live_state",
+        lanePhase: "fail_closed_recovery",
+        priority: "safety_recovery",
+        command: "node tools/render_public_live_shutdown_patch.js",
+        validatorCommand: "node tools/export_public_live_receipt.js --revoke --public-config public-config.js --output public-live-receipt.js",
+        progressAuditCommand: "node tools/evolution_goal_status.js --json",
+        requiresRealEvidence: true,
+        liveModeRemainsFalse: false,
+        currentLiveMode: true,
+        targetLiveMode: false,
+        whyNow: "liveMode is true while the public runtime config or its issued receipt is invalid; fail closed and deploy the closed config before repairing or reissuing evidence.",
+      };
+    }
+    return {
+      blockerId: "liveOperationsReview",
+      laneId: null,
+      laneStatus: "ready",
+      priority: "live_operations",
+      command: "python tools/vau_company_evolution.py --depth 1",
+      validatorCommand: "node tools/survival_check.js",
+      progressAuditCommand: "node tools/evolution_goal_status.js --json",
+      requiresRealEvidence: true,
+      liveModeRemainsFalse: false,
+      whyNow: "The current public runtime and issued receipt remain valid; review live outcomes while rebuilding any missing local packets before a future receipt reissuance.",
+    };
+  }
+
   if (reviewBlockers.length || reviewClosureEvidenceBlockers.length) {
     return laneHandoff(localEvidence, {
       blockerId: REVIEW_CLOSURE_EVIDENCE_BLOCKER,
@@ -367,36 +400,33 @@ function selectHandoff({
     };
   }
 
-  if (!liveMode) {
-    return {
-      blockerId: "humanLiveModeDecision",
-      laneId: null,
-      laneStatus: "ready",
-      priority: "human_decision",
-      command: "node tools/preflight_public_launch.js",
-      validatorCommand: "node tools/evolution_goal_status.js --json",
-      progressAuditCommand: "node tools/survival_check.js",
-      requiresRealEvidence: true,
-      liveModeRemainsFalse: true,
-      whyNow: "Every tracked gate is ready; a human operator must review the public receipt and make the separate liveMode decision.",
-    };
-  }
-
   return {
-    blockerId: "liveOperationsReview",
+    blockerId: "humanLiveModeDecision",
     laneId: null,
     laneStatus: "ready",
-    priority: "live_operations",
-    command: "python tools/vau_company_evolution.py --depth 1",
-    validatorCommand: "node tools/survival_check.js",
-    progressAuditCommand: "node tools/evolution_goal_status.js --json",
+    priority: "human_decision",
+    command: "node tools/preflight_public_launch.js",
+    validatorCommand: "node tools/evolution_goal_status.js --json",
+    progressAuditCommand: "node tools/survival_check.js",
     requiresRealEvidence: true,
-    liveModeRemainsFalse: false,
-    whyNow: "Live mode is active; review real outcomes and receipts before scaling, revising, or stopping the lane.",
+    liveModeRemainsFalse: true,
+    whyNow: "Every tracked gate is ready; a human operator must review the public receipt and make the separate liveMode decision.",
   };
 }
 
-function evolutionMode(hardBlockers, publicRouteBlockers, operationalBlockers, liveMode) {
+function evolutionMode(hardBlockers, publicRouteBlockers, operationalBlockers, liveMode, publicRuntimeReady) {
+  if (liveMode) {
+    if (!publicRuntimeReady) {
+      return {
+        mode: "recover_fail_closed",
+        nextLoop: "Disable external responses, return the public config and receipt to a deployed fail-closed state, then rebuild readiness.",
+      };
+    }
+    return {
+      mode: "operate_measure_adapt",
+      nextLoop: "Convert each live outcome into a reviewed receipt, rebuild reissuance evidence as needed, then scale, revise, or stop the lane.",
+    };
+  }
   if (hardBlockers.length) {
     return {
       mode: "burn_down_hard_blockers",
@@ -407,12 +437,6 @@ function evolutionMode(hardBlockers, publicRouteBlockers, operationalBlockers, l
     return {
       mode: "harden_operations",
       nextLoop: "Improve public route verification, reviewer capacity, delivery review, or support receipts before scaling.",
-    };
-  }
-  if (liveMode) {
-    return {
-      mode: "operate_measure_adapt",
-      nextLoop: "Convert each live outcome into a reviewed receipt, then scale, revise, or stop the lane.",
     };
   }
   return {
@@ -426,8 +450,9 @@ function buildStatus(config, logText, localEvidence, publicLiveReceiptReady) {
   const closureLane = evidenceLane(localEvidenceSummary, "liveReviewClosure");
   const closurePhase = closureLane ? closureLane.phase : "missing";
   const closureEvidenceReady = closurePhase === "config_bound_ready";
+  const publicConfigGateRows = liveGateRows(config).filter((row) => row.id !== "liveMode");
   const evidenceRows = [
-    ...liveGateRows(config).filter((row) => row.id !== "liveMode"),
+    ...publicConfigGateRows,
     {
       id: REVIEW_CLOSURE_EVIDENCE_BLOCKER,
       label: "document-bound human review closure evidence matching the public review dates",
@@ -492,20 +517,38 @@ function buildStatus(config, logText, localEvidence, publicLiveReceiptReady) {
   const closureActions = reviewClosureActions(hardBlockers, closurePhase);
   const passes = evolutionPasses(logText);
   const latestPass = summarizeLatestPass(passes[passes.length - 1]);
+  const publicRuntimeReady = publicConfigGateRows.every((row) => row.passed) && publicLiveReceiptReady;
+  const reissuanceReady = !publicRouteBlockers.length && !hardBlockers.length && !operationalBlockers.length;
+  const publicLiveReady = config.liveMode === true ? publicRuntimeReady : reissuanceReady;
   const modeState = evolutionMode(
     hardBlockers,
     publicRouteBlockers,
     operationalBlockers,
     config.liveMode === true,
+    publicRuntimeReady,
   );
-  const publicLiveReady = !publicRouteBlockers.length && !hardBlockers.length && !operationalBlockers.length;
+  const liveRecoveryActions = config.liveMode === true && !publicRuntimeReady
+    ? [
+      "Disable external Google Form responses before changing repo state.",
+      "Render the fail-closed patch: node tools/render_public_live_shutdown_patch.js.",
+      "Apply only googleFormUrl: \"\", googleFormVerified: false, and liveMode: false to public-config.js.",
+      "Revoke the receipt: node tools/export_public_live_receipt.js --revoke --public-config public-config.js --output public-live-receipt.js.",
+      "Run node tools/preflight_public_launch.js --deployment and node tools/build_public_site.js --check --output .public-site-build.local --force.",
+      "Publish the closed config and fail-closed receipt together, then verify the Pages deployment remains closed.",
+      "Rerun node tools/evolution_goal_status.js --json from the closed state before repairing evidence or issuing another receipt.",
+    ]
+    : [];
   const publicGateRows = [
     ...evidenceRows,
     {
       id: "liveMode",
       label: "live mode is enabled only when verified readiness permits it",
-      passed: config.liveMode !== true || publicLiveReady,
-      nextAction: publicLiveReady
+      passed: config.liveMode !== true || publicRuntimeReady,
+      nextAction: config.liveMode === true && !publicRuntimeReady
+        ? "Disable external responses and deploy a fail-closed config and receipt before rebuilding readiness."
+        : config.liveMode === true
+        ? "Keep monitoring the public runtime and rebuild missing local evidence before the next receipt reissuance."
+        : reissuanceReady
         ? "Require a human operator decision before changing liveMode."
         : "Keep liveMode false until all public and private live gates pass.",
     },
@@ -523,6 +566,7 @@ function buildStatus(config, logText, localEvidence, publicLiveReceiptReady) {
     operationalBlockers,
     localEvidence: localEvidenceSummary,
     liveMode: config.liveMode === true,
+    publicRuntimeReady,
   });
 
   return {
@@ -531,6 +575,8 @@ function buildStatus(config, logText, localEvidence, publicLiveReceiptReady) {
     mode: modeState.mode,
     nextLoop: modeState.nextLoop,
     publicLiveReady,
+    publicRuntimeReady,
+    reissuanceReady,
     companyOperationalReady: publicLiveReady,
     liveMode: config.liveMode === true,
     publicGateRows,
@@ -539,6 +585,7 @@ function buildStatus(config, logText, localEvidence, publicLiveReceiptReady) {
     publicLiveReceiptReady,
     liveReviewClosurePhase: closurePhase,
     selectedHandoff,
+    liveRecoveryActions,
     reviewClosureActions: closureActions,
     reviewClosureEvidenceBlockers,
     revenueBlockers,
@@ -547,18 +594,23 @@ function buildStatus(config, logText, localEvidence, publicLiveReceiptReady) {
     localEvidence: localEvidenceSummary,
     evolutionPassCount: passes.length,
     latestPass,
-    nextActions: [
-      ...(closureActions.length
-        ? closureActions
-        : []),
-      ...publicRouteBlockers.map((blocker) => blocker.nextAction),
-      ...revenueBlockers.map((blocker) => blocker.nextAction),
-      ...externalLiveBlockers.map((blocker) => blocker.nextAction),
-      ...localEvidenceActions,
-      "Run node tools/audit_evolution_log.js after every repo evolution pass.",
-    ],
+    nextActions: liveRecoveryActions.length
+      ? [
+        ...liveRecoveryActions,
+        "Run node tools/audit_evolution_log.js after the fail-closed recovery pass.",
+      ]
+      : [
+        ...(closureActions.length
+          ? closureActions
+          : []),
+        ...publicRouteBlockers.map((blocker) => blocker.nextAction),
+        ...revenueBlockers.map((blocker) => blocker.nextAction),
+        ...externalLiveBlockers.map((blocker) => blocker.nextAction),
+        ...localEvidenceActions,
+        "Run node tools/audit_evolution_log.js after every repo evolution pass.",
+      ],
     guardrails: [
-      "Do not set liveMode true while any hard blocker or private live evidence remains open.",
+      "Do not set liveMode true until reissuance readiness passes; once live, fail closed only if public runtime readiness fails.",
       "Do not commit local evidence packets, credentials, tax IDs, bank data, or customer-private material.",
       "Do not treat simulations, templates, or AI output as legal, tax, payment, privacy, fiscal, or launch approval.",
     ],
@@ -571,6 +623,8 @@ function printText(status) {
   console.log(`Mode: ${status.mode}`);
   console.log(`Next loop: ${status.nextLoop}`);
   console.log(`Public live ready: ${status.publicLiveReady}`);
+  console.log(`Public runtime ready: ${status.publicRuntimeReady}`);
+  console.log(`Reissuance ready: ${status.reissuanceReady}`);
   console.log(`Company operational ready: ${status.companyOperationalReady}`);
   console.log(`liveMode: ${status.liveMode}`);
   console.log(`Live review closure phase: ${status.liveReviewClosurePhase}`);

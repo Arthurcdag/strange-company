@@ -1240,6 +1240,12 @@ function checkEvolutionGoalStatusContract() {
   const readme = read("README.md");
   const evolutionLog = read("EVOLUTION_LOG.md");
   const statusTool = read("tools/evolution_goal_status.js");
+  const shutdownRenderer = read("tools/render_public_live_shutdown_patch.js");
+  const vauCompany = read("tools/vau_company_evolution.py");
+  const humanRevenue = read("HUMAN_REVENUE_INSTRUCTIONS.md");
+  const operatorFastStart = read("OPERATOR_FAST_START.md");
+  const operationsStart = read("OPERATIONS_START_PACKET.md");
+  const livePilot = read("RUN_LIVE_PILOT.md");
   const validateWorkflow = read(".github/workflows/validate.yml");
   const pagesWorkflow = read(".github/workflows/pages.yml");
   const builder = read("tools/build_public_site.js");
@@ -1248,13 +1254,21 @@ function checkEvolutionGoalStatusContract() {
   const required = [
     ["README evolution status tool", readme, "tools/evolution_goal_status.js"],
     ["README evolution status command", readme, "node tools/evolution_goal_status.js --json"],
+    ["README live shutdown renderer", readme, "tools/render_public_live_shutdown_patch.js"],
     ["evolution log status entry", evolutionLog, "Evolution Status Report"],
+    ["evolution log live recovery entry", evolutionLog, "Fail-Closed Live Recovery and Deployment Freshness"],
     ["status system name", statusTool, "STRANGE_COMPANY_EVOLUTION_STATUS"],
     ["status active goal", statusTool, 'goalStatus: "active"'],
     ["status hard blocker mode", statusTool, "burn_down_hard_blockers"],
     ["status revenue blocker", statusTool, "privatePaymentFiscalEvidence"],
     ["status external live blocker", statusTool, "privateExternalLiveEvidence"],
     ["status selected handoff", statusTool, "selectedHandoff"],
+    ["status live recovery mode", statusTool, "recover_fail_closed"],
+    ["status live recovery handoff", statusTool, "liveModeRecoveryRequired"],
+    ["status live recovery actions", statusTool, "liveRecoveryActions"],
+    ["status public runtime readiness", statusTool, "publicRuntimeReady"],
+    ["status reissuance readiness", statusTool, "reissuanceReady"],
+    ["status live shutdown renderer", statusTool, "render_public_live_shutdown_patch.js"],
     ["status review closure actions", statusTool, "reviewClosureActions"],
     ["status review closure local packet", statusTool, "LIVE_REVIEW_CLOSURE.local.json"],
     ["status review closure renderer", statusTool, "render_live_review_public_config_patch.js"],
@@ -1268,6 +1282,22 @@ function checkEvolutionGoalStatusContract() {
     ["status execution workflow", validateWorkflow, "node tools/evolution_goal_status.js --json"],
     ["status pages workflow", pagesWorkflow, "node tools/evolution_goal_status.js --json"],
     ["status public bundle copy", builder, "tools/evolution_goal_status.js"],
+    ["shutdown renderer system", shutdownRenderer, "STRANGE_COMPANY_PUBLIC_LIVE_SHUTDOWN_PATCH"],
+    ["shutdown renderer is output only", shutdownRenderer, "mutatesFiles: false"],
+    ["shutdown renderer clears form URL", shutdownRenderer, 'googleFormUrl: ""'],
+    ["shutdown renderer clears form verification", shutdownRenderer, "googleFormVerified: false"],
+    ["shutdown renderer closes live mode", shutdownRenderer, "liveMode: false"],
+    ["shutdown renderer revocation command", shutdownRenderer, "--revoke --public-config public-config.js"],
+    ["shutdown renderer deployment preflight", shutdownRenderer, "preflight_public_launch.js --deployment"],
+    ["shutdown renderer syntax workflow", validateWorkflow, "node --check tools/render_public_live_shutdown_patch.js"],
+    ["shutdown renderer execution workflow", validateWorkflow, "node tools/render_public_live_shutdown_patch.js --json"],
+    ["shutdown renderer Pages execution", pagesWorkflow, "node tools/render_public_live_shutdown_patch.js --json"],
+    ["shutdown renderer public bundle copy", builder, "tools/render_public_live_shutdown_patch.js"],
+    ["VAU live recovery event", vauCompany, "live_mode_recovery_required"],
+    ["human revenue live shutdown", humanRevenue, "node tools\\render_public_live_shutdown_patch.js"],
+    ["operator fast-start live shutdown", operatorFastStart, "node tools/render_public_live_shutdown_patch.js"],
+    ["operations start live shutdown", operationsStart, "node tools/render_public_live_shutdown_patch.js"],
+    ["live pilot live shutdown", livePilot, "node tools/render_public_live_shutdown_patch.js"],
     ["status survival check", survival, "STRANGE_COMPANY_EVOLUTION_STATUS"],
   ];
 
@@ -1293,6 +1323,8 @@ function checkEvolutionNextPacketContract() {
     ["next packet local target", generator, "EVOLUTION_NEXT_ACTION.local.md"],
     ["next packet status source", generator, "tools/evolution_goal_status.js"],
     ["next packet review closure section", generator, "Review Closure Workflow"],
+    ["next packet live recovery section", generator, "Live Recovery Workflow"],
+    ["next packet live recovery source", generator, "liveRecoveryActions"],
     ["next packet selected handoff section", generator, "Do This Next"],
     ["next packet external live blocker section", generator, "External Live Blockers"],
     ["next packet review closure source", generator, "reviewClosureActions"],
@@ -1381,6 +1413,7 @@ function checkLiveReviewClosureContract() {
     ["human review live closure ready command", humanReview, "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready"],
     ["human review config-bound closure command", humanReview, "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js"],
     ["human review live closure render command", humanReview, "node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json"],
+    ["human review live shutdown command", humanReview, "node tools/render_public_live_shutdown_patch.js"],
     ["evolution log live review entry", evolutionLog, "Live Review Closure Packet"],
     ["live review template schema", template, '"schemaVersion": 2'],
     ["live review template gates", template, '"reviewGates"'],
@@ -1408,16 +1441,21 @@ function checkLiveReviewClosureContract() {
     ["public receipt live review argument", receiptExporter, "--live-review-closure"],
     ["public receipt authoritative review validator", receiptExporter, "validate_live_review_closure.js"],
     ["public receipt review validator attestation", receiptExporter, "liveReviewClosureValidatorPassed"],
-    ["public receipt schema v3 exporter", receiptExporter, "schemaVersion: 3"],
-    ["public receipt schema v3 placeholder", publicReceipt, '"schemaVersion": 3'],
+    ["public receipt schema v4 exporter", receiptExporter, "schemaVersion: 4"],
+    ["public receipt schema v4 placeholder", publicReceipt, '"schemaVersion": 4'],
+    ["public receipt monotonic generation", receiptExporter, "nextReceiptGeneration"],
+    ["public receipt mutation lock", receiptExporter, "withReceiptMutationLock"],
+    ["public receipt placeholder generation", publicReceipt, '"generation"'],
     ["public receipt nine-document core", receiptExporter, "reviewDocuments"],
     ["public browser nine-document core", publicJs, "reviewDocuments"],
     ["public receipt review-document digest domain", receiptExporter, "STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1"],
     ["public browser review-document digest domain", publicJs, "STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1"],
     ["public receipt core digest domain v2", receiptExporter, "STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2"],
     ["public browser core digest domain v2", publicJs, "STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2"],
-    ["public receipt envelope digest domain v3", receiptExporter, "STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3"],
-    ["public browser envelope digest domain v3", publicJs, "STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3"],
+    ["public receipt envelope digest domain v4", receiptExporter, "STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V4"],
+    ["public browser envelope digest domain v4", publicJs, "STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V4"],
+    ["public browser receipt generation high-water", publicJs, "HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION"],
+    ["public browser same-generation identity pin", publicJs, "HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY"],
     ["status document-bound closure blocker", statusTool, "humanReviewClosureEvidence"],
     ["VAU live review closure argument", vauCompany, "--live-review-closure"],
     ["VAU authoritative review validator", vauCompany, "validate_live_review_closure.js"],
@@ -1526,6 +1564,7 @@ compileJavaScript("tools/local_evidence_status.js");
 compileJavaScript("tools/check_live_review_closure_conformance.js");
 compileJavaScript("tools/draft_live_review_closure.js");
 compileJavaScript("tools/render_live_review_public_config_patch.js");
+compileJavaScript("tools/render_public_live_shutdown_patch.js");
 compileJavaScript("tools/export_public_live_receipt.js");
 compileJavaScript("tools/build_public_site.js");
 compileJavaScript("tools/draft_external_live_packet.js");

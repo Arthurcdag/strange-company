@@ -1,5 +1,6 @@
 window.PUBLIC_LIVE_RECEIPT = Object.freeze({
-  "schemaVersion": 3,
+  "schemaVersion": 4,
+  "generation": 2,
   "mode": "public",
   "status": "not_issued",
   "issuedAt": "",
@@ -37,7 +38,7 @@ window.PUBLIC_LIVE_RECEIPT = Object.freeze({
       "BRAZIL_COMPLIANCE_AGENTS.md": "cf7e1144364602b6bc99ee8d47416cc9a4ed57f9d599f42e40143f8c3ba95b0d",
       "CONKA8_LAW_INSTRUCTIONS.md": "885b1ac85b505eb03a2d8676cdb8dbfbcc3df826b02124e2585813a5405cba5a",
       "AI_LEGAL_HANDOFF.md": "c73caa99557921220a41ebe54cfd6ec61d82443355d9b3bd0248f28843c3aa2f",
-      "HUMAN_REVIEW_PACKET.md": "0a973bf353d22ec89306d008c633126e04b1fa96277ebfa59c214d83293de2f4"
+      "HUMAN_REVIEW_PACKET.md": "b5432bc06f7236661fdb67da1bbad49756beb90cc1b11dc612b4c514dafffd8d"
     },
     "services": [
       {
