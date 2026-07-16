@@ -29,7 +29,7 @@ The current mode changes with evidence:
 - `burn_down_hard_blockers`: real legal, tax, payment, privacy, Brazil, or AI handoff evidence is still missing.
 - `harden_operations`: hard blockers are closed, but reviewer capacity, delivery review, or support receipts still need hardening.
 - `ready_for_human_live_decision`: the system looks ready, but a human still has to decide before `liveMode` changes.
-- `recover_fail_closed`: `liveMode` is true while at least one readiness gate is open; disable external responses and deploy the closed config plus revoked receipt before any repair or reissuance.
+- `recover_fail_closed`: `liveMode` is true while the live public config or current issued receipt/runtime gate is invalid; disable external responses and deploy the closed config plus revoked receipt before any repair or reissuance.
 - `operate_measure_adapt`: live operation is already on, so every outcome must become a reviewed receipt before scaling.
 
 Constant evolution does not mean constant launch. If evidence is missing, the
