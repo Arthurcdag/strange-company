@@ -6,6 +6,17 @@ const vm = require("vm");
 const root = path.resolve(__dirname, "..");
 const failures = [];
 const deploymentMode = process.argv.includes("--deployment");
+const PUBLIC_REVIEW_DOCUMENT_PATHS = Object.freeze([
+  "TERMOS.md",
+  "TERMS.md",
+  "AVISO_DE_PRIVACIDADE.md",
+  "PRIVACY.md",
+  "BRAZIL_COMPLIANCE.md",
+  "BRAZIL_COMPLIANCE_AGENTS.md",
+  "CONKA8_LAW_INSTRUCTIONS.md",
+  "AI_LEGAL_HANDOFF.md",
+  "HUMAN_REVIEW_PACKET.md",
+]);
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
@@ -186,9 +197,10 @@ function checkPublicSurface() {
   );
   assert(assetHelperReferences.length === 3, "public.js public-asset helper must have only its declaration and two fixed call sites.");
   assert(
-    publicJs.includes('Object.freeze({ key: "terms", path: "TERMOS.md" })')
-      && publicJs.includes('Object.freeze({ key: "privacy", path: "AVISO_DE_PRIVACIDADE.md" })'),
-    "public.js legal-document fetch allowlist must stay fixed."
+    publicJs.includes("const PUBLIC_REVIEW_DOCUMENT_PATHS = Object.freeze([")
+      && PUBLIC_REVIEW_DOCUMENT_PATHS.every((documentPath) => publicJs.includes(JSON.stringify(documentPath)))
+      && publicJs.includes("Promise.all(PUBLIC_REVIEW_DOCUMENT_PATHS.map"),
+    "public.js nine-document fetch allowlist must stay fixed and concurrently revalidated."
   );
   assert(
     publicJs.includes('fetchPublicAssetText("public-live-receipt.js")'),
@@ -224,8 +236,10 @@ function checkPublicSurface() {
     "function publicLiveReceiptReady(",
     "function fetchPublicAssetText(",
     "function parsePublicLiveReceiptScript(",
-    "await waitForLatestPublicLiveReceiptRefresh();",
-    "PUBLIC_LIVE_RECEIPT_REFRESH_EPOCH",
+    "await refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });",
+    "PUBLIC_LIVE_RECEIPT_REFRESH_IN_FLIGHT",
+    "PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED",
+    "PUBLIC_REVIEW_DOCUMENT_VERIFICATION_TTL_MS",
     'receipt.status === "local_packet_validators_passed"',
     'globalThis.crypto.subtle.digest("SHA-256", bytes)',
     "attestations.operationalValidatorsPassed === true",
@@ -668,7 +682,7 @@ function checkOperationalV15Contract() {
     assert(!/copyGrowthReview/.test(contents), `${file} exposes growth review copy action.`);
     assert(!/outreachLogForm/.test(contents), `${file} exposes outreach log form id.`);
     assert(!/SETUP_EVIDENCE_SLOTS/.test(contents), `${file} exposes setup evidence slot internals.`);
-    assert(!/BRAZIL_COMPLIANCE_AGENTS/.test(contents), `${file} exposes Brazil compliance agent internals.`);
+    assert(!/\bBRAZIL_COMPLIANCE_AGENTS\b(?!\.md)/.test(contents), `${file} exposes Brazil compliance agent internals.`);
     assert(!/ACQUISITION_LEAD_SOURCES/.test(contents), `${file} exposes acquisition lead source internals.`);
   }
 }
@@ -1328,6 +1342,8 @@ function checkLiveReviewClosureContract() {
   const renderer = read("tools/render_live_review_public_config_patch.js");
   const validator = read("tools/validate_live_review_closure.js");
   const receiptExporter = read("tools/export_public_live_receipt.js");
+  const publicJs = read("public.js");
+  const publicReceipt = read("public-live-receipt.js");
   const statusTool = read("tools/evolution_goal_status.js");
   const vauCompany = read("tools/vau_company_evolution.py");
   const gitignore = read(".gitignore");
@@ -1363,6 +1379,16 @@ function checkLiveReviewClosureContract() {
     ["public receipt live review argument", receiptExporter, "--live-review-closure"],
     ["public receipt authoritative review validator", receiptExporter, "validate_live_review_closure.js"],
     ["public receipt review validator attestation", receiptExporter, "liveReviewClosureValidatorPassed"],
+    ["public receipt schema v3 exporter", receiptExporter, "schemaVersion: 3"],
+    ["public receipt schema v3 placeholder", publicReceipt, '"schemaVersion": 3'],
+    ["public receipt nine-document core", receiptExporter, "reviewDocuments"],
+    ["public browser nine-document core", publicJs, "reviewDocuments"],
+    ["public receipt review-document digest domain", receiptExporter, "STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1"],
+    ["public browser review-document digest domain", publicJs, "STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1"],
+    ["public receipt core digest domain v2", receiptExporter, "STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2"],
+    ["public browser core digest domain v2", publicJs, "STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2"],
+    ["public receipt envelope digest domain v3", receiptExporter, "STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3"],
+    ["public browser envelope digest domain v3", publicJs, "STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3"],
     ["status document-bound closure blocker", statusTool, "humanReviewClosureEvidence"],
     ["VAU live review closure argument", vauCompany, "--live-review-closure"],
     ["VAU authoritative review validator", vauCompany, "validate_live_review_closure.js"],
@@ -1376,6 +1402,10 @@ function checkLiveReviewClosureContract() {
     ["live review public bundle copy", builder, "LIVE_REVIEW_CLOSURE.template.json"],
     ["live review validator public bundle copy", builder, "tools/validate_live_review_closure.js"],
     ["live review renderer public bundle copy", builder, "tools/render_live_review_public_config_patch.js"],
+    ["public bundle reviewed-document size parity", builder, "sourceBytes.length !== bundledBytes.length"],
+    ["public bundle reviewed-document byte parity", builder, "sourceBytes.equals(bundledBytes)"],
+    ["public bundle receipt document-root validation", builder, '"--document-root"'],
+    ["public bundle receipt uses root exporter", builder, 'path.join(root, "tools", "export_public_live_receipt.js")'],
     ["live review local file forbidden from bundle", builder, "LIVE_REVIEW_CLOSURE\\.local\\.json"],
     ["live review survival check", survival, "Live Review Closure Packet"],
   ];
@@ -1383,6 +1413,17 @@ function checkLiveReviewClosureContract() {
   for (const [label, contents, snippet] of required) {
     assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
   }
+
+  for (const documentPath of PUBLIC_REVIEW_DOCUMENT_PATHS) {
+    const quotedPath = JSON.stringify(documentPath);
+    assert(template.includes(quotedPath), `live review template is missing canonical reviewed document ${documentPath}.`);
+    assert(receiptExporter.includes(quotedPath), `public receipt exporter is missing runtime reviewed document ${documentPath}.`);
+    assert(publicJs.includes(quotedPath), `public browser is missing runtime reviewed document ${documentPath}.`);
+    assert(builder.includes(quotedPath), `public bundle contract is missing runtime reviewed document ${documentPath}.`);
+  }
+  assert(!receiptExporter.includes("legalDocuments"), "public receipt exporter must not retain the legacy two-document legalDocuments core.");
+  assert(!publicJs.includes("legalDocuments"), "public browser must not retain the legacy two-document legalDocuments core.");
+  assert(!publicReceipt.includes('"legalDocuments"'), "public receipt placeholder must not retain the legacy two-document legalDocuments core.");
 }
 
 function checkConfig() {

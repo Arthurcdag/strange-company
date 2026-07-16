@@ -283,7 +283,7 @@ class EvolutionGoalStatusTests(unittest.TestCase):
         self.assertGreaterEqual(data["localEvidence"]["laneCount"], 6)
         self.assertTrue(any(lane["id"] == "liveReviewClosure" for lane in data["localEvidence"]["lanes"]))
         self.assertGreaterEqual(data["evolutionPassCount"], 3)
-        self.assertEqual(data["latestPass"]["title"], "Document-Bound Human Review Closure")
+        self.assertEqual(data["latestPass"]["title"], "Nine-Document Runtime Review Binding")
 
     def test_text_output_names_latest_pass(self) -> None:
         with tempfile.TemporaryDirectory() as workspace:

@@ -390,3 +390,53 @@ Result: a missing or stale human-review closure now keeps `liveMode` closed and
 blocks receipt issuance even when public review dates are populated; edits to any
 required reviewed document require a new digest snapshot and renewed human review
 before readiness can advance.
+
+## 2026-07-16 - Nine-Document Runtime Review Binding
+
+Objective: extend document-bound review integrity through the deployed runtime
+so every reviewed terms, privacy, Brazil compliance, and AI handoff file is
+revalidated by the public receipt and browser, not only during private closure.
+
+Changed:
+
+- Replaced the legacy two-document public receipt core with schema v3's exact
+  `reviewDocuments` map for all nine canonical reviewed paths.
+- Added shared path-bound digest, core, and envelope domains so the exporter and
+  browser recompute the same normalized document and receipt bytes.
+- Froze the config, closure packet, and all nine documents into one private
+  issuance snapshot so a concurrent file swap cannot make validation and the
+  emitted receipt describe different bytes.
+- Kept browser polling lightweight with one-minute receipt checks and a
+  15-minute document-verification cache, while forcing all nine documents to be
+  rechecked on security transitions and immediately before paid submission.
+- Enforced the same one-million-code-unit public asset limit in the exporter and
+  browser so issuance cannot produce a receipt the deployed runtime cannot read.
+- Required every reviewed document in the public bundle and added preflight,
+  functionality-audit, and survival contracts for schema, domains, paths, and
+  removal of the legacy `legalDocuments` shape.
+- Made the post-build check compare source and bundled size plus exact bytes for
+  all nine documents, then validate the bundled receipt against the bundled
+  config and document root with the trusted root exporter.
+- Updated human, external-live, README, and VAU guidance to distinguish the
+  private schema-v2 closure from the public schema-v3 runtime receipt.
+
+Verified with:
+
+- `node --check tools\build_public_site.js`
+- `node --check tools\preflight_public_launch.js`
+- `node --check tools\audit_company_functionality.js`
+- `node --check tools\survival_check.js`
+- `python -m unittest tests.test_public_live_receipt tests.test_public_ama tests.test_public_site_bundle`
+- `python -m unittest tests.test_public_site_bundle tests.test_evolution_goal_status`
+- `python -m unittest discover -s tests`
+- Full discovery result: 236 tests passed; 1 skipped.
+- `node tools\audit_evolution_log.js`
+- `node tools\preflight_public_launch.js`
+- `node tools\audit_company_functionality.js`
+- `node tools\build_public_site.js --check --output .public-site-build.local --force`
+- `node tools\survival_check.js`
+
+Result: all nine public reviewed files now form one exact runtime digest set;
+any missing path, substituted key, content drift, receipt edit, or stale lease
+keeps paid intake fail-closed. This is process-integrity evidence only, and
+`liveMode` remains false until the separate human decision and external gates.

@@ -1,6 +1,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { spawnSync } = require("child_process");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
@@ -14,6 +15,17 @@ function argValue(name) {
 
 const outputPath = path.resolve(process.cwd(), argValue("--output") || path.join(root, ".public-site-build.local"));
 const failures = [];
+const REVIEW_DOCUMENT_PATHS = Object.freeze([
+  "TERMOS.md",
+  "TERMS.md",
+  "AVISO_DE_PRIVACIDADE.md",
+  "PRIVACY.md",
+  "BRAZIL_COMPLIANCE.md",
+  "BRAZIL_COMPLIANCE_AGENTS.md",
+  "CONKA8_LAW_INSTRUCTIONS.md",
+  "AI_LEGAL_HANDOFF.md",
+  "HUMAN_REVIEW_PACKET.md",
+]);
 
 function fail(message) {
   failures.push(message);
@@ -137,6 +149,54 @@ function walkFiles(dir) {
   return found;
 }
 
+function assertReviewDocumentParity() {
+  for (const documentPath of REVIEW_DOCUMENT_PATHS) {
+    const sourcePath = path.join(root, documentPath);
+    const bundledPath = path.join(outputPath, documentPath);
+    if (!fs.existsSync(sourcePath) || !fs.existsSync(bundledPath)) {
+      continue;
+    }
+    const sourceBytes = fs.readFileSync(sourcePath);
+    const bundledBytes = fs.readFileSync(bundledPath);
+    if (sourceBytes.length !== bundledBytes.length) {
+      fail(
+        `Public bundle reviewed document size mismatch for ${documentPath}: source=${sourceBytes.length}, bundle=${bundledBytes.length}.`
+      );
+      continue;
+    }
+    if (!sourceBytes.equals(bundledBytes)) {
+      fail(`Public bundle reviewed document byte mismatch for ${documentPath}.`);
+    }
+  }
+}
+
+function assertBundledReceipt() {
+  const publicConfig = path.join(outputPath, "public-config.js");
+  const publicReceipt = path.join(outputPath, "public-live-receipt.js");
+  if (!fs.existsSync(publicConfig) || !fs.existsSync(publicReceipt)) {
+    return;
+  }
+  const result = spawnSync(process.execPath, [
+    path.join(root, "tools", "export_public_live_receipt.js"),
+    "--check-public-js",
+    "--public-config",
+    publicConfig,
+    "--public-js",
+    publicReceipt,
+    "--document-root",
+    outputPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) {
+    const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
+    fail(
+      `Public bundle receipt validation failed against bundled config and nine-document root${output ? `:\n${output}` : "."}`
+    );
+  }
+}
+
 function assertBundle() {
   for (const file of [
     "index.html",
@@ -145,8 +205,7 @@ function assertBundle() {
     "public-live-receipt.js",
     "public-ama-answers.js",
     "styles.css",
-    "TERMOS.md",
-    "AVISO_DE_PRIVACIDADE.md",
+    ...REVIEW_DOCUMENT_PATHS,
     "PUBLIC_AMA.md",
     "PUBLIC_AMA_QUEUE.template.json",
     "PUBLIC_AMA_ANSWERS.template.json",
@@ -180,6 +239,9 @@ function assertBundle() {
   if (!index.includes('src="public-live-receipt.js"')) {
     fail("Public bundle index.html must load public-live-receipt.js.");
   }
+
+  assertReviewDocumentParity();
+  assertBundledReceipt();
 
   const forbidden = [
     /EXTERNAL_LIVE_PACKET\.local\.json/i,

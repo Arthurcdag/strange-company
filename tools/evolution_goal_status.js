@@ -429,11 +429,11 @@ function buildStatus(config, logText, localEvidence, publicLiveReceiptReady, clo
     },
     {
       id: "publicLiveReceipt",
-      label: "issued public live receipt bound to the current public config, terms, and privacy notice",
+      label: "issued public live receipt bound to the current public config and all nine canonical reviewed documents",
       passed: publicLiveReceiptReady,
       command: "node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --live-review-closure LIVE_REVIEW_CLOSURE.local.json --public-config public-config.js --output public-live-receipt.js --force",
       validatorCommand: "node tools/export_public_live_receipt.js --check-public-js --require-issued",
-      nextAction: "Validate document-bound review closure, revenue, external-live, reviewer-capacity, delivery-review, and the current public legal documents, then export the seven-day public-only live receipt while liveMode remains false.",
+      nextAction: "Validate document-bound review closure, revenue, external-live, reviewer-capacity, delivery-review, and all nine canonical reviewed documents, then export the seven-day public-only live receipt while liveMode remains false.",
     },
   ];
   const publicRouteBlockers = evidenceRows

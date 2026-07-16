@@ -37,10 +37,17 @@ const PUBLIC_ORDER_CONFIG = {
 };
 const PUBLIC_LIVE_RECEIPT = window.PUBLIC_LIVE_RECEIPT || {};
 let CURRENT_PUBLIC_LIVE_RECEIPT = PUBLIC_LIVE_RECEIPT;
-const PUBLIC_LEGAL_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_PUBLIC_LEGAL_DOCUMENT_V1";
-const PUBLIC_LEGAL_DOCUMENT_SPECS = Object.freeze([
-  Object.freeze({ key: "terms", path: "TERMOS.md" }),
-  Object.freeze({ key: "privacy", path: "AVISO_DE_PRIVACIDADE.md" })
+const PUBLIC_REVIEW_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1";
+const PUBLIC_REVIEW_DOCUMENT_PATHS = Object.freeze([
+  "TERMOS.md",
+  "TERMS.md",
+  "AVISO_DE_PRIVACIDADE.md",
+  "PRIVACY.md",
+  "BRAZIL_COMPLIANCE.md",
+  "BRAZIL_COMPLIANCE_AGENTS.md",
+  "CONKA8_LAW_INSTRUCTIONS.md",
+  "AI_LEGAL_HANDOFF.md",
+  "HUMAN_REVIEW_PACKET.md"
 ]);
 
 const money = new Intl.NumberFormat("pt-BR", {
@@ -100,7 +107,7 @@ function canonicalPublicText(value) {
   return String(value || "").trim();
 }
 
-function canonicalPublicConfigCore(config, legalDocuments) {
+function canonicalPublicConfigCore(config, reviewDocuments) {
   const services = Array.isArray(config.services) ? config.services : [];
   return {
     operatorName: canonicalPublicText(config.operatorName),
@@ -126,7 +133,7 @@ function canonicalPublicConfigCore(config, legalDocuments) {
       brazilComplianceReviewedAt: canonicalPublicText(config.brazilComplianceReviewedAt),
       aiHandoffReviewedAt: canonicalPublicText(config.aiHandoffReviewedAt)
     },
-    legalDocuments,
+    reviewDocuments,
     services: services.map((service) => ({
       id: canonicalPublicText(service.id),
       title: canonicalPublicText(service.title),
@@ -155,7 +162,7 @@ async function sha256Hex(value) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function normalizePublicLegalDocumentText(value) {
+function normalizePublicReviewDocumentText(value) {
   return String(value).replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
 }
 
@@ -185,19 +192,18 @@ async function fetchPublicAssetText(assetPath) {
   }
 }
 
-async function publicLegalDocumentCore() {
-  const documents = {};
-  for (const spec of PUBLIC_LEGAL_DOCUMENT_SPECS) {
-    const contents = normalizePublicLegalDocumentText(await fetchPublicAssetText(spec.path));
+async function publicReviewDocumentCore() {
+  const entries = await Promise.all(PUBLIC_REVIEW_DOCUMENT_PATHS.map(async (documentPath) => {
+    const contents = normalizePublicReviewDocumentText(await fetchPublicAssetText(documentPath));
     const sha256 = await sha256Hex(
-      `${PUBLIC_LEGAL_DOCUMENT_DIGEST_DOMAIN}\npath=${spec.path}\n${contents}`
+      `${PUBLIC_REVIEW_DOCUMENT_DIGEST_DOMAIN}\npath=${documentPath}\n${contents}`
     );
     if (!/^[a-f0-9]{64}$/.test(sha256)) {
-      throw new Error(`Could not hash public legal document ${spec.path}.`);
+      throw new Error(`Could not hash public review document ${documentPath}.`);
     }
-    documents[spec.key] = { path: spec.path, sha256 };
-  }
-  return documents;
+    return [documentPath, sha256];
+  }));
+  return Object.fromEntries(entries);
 }
 
 function parsePublicLiveReceiptScript(contents) {
@@ -260,18 +266,17 @@ function publicLiveReceiptFresh(receipt = CURRENT_PUBLIC_LIVE_RECEIPT, now = Dat
   );
 }
 
-async function publicLiveReceiptReady(config = PUBLIC_ORDER_CONFIG, receipt = CURRENT_PUBLIC_LIVE_RECEIPT, now = Date.now()) {
-  const attestations = receipt && receipt.attestations ? receipt.attestations : {};
-  const receiptCore = receipt && receipt.core && typeof receipt.core === "object"
-    ? receipt.core
-    : null;
+async function publicLiveReceiptEnvelopeReady(config, receipt, now = Date.now()) {
   try {
-    const legalDocuments = await publicLegalDocumentCore();
+    const attestations = receipt && receipt.attestations ? receipt.attestations : {};
+    const receiptCore = receipt && receipt.core && typeof receipt.core === "object"
+      ? receipt.core
+      : null;
     if (!(
       receipt
       && hasExactKeys(receipt, ["schemaVersion", "mode", "status", "issuedAt", "validUntil", "core", "coreSha256", "attestations", "envelopeSha256"])
       && hasExactKeys(attestations, ["publicOnly", "privatePacketDataExcluded", "privatePacketHashesExcluded", "localPacketValidatorsPassed", "liveReviewClosureValidatorPassed", "reviewerCandidateTrackerReady", "deliveryReviewChecklistReady", "operationalValidatorsPassed", "digestCoversCanonicalPublicCoreExceptLiveMode", "digestCoversReceiptEnvelopeExceptLiveMode"])
-      && receipt.schemaVersion === 2
+      && receipt.schemaVersion === 3
       && receipt.mode === "public"
       && receipt.status === "local_packet_validators_passed"
       && publicLiveReceiptFresh(receipt, now)
@@ -290,18 +295,27 @@ async function publicLiveReceiptReady(config = PUBLIC_ORDER_CONFIG, receipt = CU
       && receiptCore
       && receiptCore.flags
       && receiptCore.flags.liveMode === false
-      && stableSerialize(digestablePublicCore(receiptCore)) === stableSerialize(digestablePublicCore(canonicalPublicConfigCore(config, legalDocuments)))
+      && hasExactKeys(receiptCore.reviewDocuments, PUBLIC_REVIEW_DOCUMENT_PATHS)
+      && PUBLIC_REVIEW_DOCUMENT_PATHS.every(
+        (documentPath) => /^[a-f0-9]{64}$/.test(String(receiptCore.reviewDocuments[documentPath] || ""))
+      )
     )) {
       return false;
     }
+    if (
+      stableSerialize(digestablePublicCore(receiptCore))
+      !== stableSerialize(digestablePublicCore(canonicalPublicConfigCore(config, receiptCore.reviewDocuments)))
+    ) {
+      return false;
+    }
     const expectedCoreDigest = await sha256Hex(
-      `STRANGE_COMPANY_PUBLIC_LIVE_CORE_V1\n${stableSerialize(digestablePublicCore(receiptCore))}`
+      `STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2\n${stableSerialize(digestablePublicCore(receiptCore))}`
     );
     if (expectedCoreDigest !== receipt.coreSha256) {
       return false;
     }
     const expectedEnvelopeDigest = await sha256Hex(
-      `STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V2\n${stableSerialize(receiptEnvelopePayload(receipt, digestablePublicCore(receiptCore)))}`
+      `STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3\n${stableSerialize(receiptEnvelopePayload(receipt, digestablePublicCore(receiptCore)))}`
     );
     return expectedEnvelopeDigest === receipt.envelopeSha256;
   } catch {
@@ -309,35 +323,138 @@ async function publicLiveReceiptReady(config = PUBLIC_ORDER_CONFIG, receipt = CU
   }
 }
 
+async function publicReviewDocumentsReady(receipt) {
+  try {
+    const receiptDocuments = receipt && receipt.core ? receipt.core.reviewDocuments : null;
+    if (!hasExactKeys(receiptDocuments, PUBLIC_REVIEW_DOCUMENT_PATHS)) {
+      return false;
+    }
+    const currentDocuments = await publicReviewDocumentCore();
+    return stableSerialize(receiptDocuments) === stableSerialize(currentDocuments);
+  } catch {
+    return false;
+  }
+}
+
+async function publicLiveReceiptReady(config = PUBLIC_ORDER_CONFIG, receipt = CURRENT_PUBLIC_LIVE_RECEIPT, now = Date.now()) {
+  if (!await publicLiveReceiptEnvelopeReady(config, receipt, now)) {
+    return false;
+  }
+  return publicReviewDocumentsReady(receipt);
+}
+
+const PUBLIC_REVIEW_DOCUMENT_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 let PUBLIC_LIVE_RECEIPT_VERIFIED = false;
-let PUBLIC_LIVE_RECEIPT_REFRESH_EPOCH = 0;
+let PUBLIC_REVIEW_DOCUMENTS_VERIFIED_AT = 0;
+let PUBLIC_REVIEW_DOCUMENTS_VERIFIED_ENVELOPE_SHA256 = "";
+let PUBLIC_LIVE_RECEIPT_REFRESH_IN_FLIGHT = null;
+let PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_FORCED = false;
+let PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_REVALIDATES_DOCUMENTS = false;
+let PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED = false;
 let LATEST_PUBLIC_LIVE_RECEIPT_REFRESH = Promise.resolve(false);
 
-function refreshPublicLiveReceiptVerification() {
-  const refreshEpoch = ++PUBLIC_LIVE_RECEIPT_REFRESH_EPOCH;
+function clearPublicReviewDocumentVerificationCache() {
+  PUBLIC_REVIEW_DOCUMENTS_VERIFIED_AT = 0;
+  PUBLIC_REVIEW_DOCUMENTS_VERIFIED_ENVELOPE_SHA256 = "";
+}
+
+function publicReviewDocumentVerificationCached(receipt, now = Date.now()) {
+  return Boolean(
+    PUBLIC_REVIEW_DOCUMENTS_VERIFIED_AT
+    && PUBLIC_REVIEW_DOCUMENTS_VERIFIED_ENVELOPE_SHA256
+    && PUBLIC_REVIEW_DOCUMENTS_VERIFIED_ENVELOPE_SHA256 === String(receipt.envelopeSha256 || "")
+    && now - PUBLIC_REVIEW_DOCUMENTS_VERIFIED_AT >= 0
+    && now - PUBLIC_REVIEW_DOCUMENTS_VERIFIED_AT < PUBLIC_REVIEW_DOCUMENT_VERIFICATION_TTL_MS
+  );
+}
+
+function applyPublicLiveReceiptState(receipt, verified) {
+  CURRENT_PUBLIC_LIVE_RECEIPT = receipt;
+  PUBLIC_LIVE_RECEIPT_VERIFIED = verified === true;
+  renderReadiness();
+  setPublicOrderAvailability();
+  schedulePublicReceiptExpiry();
+}
+
+async function performPublicLiveReceiptRefresh(forceDocumentCheck) {
+  let latestReceipt = {};
+  try {
+    latestReceipt = await fetchCurrentPublicLiveReceipt();
+    if (!await publicLiveReceiptEnvelopeReady(PUBLIC_ORDER_CONFIG, latestReceipt)) {
+      PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED = false;
+      clearPublicReviewDocumentVerificationCache();
+      applyPublicLiveReceiptState(latestReceipt, false);
+      return false;
+    }
+
+    if (PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED) {
+      PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED = false;
+      PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_FORCED = true;
+      forceDocumentCheck = true;
+    }
+    const cacheReady = publicReviewDocumentVerificationCached(latestReceipt);
+    if (!forceDocumentCheck && cacheReady) {
+      applyPublicLiveReceiptState(latestReceipt, true);
+      return true;
+    }
+
+    PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_REVALIDATES_DOCUMENTS = true;
+    applyPublicLiveReceiptState(latestReceipt, false);
+    if (!await publicReviewDocumentsReady(latestReceipt)) {
+      clearPublicReviewDocumentVerificationCache();
+      return false;
+    }
+    PUBLIC_REVIEW_DOCUMENTS_VERIFIED_AT = Date.now();
+    PUBLIC_REVIEW_DOCUMENTS_VERIFIED_ENVELOPE_SHA256 = latestReceipt.envelopeSha256;
+    applyPublicLiveReceiptState(latestReceipt, true);
+    return true;
+  } catch {
+    PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED = false;
+    clearPublicReviewDocumentVerificationCache();
+    applyPublicLiveReceiptState(latestReceipt, false);
+    return false;
+  }
+}
+
+function refreshPublicLiveReceiptVerification({ forceDocumentCheck = false } = {}) {
+  if (
+    forceDocumentCheck
+    && !(
+      PUBLIC_LIVE_RECEIPT_REFRESH_IN_FLIGHT
+      && (
+        PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_FORCED
+        || PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_REVALIDATES_DOCUMENTS
+      )
+    )
+  ) {
+    PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED = true;
+    applyPublicLiveReceiptState(CURRENT_PUBLIC_LIVE_RECEIPT, false);
+  }
+  if (PUBLIC_LIVE_RECEIPT_REFRESH_IN_FLIGHT) {
+    return PUBLIC_LIVE_RECEIPT_REFRESH_IN_FLIGHT;
+  }
+
   const refresh = (async () => {
-    let latestReceipt = {};
-    let latestVerified = false;
-    try {
-      latestReceipt = await fetchCurrentPublicLiveReceipt();
-      latestVerified = await publicLiveReceiptReady(
-        PUBLIC_ORDER_CONFIG,
-        latestReceipt
-      );
-    } catch {
-      latestReceipt = {};
-      latestVerified = false;
-    }
-    if (refreshEpoch !== PUBLIC_LIVE_RECEIPT_REFRESH_EPOCH) {
-      return PUBLIC_LIVE_RECEIPT_VERIFIED;
-    }
-    CURRENT_PUBLIC_LIVE_RECEIPT = latestReceipt;
-    PUBLIC_LIVE_RECEIPT_VERIFIED = latestVerified;
-    renderReadiness();
-    setPublicOrderAvailability();
+    do {
+      const forceCurrentPass = PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED;
+      PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED = false;
+      PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_FORCED = forceCurrentPass;
+      try {
+        await performPublicLiveReceiptRefresh(forceCurrentPass);
+      } finally {
+        PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_FORCED = false;
+        PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_REVALIDATES_DOCUMENTS = false;
+      }
+    } while (PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED);
     return PUBLIC_LIVE_RECEIPT_VERIFIED;
   })();
+  PUBLIC_LIVE_RECEIPT_REFRESH_IN_FLIGHT = refresh;
   LATEST_PUBLIC_LIVE_RECEIPT_REFRESH = refresh;
+  void refresh.finally(() => {
+    if (PUBLIC_LIVE_RECEIPT_REFRESH_IN_FLIGHT === refresh) {
+      PUBLIC_LIVE_RECEIPT_REFRESH_IN_FLIGHT = null;
+    }
+  });
   return refresh;
 }
 
@@ -428,27 +545,43 @@ function setPublicOrderAvailability() {
   closed.setAttribute("aria-hidden", String(liveReady));
 }
 
+let PUBLIC_RECEIPT_EXPIRY_TIMEOUT = null;
+let PUBLIC_RECEIPT_REVALIDATION_INTERVAL = null;
+let PUBLIC_RECEIPT_VISIBILITY_LISTENER_ATTACHED = false;
+
 function schedulePublicReceiptExpiry() {
+  if (PUBLIC_RECEIPT_EXPIRY_TIMEOUT !== null && typeof window.clearTimeout === "function") {
+    window.clearTimeout(PUBLIC_RECEIPT_EXPIRY_TIMEOUT);
+    PUBLIC_RECEIPT_EXPIRY_TIMEOUT = null;
+  }
   const expiresAt = new Date(String(CURRENT_PUBLIC_LIVE_RECEIPT.validUntil || "")).valueOf();
   if (!PUBLIC_LIVE_RECEIPT_VERIFIED || !Number.isFinite(expiresAt)) {
     return;
   }
   const delay = Math.max(0, expiresAt - Date.now());
-  window.setTimeout(() => {
+  PUBLIC_RECEIPT_EXPIRY_TIMEOUT = window.setTimeout(() => {
+    PUBLIC_RECEIPT_EXPIRY_TIMEOUT = null;
+    PUBLIC_LIVE_RECEIPT_VERIFIED = false;
+    clearPublicReviewDocumentVerificationCache();
     renderReadiness();
     setPublicOrderAvailability();
-  }, delay);
+  }, delay + 1);
 }
 
 function schedulePublicReceiptRevalidation() {
-  window.setInterval(() => {
-    void refreshPublicLiveReceiptVerification();
-  }, 60 * 1000);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") {
+  if (PUBLIC_RECEIPT_REVALIDATION_INTERVAL === null) {
+    PUBLIC_RECEIPT_REVALIDATION_INTERVAL = window.setInterval(() => {
       void refreshPublicLiveReceiptVerification();
-    }
-  });
+    }, 60 * 1000);
+  }
+  if (!PUBLIC_RECEIPT_VISIBILITY_LISTENER_ATTACHED) {
+    PUBLIC_RECEIPT_VISIBILITY_LISTENER_ATTACHED = true;
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        void refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+      }
+    });
+  }
 }
 
 function requestPacket(order) {
@@ -596,10 +729,8 @@ function setupAmaForm() {
   if (!form) {
     return;
   }
-  form.addEventListener("submit", async (event) => {
+  form.addEventListener("submit", (event) => {
     event.preventDefault();
-    refreshPublicLiveReceiptVerification();
-    await waitForLatestPublicLiveReceiptRefresh();
     const readiness = publicReadinessModel();
     if (!readiness.supportReady) {
       renderAmaBlocked("AMA is closed until the public support inbox is verified.");
@@ -685,8 +816,7 @@ function setupForm() {
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    refreshPublicLiveReceiptVerification();
-    await waitForLatestPublicLiveReceiptRefresh();
+    await refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
     const readiness = publicReadinessModel();
     if (!readiness.liveReady) {
       renderBlocked(`Public intake is closed until these gates are reviewed: ${readiness.blockers.join(", ")}.`);
@@ -732,11 +862,12 @@ function setupForm() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
-  await refreshPublicLiveReceiptVerification();
-  schedulePublicReceiptExpiry();
-  schedulePublicReceiptRevalidation();
+document.addEventListener("DOMContentLoaded", () => {
+  renderReadiness();
+  setPublicOrderAvailability();
   renderPublicAmaAnswers();
   setupAmaForm();
   setupForm();
+  schedulePublicReceiptRevalidation();
+  void refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
 });

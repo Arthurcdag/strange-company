@@ -7,6 +7,17 @@ const root = path.resolve(__dirname, "..");
 const requireLive = process.argv.includes("--require-live");
 const failures = [];
 const evidence = [];
+const PUBLIC_REVIEW_DOCUMENT_PATHS = Object.freeze([
+  "TERMOS.md",
+  "TERMS.md",
+  "AVISO_DE_PRIVACIDADE.md",
+  "PRIVACY.md",
+  "BRAZIL_COMPLIANCE.md",
+  "BRAZIL_COMPLIANCE_AGENTS.md",
+  "CONKA8_LAW_INSTRUCTIONS.md",
+  "AI_LEGAL_HANDOFF.md",
+  "HUMAN_REVIEW_PACKET.md",
+]);
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
@@ -222,6 +233,30 @@ function auditDocs() {
   assertIncludes("tools/export_public_live_receipt.js", "validate_live_review_closure.js", "public live receipt authoritative human-review validator");
   assertIncludes("tools/export_public_live_receipt.js", "liveReviewClosureValidatorPassed", "public live receipt human-review validator attestation");
   assertIncludes("public.js", "liveReviewClosureValidatorPassed", "public browser human-review validator attestation gate");
+  assertIncludes("tools/export_public_live_receipt.js", "schemaVersion: 3", "public live receipt schema v3");
+  assertIncludes("public-live-receipt.js", '"schemaVersion": 3', "public live receipt placeholder schema v3");
+  assertIncludes("tools/export_public_live_receipt.js", "reviewDocuments", "public receipt nine-document review core");
+  assertIncludes("public.js", "reviewDocuments", "public browser nine-document review core");
+  assertIncludes("tools/export_public_live_receipt.js", "STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1", "public receipt review-document digest domain");
+  assertIncludes("public.js", "STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1", "public browser review-document digest domain");
+  assertIncludes("tools/export_public_live_receipt.js", "STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2", "public receipt core digest domain v2");
+  assertIncludes("public.js", "STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2", "public browser core digest domain v2");
+  assertIncludes("tools/export_public_live_receipt.js", "STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3", "public receipt envelope digest domain v3");
+  assertIncludes("public.js", "STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3", "public browser envelope digest domain v3");
+  assertIncludes("tools/build_public_site.js", "sourceBytes.length !== bundledBytes.length", "public bundle reviewed-document size parity");
+  assertIncludes("tools/build_public_site.js", "sourceBytes.equals(bundledBytes)", "public bundle reviewed-document byte parity");
+  assertIncludes("tools/build_public_site.js", '"--document-root"', "public bundle receipt document-root validation");
+  assertIncludes("tools/build_public_site.js", 'path.join(root, "tools", "export_public_live_receipt.js")', "public bundle receipt uses root exporter");
+  for (const documentPath of PUBLIC_REVIEW_DOCUMENT_PATHS) {
+    const quotedPath = JSON.stringify(documentPath);
+    assertIncludes("LIVE_REVIEW_CLOSURE.template.json", quotedPath, `closure canonical document ${documentPath}`);
+    assertIncludes("tools/export_public_live_receipt.js", quotedPath, `receipt runtime document ${documentPath}`);
+    assertIncludes("public.js", quotedPath, `browser runtime document ${documentPath}`);
+    assertIncludes("tools/build_public_site.js", quotedPath, `bundle runtime document ${documentPath}`);
+  }
+  assertAbsent("tools/export_public_live_receipt.js", /legalDocuments/, "legacy two-document receipt core");
+  assertAbsent("public.js", /legalDocuments/, "legacy two-document browser core");
+  assertAbsent("public-live-receipt.js", /"legalDocuments"/, "legacy two-document receipt placeholder");
   assertIncludes("tools/export_public_live_receipt.js", "envelopeSha256", "public live receipt full-envelope integrity");
   assertIncludes("tools/export_public_live_receipt.js", "RECEIPT_VALIDITY_MS", "public live receipt expiry window");
   assertIncludes("PUBLIC_AMA_PUBLICATION_PACKET.md", "Manual Close Sheet", "public AMA publication close sheet");
@@ -346,7 +381,7 @@ function auditPublicBoundary() {
     [/revenueStartPanel/, "private revenue start panel"],
     [/issueRevenueStartPacket/, "private revenue start action"],
     [/brazilComplianceAgentsPanel/, "private Brazil compliance agents panel"],
-    [/BRAZIL_COMPLIANCE_AGENTS/, "Brazil compliance agent internals"],
+    [/\bBRAZIL_COMPLIANCE_AGENTS\b(?!\.md)/, "Brazil compliance agent internals"],
     [/adaptiveOperatorPanel/, "private adaptive operator panel"],
     [/strange-company-adaptive-operator/, "adaptive operator storage key"],
     [/ADAPTIVE_DAMAGE_ROUTES/, "adaptive damage route internals"],

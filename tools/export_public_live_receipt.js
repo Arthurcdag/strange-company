@@ -1,22 +1,103 @@
 const crypto = require("crypto");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const vm = require("vm");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
-const force = args.includes("--force");
-const asJson = args.includes("--json");
-const checkPublicJs = args.includes("--check-public-js");
-const requireIssued = args.includes("--require-issued");
-const revoke = args.includes("--revoke");
+
+const BOOLEAN_OPTIONS = new Set([
+  "--force",
+  "--json",
+  "--check-public-js",
+  "--require-issued",
+  "--revoke",
+]);
+const VALUE_OPTION_GROUPS = Object.freeze([
+  ["--public-config"],
+  ["--document-root"],
+  ["--external-live-packet", "--external-packet"],
+  ["--revenue-index", "--revenue-evidence-index"],
+  ["--reviewer-tracker", "--reviewer-candidate-tracker"],
+  ["--delivery-review-checklist", "--delivery-checklist"],
+  ["--live-review-closure"],
+  ["--output"],
+  ["--public-js"],
+  ["--terms-doc"],
+  ["--privacy-doc"],
+]);
+const VALUE_OPTIONS = new Set(VALUE_OPTION_GROUPS.flat());
+
+function parseArguments(rawArgs) {
+  const flags = new Set();
+  const values = new Map();
+  for (let index = 0; index < rawArgs.length; index += 1) {
+    const option = String(rawArgs[index]);
+    if (!option.startsWith("--")) {
+      throw new Error(`unexpected positional argument: ${option}`);
+    }
+    if (BOOLEAN_OPTIONS.has(option)) {
+      if (flags.has(option)) throw new Error(`duplicate option: ${option}`);
+      flags.add(option);
+      continue;
+    }
+    if (!VALUE_OPTIONS.has(option)) {
+      throw new Error(`unknown option: ${option}`);
+    }
+    if (values.has(option)) throw new Error(`duplicate option: ${option}`);
+    const value = rawArgs[index + 1];
+    if (
+      value === undefined
+      || String(value).trim() === ""
+      || String(value).startsWith("--")
+    ) {
+      throw new Error(`${option} requires a non-option value.`);
+    }
+    values.set(option, String(value));
+    index += 1;
+  }
+  for (const aliases of VALUE_OPTION_GROUPS) {
+    const supplied = aliases.filter((option) => values.has(option));
+    if (supplied.length > 1) {
+      throw new Error(`duplicate aliases are not allowed: ${supplied.join(", ")}`);
+    }
+  }
+  return { flags, values };
+}
+
+let parsedArgs;
+try {
+  parsedArgs = parseArguments(args);
+} catch (error) {
+  console.error(`Public live receipt export failed: ${error.message}`);
+  process.exit(1);
+}
+
+const force = parsedArgs.flags.has("--force");
+const asJson = parsedArgs.flags.has("--json");
+const checkPublicJs = parsedArgs.flags.has("--check-public-js");
+const requireIssued = parsedArgs.flags.has("--require-issued");
+const revoke = parsedArgs.flags.has("--revoke");
 
 const ACTIVE_STATUS = "local_packet_validators_passed";
 const PLACEHOLDER_STATUS = "not_issued";
 const RECEIPT_VALIDITY_MS = 7 * 24 * 60 * 60 * 1000;
 const CLOCK_SKEW_MS = 5 * 60 * 1000;
-const LEGAL_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_PUBLIC_LEGAL_DOCUMENT_V1";
+const MAX_PUBLIC_ASSET_TEXT_LENGTH = 1000000;
+const PUBLIC_REVIEW_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1";
+const REVIEW_DOCUMENT_PATHS = Object.freeze([
+  "TERMOS.md",
+  "TERMS.md",
+  "AVISO_DE_PRIVACIDADE.md",
+  "PRIVACY.md",
+  "BRAZIL_COMPLIANCE.md",
+  "BRAZIL_COMPLIANCE_AGENTS.md",
+  "CONKA8_LAW_INSTRUCTIONS.md",
+  "AI_LEGAL_HANDOFF.md",
+  "HUMAN_REVIEW_PACKET.md",
+]);
 const REVIEW_FIELDS = [
   "termsReviewedAt",
   "privacyReviewedAt",
@@ -25,8 +106,7 @@ const REVIEW_FIELDS = [
 ];
 
 function argValue(name) {
-  const index = args.indexOf(name);
-  return index >= 0 && args[index + 1] ? String(args[index + 1]) : "";
+  return parsedArgs.values.get(name) || "";
 }
 
 function firstArgValue(names, fallback) {
@@ -40,6 +120,10 @@ function firstArgValue(names, fallback) {
 const publicConfigPath = firstArgValue(
   ["--public-config"],
   path.join(root, "public-config.js")
+);
+const documentRootPath = firstArgValue(
+  ["--document-root"],
+  root
 );
 const externalPacketPath = firstArgValue(
   ["--external-live-packet", "--external-packet"],
@@ -73,16 +157,20 @@ const publicJsPath = firstArgValue(
 );
 const termsDocumentPath = firstArgValue(
   ["--terms-doc"],
-  path.join(root, "TERMOS.md")
+  path.join(documentRootPath, "TERMOS.md")
 );
 const privacyDocumentPath = firstArgValue(
   ["--privacy-doc"],
-  path.join(root, "AVISO_DE_PRIVACIDADE.md")
+  path.join(documentRootPath, "AVISO_DE_PRIVACIDADE.md")
 );
-const LEGAL_DOCUMENT_SPECS = [
-  { key: "terms", publicPath: "TERMOS.md", filePath: termsDocumentPath },
-  { key: "privacy", publicPath: "AVISO_DE_PRIVACIDADE.md", filePath: privacyDocumentPath },
-];
+const REVIEW_DOCUMENT_SPECS = REVIEW_DOCUMENT_PATHS.map((publicPath) => ({
+  publicPath,
+  filePath: publicPath === "TERMOS.md"
+    ? termsDocumentPath
+    : publicPath === "AVISO_DE_PRIVACIDADE.md"
+      ? privacyDocumentPath
+      : path.join(documentRootPath, publicPath),
+}));
 
 function fail(message) {
   throw new Error(message);
@@ -143,10 +231,25 @@ function requireIsoTimestamp(value, label) {
   return text;
 }
 
-function loadPublicConfig(filePath) {
+function enforcePublicAssetTextLength(source, label) {
+  if (source.length > MAX_PUBLIC_ASSET_TEXT_LENGTH) {
+    fail(`${label} exceeds ${MAX_PUBLIC_ASSET_TEXT_LENGTH} decoded text code units.`);
+  }
+  return source;
+}
+
+function readPublicAssetText(filePath, label) {
+  try {
+    return enforcePublicAssetTextLength(fs.readFileSync(filePath, "utf8"), label);
+  } catch (error) {
+    fail(`Could not read ${label} ${filePath}: ${error.message}`);
+  }
+}
+
+function loadPublicConfigSource(source, filePath) {
   try {
     const sandbox = { window: {} };
-    vm.runInNewContext(fs.readFileSync(filePath, "utf8"), sandbox, { filename: filePath });
+    vm.runInNewContext(source, sandbox, { filename: filePath });
     if (!isPlainObject(sandbox.window.PUBLIC_ORDER_CONFIG)) {
       fail(`${filePath} must assign window.PUBLIC_ORDER_CONFIG.`);
     }
@@ -154,6 +257,13 @@ function loadPublicConfig(filePath) {
   } catch (error) {
     fail(`Could not load public config ${filePath}: ${error.message}`);
   }
+}
+
+function loadPublicConfig(filePath) {
+  return loadPublicConfigSource(
+    readPublicAssetText(filePath, "public config"),
+    filePath
+  );
 }
 
 function normalizeServices(services) {
@@ -175,37 +285,42 @@ function normalizeServices(services) {
   });
 }
 
-function normalizeLegalDocumentText(value) {
+function normalizeReviewDocumentText(value) {
   return String(value).replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
 }
 
-function legalDocumentDigest(publicPath, contents) {
+function reviewDocumentDigest(publicPath, contents) {
   return crypto
     .createHash("sha256")
     .update(
-      `${LEGAL_DOCUMENT_DIGEST_DOMAIN}\npath=${publicPath}\n${normalizeLegalDocumentText(contents)}`,
+      `${PUBLIC_REVIEW_DOCUMENT_DIGEST_DOMAIN}\npath=${publicPath}\n${normalizeReviewDocumentText(contents)}`,
       "utf8"
     )
     .digest("hex");
 }
 
-function buildLegalDocumentCore() {
-  return LEGAL_DOCUMENT_SPECS.reduce((documents, spec) => {
-    let contents;
-    try {
-      contents = fs.readFileSync(spec.filePath, "utf8");
-    } catch (error) {
-      fail(`Could not read public legal document ${spec.publicPath}: ${error.message}`);
-    }
-    documents[spec.key] = {
-      path: spec.publicPath,
-      sha256: legalDocumentDigest(spec.publicPath, contents),
-    };
+function readReviewDocumentContents() {
+  return REVIEW_DOCUMENT_SPECS.reduce((documents, spec) => {
+    documents[spec.publicPath] = readPublicAssetText(
+      spec.filePath,
+      `public review document ${spec.publicPath}`
+    );
     return documents;
   }, {});
 }
 
-function buildPublicCore(config) {
+function buildReviewDocumentCore(documentContents = readReviewDocumentContents()) {
+  return REVIEW_DOCUMENT_PATHS.reduce((documents, publicPath) => {
+    const contents = documentContents[publicPath];
+    if (typeof contents !== "string") {
+      fail(`public review document snapshot is missing ${publicPath}.`);
+    }
+    documents[publicPath] = reviewDocumentDigest(publicPath, contents);
+    return documents;
+  }, {});
+}
+
+function buildPublicCore(config, documentContents = readReviewDocumentContents()) {
   const supportEmail = requireText(config.supportEmail, "supportEmail");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(supportEmail)) {
     fail("supportEmail must be a valid public support email.");
@@ -245,7 +360,7 @@ function buildPublicCore(config) {
       liveMode,
     },
     reviewDates,
-    legalDocuments: buildLegalDocumentCore(),
+    reviewDocuments: buildReviewDocumentCore(documentContents),
     services: normalizeServices(config.services),
   };
 }
@@ -287,7 +402,7 @@ function digestableCore(core) {
 function coreDigest(core) {
   return crypto
     .createHash("sha256")
-    .update(`STRANGE_COMPANY_PUBLIC_LIVE_CORE_V1\n${JSON.stringify(digestableCore(core))}`, "utf8")
+    .update(`STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2\n${JSON.stringify(digestableCore(core))}`, "utf8")
     .digest("hex");
 }
 
@@ -308,7 +423,7 @@ function envelopeDigest(receipt) {
   return crypto
     .createHash("sha256")
     .update(
-      `STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V2\n${JSON.stringify(digestableEnvelope(receipt))}`,
+      `STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3\n${JSON.stringify(digestableEnvelope(receipt))}`,
       "utf8"
     )
     .digest("hex");
@@ -316,6 +431,72 @@ function envelopeDigest(receipt) {
 
 function sameDigestableCore(left, right) {
   return JSON.stringify(digestableCore(left)) === JSON.stringify(digestableCore(right));
+}
+
+function readPrivateSnapshotText(filePath, label) {
+  if (!fs.existsSync(filePath)) fail(`${label} is missing: ${filePath}`);
+  try {
+    return fs.readFileSync(filePath, "utf8");
+  } catch (error) {
+    fail(`Could not read ${label} ${filePath}: ${error.message}`);
+  }
+}
+
+function createIssuanceSnapshot() {
+  const configSource = readPublicAssetText(publicConfigPath, "public config");
+  const closureSource = readPrivateSnapshotText(liveReviewClosurePath, "LIVE_REVIEW_CLOSURE");
+  const documentContents = readReviewDocumentContents();
+  const snapshotDir = fs.mkdtempSync(path.join(os.tmpdir(), "strange-company-live-receipt-"));
+  try {
+    try {
+      fs.chmodSync(snapshotDir, 0o700);
+    } catch (_error) {
+      // Windows may not expose POSIX permissions; the unique temp directory is still private to this run.
+    }
+    const snapshotConfigPath = path.join(snapshotDir, "public-config.js");
+    const snapshotClosurePath = path.join(snapshotDir, "LIVE_REVIEW_CLOSURE.local.json");
+    fs.writeFileSync(snapshotConfigPath, configSource, "utf8");
+    fs.writeFileSync(snapshotClosurePath, closureSource, "utf8");
+    for (const documentPath of REVIEW_DOCUMENT_PATHS) {
+      fs.writeFileSync(path.join(snapshotDir, documentPath), documentContents[documentPath], "utf8");
+    }
+    return {
+      dir: snapshotDir,
+      configPath: snapshotConfigPath,
+      configSource,
+      closurePath: snapshotClosurePath,
+      documentContents,
+    };
+  } catch (error) {
+    fs.rmSync(snapshotDir, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+function cleanupIssuanceSnapshot(snapshot) {
+  if (snapshot && snapshot.dir) {
+    fs.rmSync(snapshot.dir, { recursive: true, force: true });
+  }
+}
+
+function waitAtSnapshotBarrierForTest() {
+  const barrierValue = process.env.STRANGE_COMPANY_TEST_RECEIPT_SNAPSHOT_BARRIER;
+  if (!barrierValue) return;
+  if (process.env.NODE_ENV !== "test") {
+    fail("STRANGE_COMPANY_TEST_RECEIPT_SNAPSHOT_BARRIER is allowed only with NODE_ENV=test.");
+  }
+  const barrier = path.resolve(barrierValue);
+  const readyPath = `${barrier}.ready`;
+  const releasePath = `${barrier}.release`;
+  fs.writeFileSync(readyPath, "snapshot-ready\n", "utf8");
+  const deadline = Date.now() + 15000;
+  const sleeper = new Int32Array(new SharedArrayBuffer(4));
+  while (!fs.existsSync(releasePath)) {
+    if (Date.now() >= deadline) {
+      fail("test receipt snapshot barrier timed out.");
+    }
+    Atomics.wait(sleeper, 0, 0, 10);
+  }
 }
 
 function runValidator(label, scriptName, packetPath, validatorArgs) {
@@ -335,7 +516,7 @@ function runValidator(label, scriptName, packetPath, validatorArgs) {
 function buildReceipt(core) {
   const issuedAt = new Date();
   const receipt = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     mode: "public",
     status: ACTIVE_STATUS,
     issuedAt: issuedAt.toISOString(),
@@ -355,12 +536,17 @@ function buildReceipt(core) {
       digestCoversReceiptEnvelopeExceptLiveMode: true,
     },
   };
-  return { ...receipt, envelopeSha256: envelopeDigest(receipt) };
+  const completeReceipt = { ...receipt, envelopeSha256: envelopeDigest(receipt) };
+  enforcePublicAssetTextLength(
+    renderPublicJavaScript(completeReceipt),
+    "rendered public live receipt"
+  );
+  return completeReceipt;
 }
 
 function buildPlaceholder(core) {
-  return {
-    schemaVersion: 2,
+  const receipt = {
+    schemaVersion: 3,
     mode: "public",
     status: PLACEHOLDER_STATUS,
     issuedAt: "",
@@ -381,6 +567,11 @@ function buildPlaceholder(core) {
     },
     envelopeSha256: "",
   };
+  enforcePublicAssetTextLength(
+    renderPublicJavaScript(receipt),
+    "rendered public live receipt"
+  );
+  return receipt;
 }
 
 function renderPublicJavaScript(receipt) {
@@ -390,7 +581,11 @@ function renderPublicJavaScript(receipt) {
 function loadPublicReceipt(filePath) {
   try {
     const sandbox = { window: {}, Object };
-    vm.runInNewContext(fs.readFileSync(filePath, "utf8"), sandbox, { filename: filePath });
+    vm.runInNewContext(
+      readPublicAssetText(filePath, "public live receipt"),
+      sandbox,
+      { filename: filePath }
+    );
     return sandbox.window.PUBLIC_LIVE_RECEIPT;
   } catch (error) {
     fail(`Could not load public live receipt ${filePath}: ${error.message}`);
@@ -409,7 +604,7 @@ function validateCoreShape(core) {
       "form",
       "flags",
       "reviewDates",
-      "legalDocuments",
+      "reviewDocuments",
       "services",
     ],
     "receipt.core"
@@ -442,15 +637,10 @@ function validateCoreShape(core) {
       requireIsoDate(value, `receipt.core.reviewDates.${field}`, { allowFuture: true });
     }
   }
-  assertExactKeys(core.legalDocuments, ["terms", "privacy"], "receipt.core.legalDocuments");
-  for (const spec of LEGAL_DOCUMENT_SPECS) {
-    const document = core.legalDocuments[spec.key];
-    assertExactKeys(document, ["path", "sha256"], `receipt.core.legalDocuments.${spec.key}`);
-    if (document.path !== spec.publicPath) {
-      fail(`receipt.core.legalDocuments.${spec.key}.path must be ${spec.publicPath}.`);
-    }
-    if (!/^[a-f0-9]{64}$/.test(String(document.sha256 || ""))) {
-      fail(`receipt.core.legalDocuments.${spec.key}.sha256 must be a lowercase SHA-256 hex digest.`);
+  assertExactKeys(core.reviewDocuments, REVIEW_DOCUMENT_PATHS, "receipt.core.reviewDocuments");
+  for (const documentPath of REVIEW_DOCUMENT_PATHS) {
+    if (!/^[a-f0-9]{64}$/.test(String(core.reviewDocuments[documentPath] || ""))) {
+      fail(`receipt.core.reviewDocuments.${documentPath} must be a lowercase SHA-256 hex digest.`);
     }
   }
   if (!Array.isArray(core.services) || core.services.length === 0) {
@@ -483,7 +673,7 @@ function validateReceipt(receipt, currentCore) {
     ],
     "public live receipt"
   );
-  if (receipt.schemaVersion !== 2) fail("public live receipt schemaVersion must be 2.");
+  if (receipt.schemaVersion !== 3) fail("public live receipt schemaVersion must be 3.");
   if (receipt.mode !== "public") fail("public live receipt mode must be public.");
   if (![PLACEHOLDER_STATUS, ACTIVE_STATUS].includes(receipt.status)) {
     fail(`public live receipt status must be ${PLACEHOLDER_STATUS} or ${ACTIVE_STATUS}.`);
@@ -609,9 +799,11 @@ function writeReceipt(filePath, receipt, overwrite = force) {
   const contents = filePath.toLowerCase().endsWith(".json")
     ? `${JSON.stringify(receipt, null, 2)}\n`
     : renderPublicJavaScript(receipt);
+  enforcePublicAssetTextLength(contents, "rendered public live receipt");
   fs.writeFileSync(filePath, contents, "utf8");
 }
 
+let issuanceSnapshot = null;
 try {
   if (revoke && checkPublicJs) {
     fail("--revoke cannot be combined with --check-public-js.");
@@ -619,9 +811,9 @@ try {
   if (revoke && requireIssued) {
     fail("--revoke cannot be combined with --require-issued.");
   }
-  const currentCore = buildPublicCore(loadPublicConfig(publicConfigPath));
 
   if (checkPublicJs) {
+    const currentCore = buildPublicCore(loadPublicConfig(publicConfigPath));
     const receipt = loadPublicReceipt(publicJsPath);
     validateReceipt(receipt, currentCore);
     if (asJson) {
@@ -633,10 +825,8 @@ try {
           : "Public live receipt fail-closed placeholder validation passed."
       );
     }
-    process.exit(0);
-  }
-
-  if (revoke) {
+  } else if (revoke) {
+    const currentCore = buildPublicCore(loadPublicConfig(publicConfigPath));
     if (currentCore.flags.liveMode !== false) {
       fail("Refusing to revoke the public live receipt until public-config.js liveMode is false.");
     }
@@ -648,59 +838,68 @@ try {
     } else {
       console.log(`Public live receipt revoked to a fail-closed placeholder: ${outputPath}`);
     }
-    process.exit(0);
-  }
-
-  if (currentCore.flags.liveMode !== false) {
-    fail("Refusing to issue a live receipt after public-config.js liveMode has been enabled; issue it while liveMode is false, then perform the human flip.");
-  }
-  requireReadyCore(currentCore);
-  runValidator(
-    "LIVE_REVIEW_CLOSURE",
-    "validate_live_review_closure.js",
-    liveReviewClosurePath,
-    [
-      "--require-ready",
-      "--terms-doc",
-      termsDocumentPath,
-      "--privacy-doc",
-      privacyDocumentPath,
-      "--public-config",
-      publicConfigPath,
-    ]
-  );
-  runValidator(
-    "EXTERNAL_LIVE_PACKET",
-    "validate_external_live_packet.js",
-    externalPacketPath,
-    ["--require-live", "--public-config", publicConfigPath]
-  );
-  runValidator(
-    "REVENUE_SETUP_EVIDENCE_INDEX",
-    "validate_revenue_setup_evidence_index.js",
-    revenueIndexPath,
-    ["--require-all", "--public-config", publicConfigPath]
-  );
-  runValidator(
-    "REVIEWER_CANDIDATE_TRACKER",
-    "validate_reviewer_candidate_tracker.js",
-    reviewerTrackerPath,
-    ["--require-ready"]
-  );
-  runValidator(
-    "DELIVERY_REVIEW_CHECKLIST",
-    "validate_delivery_review_checklist.js",
-    deliveryReviewChecklistPath,
-    ["--require-ready"]
-  );
-  const receipt = buildReceipt(currentCore);
-  if (outputPath) writeReceipt(outputPath, receipt);
-  if (asJson) {
-    process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
   } else {
-    console.log(`Public live receipt written: ${outputPath}`);
+    issuanceSnapshot = createIssuanceSnapshot();
+    waitAtSnapshotBarrierForTest();
+    const currentCore = buildPublicCore(
+      loadPublicConfigSource(issuanceSnapshot.configSource, issuanceSnapshot.configPath),
+      issuanceSnapshot.documentContents
+    );
+    if (currentCore.flags.liveMode !== false) {
+      fail("Refusing to issue a live receipt after public-config.js liveMode has been enabled; issue it while liveMode is false, then perform the human flip.");
+    }
+    requireReadyCore(currentCore);
+    runValidator(
+      "LIVE_REVIEW_CLOSURE",
+      "validate_live_review_closure.js",
+      issuanceSnapshot.closurePath,
+      [
+        "--require-ready",
+        "--document-root",
+        issuanceSnapshot.dir,
+        "--terms-doc",
+        path.join(issuanceSnapshot.dir, "TERMOS.md"),
+        "--privacy-doc",
+        path.join(issuanceSnapshot.dir, "AVISO_DE_PRIVACIDADE.md"),
+        "--public-config",
+        issuanceSnapshot.configPath,
+      ]
+    );
+    runValidator(
+      "EXTERNAL_LIVE_PACKET",
+      "validate_external_live_packet.js",
+      externalPacketPath,
+      ["--require-live", "--public-config", issuanceSnapshot.configPath]
+    );
+    runValidator(
+      "REVENUE_SETUP_EVIDENCE_INDEX",
+      "validate_revenue_setup_evidence_index.js",
+      revenueIndexPath,
+      ["--require-all", "--public-config", issuanceSnapshot.configPath]
+    );
+    runValidator(
+      "REVIEWER_CANDIDATE_TRACKER",
+      "validate_reviewer_candidate_tracker.js",
+      reviewerTrackerPath,
+      ["--require-ready"]
+    );
+    runValidator(
+      "DELIVERY_REVIEW_CHECKLIST",
+      "validate_delivery_review_checklist.js",
+      deliveryReviewChecklistPath,
+      ["--require-ready"]
+    );
+    const receipt = buildReceipt(currentCore);
+    if (outputPath) writeReceipt(outputPath, receipt);
+    if (asJson) {
+      process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
+    } else {
+      console.log(`Public live receipt written: ${outputPath}`);
+    }
   }
 } catch (error) {
   console.error(`Public live receipt export failed: ${error.message}`);
-  process.exit(1);
+  process.exitCode = 1;
+} finally {
+  cleanupIssuanceSnapshot(issuanceSnapshot);
 }

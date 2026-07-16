@@ -10,7 +10,7 @@ The company-level loop models:
 - Brazil/legal/privacy/AI handoff review status
 - private payment and fiscal evidence readiness
 - private external support, Google, Stripe, bank, and review evidence readiness
-- public-only live receipt readiness, bound to the current public config plus normalized `TERMOS.md` and `AVISO_DE_PRIVACIDADE.md`
+- public-only schema-v3 live receipt readiness, bound to the current public config plus the exact nine-path `reviewDocuments` digest map
 - delivery review loop readiness
 - revenue pilot flow
 - support, tooling, and risk pressure
@@ -80,7 +80,7 @@ Hard blockers remain hard:
 - `privacyReviewedAt`
 - `brazilComplianceReviewedAt`
 - `aiHandoffReviewedAt`
-- document-bound human review closure validated against every required current file with `node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready`
+- document-bound human review closure validated against every required current file and the public review dates with `node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js`
 - private payment/fiscal evidence
 - private external live evidence validated against the current config with `node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js`
 

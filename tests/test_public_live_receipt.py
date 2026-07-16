@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import hashlib
+import os
 import pathlib
 import subprocess
 import tempfile
+import time
 import unittest
 from datetime import datetime, timedelta, timezone
 
@@ -18,13 +20,26 @@ REVIEWER_TEMPLATE = ROOT / "REVIEWER_CANDIDATE_TRACKER.template.json"
 DELIVERY_TEMPLATE = ROOT / "DELIVERY_REVIEW_CHECKLIST.template.json"
 CLOSURE_TEMPLATE = ROOT / "LIVE_REVIEW_CLOSURE.template.json"
 ACTIVE_STATUS = "local_packet_validators_passed"
-LEGAL_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_PUBLIC_LEGAL_DOCUMENT_V1"
+PUBLIC_REVIEW_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1"
 REVIEW_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_REVIEW_DOCUMENT_V1"
+PUBLIC_LIVE_CORE_DIGEST_DOMAIN = "STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2"
+PUBLIC_LIVE_RECEIPT_DIGEST_DOMAIN = "STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3"
+REVIEW_DOCUMENT_PATHS = (
+    "TERMOS.md",
+    "TERMS.md",
+    "AVISO_DE_PRIVACIDADE.md",
+    "PRIVACY.md",
+    "BRAZIL_COMPLIANCE.md",
+    "BRAZIL_COMPLIANCE_AGENTS.md",
+    "CONKA8_LAW_INSTRUCTIONS.md",
+    "AI_LEGAL_HANDOFF.md",
+    "HUMAN_REVIEW_PACKET.md",
+)
 
 
-def legal_document_digest(document_path: str, contents: str) -> str:
+def public_review_document_digest(document_path: str, contents: str) -> str:
     normalized = contents.removeprefix("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
-    payload = f"{LEGAL_DOCUMENT_DIGEST_DOMAIN}\npath={document_path}\n{normalized}"
+    payload = f"{PUBLIC_REVIEW_DOCUMENT_DIGEST_DOMAIN}\npath={document_path}\n{normalized}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -32,6 +47,34 @@ def review_document_digest(document_path: str, contents: str) -> str:
     normalized = contents.removeprefix("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
     payload = f"{REVIEW_DOCUMENT_DIGEST_DOMAIN}\npath={document_path}\n{normalized}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def recompute_public_receipt_digests(
+    receipt: dict[str, object],
+) -> dict[str, object]:
+    core = json.loads(json.dumps(receipt["core"]))
+    core["flags"].pop("liveMode", None)
+    core_json = json.dumps(core, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    receipt["coreSha256"] = hashlib.sha256(
+        f"{PUBLIC_LIVE_CORE_DIGEST_DOMAIN}\n{core_json}".encode("utf-8")
+    ).hexdigest()
+    envelope = {
+        "schemaVersion": receipt["schemaVersion"],
+        "mode": receipt["mode"],
+        "status": receipt["status"],
+        "issuedAt": receipt["issuedAt"],
+        "validUntil": receipt["validUntil"],
+        "core": core,
+        "coreSha256": receipt["coreSha256"],
+        "attestations": receipt["attestations"],
+    }
+    envelope_json = json.dumps(
+        envelope, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    )
+    receipt["envelopeSha256"] = hashlib.sha256(
+        f"{PUBLIC_LIVE_RECEIPT_DIGEST_DOMAIN}\n{envelope_json}".encode("utf-8")
+    ).hexdigest()
+    return receipt
 
 
 def run_exporter(*args: str) -> subprocess.CompletedProcess[str]:
@@ -484,21 +527,62 @@ def generation_args(
     )
 
 
+def copy_review_documents(folder: pathlib.Path) -> dict[str, pathlib.Path]:
+    document_root = folder / "review-documents"
+    document_root.mkdir()
+    documents: dict[str, pathlib.Path] = {}
+    for document_path in REVIEW_DOCUMENT_PATHS:
+        target = document_root / document_path
+        target.write_bytes((ROOT / document_path).read_bytes())
+        documents[document_path] = target
+    return documents
+
+
 class PublicLiveReceiptTests(unittest.TestCase):
+    def test_cli_rejects_missing_flag_valued_duplicate_alias_and_unknown_options(self) -> None:
+        for option in ("--document-root", "--terms-doc", "--privacy-doc"):
+            with self.subTest(option=option, case="bare"):
+                result = run_exporter(option)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(f"{option} requires a non-option value", result.stderr)
+            with self.subTest(option=option, case="flag-valued"):
+                result = run_exporter(option, "--force")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(f"{option} requires a non-option value", result.stderr)
+
+        duplicate_alias = run_exporter(
+            "--external-live-packet",
+            "first.json",
+            "--external-packet",
+            "second.json",
+        )
+        self.assertNotEqual(duplicate_alias.returncode, 0)
+        self.assertIn("duplicate aliases are not allowed", duplicate_alias.stderr)
+
+        duplicate_option = run_exporter(
+            "--terms-doc",
+            "TERMOS.md",
+            "--terms-doc",
+            "TERMOS.md",
+        )
+        self.assertNotEqual(duplicate_option.returncode, 0)
+        self.assertIn("duplicate option: --terms-doc", duplicate_option.stderr)
+
+        unknown = run_exporter("--untrusted-receipt-override")
+        self.assertNotEqual(unknown.returncode, 0)
+        self.assertIn("unknown option", unknown.stderr)
+
     def test_committed_placeholder_is_public_and_fail_closed(self) -> None:
         receipt = read_receipt(PUBLIC_RECEIPT)
 
+        self.assertEqual(receipt["schemaVersion"], 3)
         self.assertEqual(receipt["status"], "not_issued")
         self.assertEqual(receipt["issuedAt"], "")
         self.assertEqual(receipt["validUntil"], "")
         self.assertEqual(receipt["coreSha256"], "")
         self.assertEqual(receipt["envelopeSha256"], "")
         self.assertFalse(receipt["core"]["flags"]["liveMode"])
-        self.assertEqual(receipt["core"]["legalDocuments"]["terms"]["path"], "TERMOS.md")
-        self.assertEqual(
-            receipt["core"]["legalDocuments"]["privacy"]["path"],
-            "AVISO_DE_PRIVACIDADE.md",
-        )
+        self.assertEqual(set(receipt["core"]["reviewDocuments"]), set(REVIEW_DOCUMENT_PATHS))
         self.assertFalse(receipt["attestations"]["localPacketValidatorsPassed"])
         self.assertFalse(receipt["attestations"]["liveReviewClosureValidatorPassed"])
         self.assertFalse(receipt["attestations"]["operationalValidatorsPassed"])
@@ -510,6 +594,56 @@ class PublicLiveReceiptTests(unittest.TestCase):
         required = run_exporter("--check-public-js", "--require-issued")
         self.assertNotEqual(required.returncode, 0)
         self.assertIn("issued receipt", required.stderr)
+
+    def test_public_asset_text_limit_applies_to_issue_check_and_revoke(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            documents = copy_review_documents(folder)
+            document_root = documents["TERMOS.md"].parent
+            documents["AI_LEGAL_HANDOFF.md"].write_text(
+                "x" * 1_000_001,
+                encoding="utf-8",
+            )
+            output = folder / "public-live-receipt.js"
+            cases = {
+                "issue": generation_args(
+                    config,
+                    external,
+                    revenue,
+                    output,
+                    "--document-root",
+                    str(document_root),
+                ),
+                "check": (
+                    "--check-public-js",
+                    "--public-config",
+                    str(config),
+                    "--public-js",
+                    str(PUBLIC_RECEIPT),
+                    "--document-root",
+                    str(document_root),
+                ),
+                "revoke": (
+                    "--revoke",
+                    "--public-config",
+                    str(config),
+                    "--output",
+                    str(output),
+                    "--document-root",
+                    str(document_root),
+                ),
+            }
+
+            for mode, command in cases.items():
+                with self.subTest(mode=mode):
+                    result = run_exporter(*command)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(
+                        "exceeds 1000000 decoded text code units",
+                        result.stderr,
+                    )
+            self.assertFalse(output.exists())
 
     def test_export_generates_only_public_fields_and_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -525,6 +659,7 @@ class PublicLiveReceiptTests(unittest.TestCase):
             stdout_receipt = json.loads(result.stdout)
             file_receipt = read_receipt(output)
             self.assertEqual(stdout_receipt, file_receipt)
+            self.assertEqual(file_receipt["schemaVersion"], 3)
             self.assertEqual(file_receipt["status"], ACTIVE_STATUS)
             self.assertRegex(file_receipt["coreSha256"], r"^[a-f0-9]{64}$")
             self.assertRegex(file_receipt["envelopeSha256"], r"^[a-f0-9]{64}$")
@@ -542,18 +677,18 @@ class PublicLiveReceiptTests(unittest.TestCase):
             self.assertIn("form", file_receipt["core"])
             self.assertIn("flags", file_receipt["core"])
             self.assertEqual(
-                file_receipt["core"]["legalDocuments"]["terms"]["sha256"],
-                legal_document_digest(
-                    "TERMOS.md", (ROOT / "TERMOS.md").read_text(encoding="utf-8")
-                ),
+                set(file_receipt["core"]["reviewDocuments"]),
+                set(REVIEW_DOCUMENT_PATHS),
             )
-            self.assertEqual(
-                file_receipt["core"]["legalDocuments"]["privacy"]["sha256"],
-                legal_document_digest(
-                    "AVISO_DE_PRIVACIDADE.md",
-                    (ROOT / "AVISO_DE_PRIVACIDADE.md").read_text(encoding="utf-8"),
-                ),
-            )
+            for document_path in REVIEW_DOCUMENT_PATHS:
+                with self.subTest(document_path=document_path):
+                    self.assertEqual(
+                        file_receipt["core"]["reviewDocuments"][document_path],
+                        public_review_document_digest(
+                            document_path,
+                            (ROOT / document_path).read_text(encoding="utf-8"),
+                        ),
+                    )
             self.assertEqual(len(file_receipt["core"]["reviewDates"]), 4)
             self.assertEqual(len(file_receipt["core"]["services"]), 2)
 
@@ -599,6 +734,195 @@ class PublicLiveReceiptTests(unittest.TestCase):
                     "digestCoversCanonicalPublicCoreExceptLiveMode",
                     "digestCoversReceiptEnvelopeExceptLiveMode",
                 },
+            )
+
+    def test_check_rejects_manifest_shape_or_stale_digest_after_digest_recomputation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            output = folder / "public-live-receipt.js"
+            generated = run_exporter(
+                *generation_args(config, external, revenue, output)
+            )
+            self.assertEqual(generated.returncode, 0, generated.stderr)
+            original = read_receipt(output)
+
+            for case in ("missing", "extra", "substituted", "stale"):
+                with self.subTest(case=case):
+                    receipt = json.loads(json.dumps(original))
+                    manifest = receipt["core"]["reviewDocuments"]
+                    if case == "missing":
+                        manifest.pop("AI_LEGAL_HANDOFF.md")
+                    elif case == "extra":
+                        manifest["UNREVIEWED.md"] = "0" * 64
+                    elif case == "substituted":
+                        digest = manifest.pop("HUMAN_REVIEW_PACKET.md")
+                        manifest["HUMAN_REVIEW_PACKET-copy.md"] = digest
+                    else:
+                        manifest["BRAZIL_COMPLIANCE.md"] = "0" * 64
+                    recompute_public_receipt_digests(receipt)
+                    candidate = folder / f"public-live-receipt-{case}.js"
+                    candidate.write_text(render_receipt(receipt), encoding="utf-8")
+
+                    checked = run_exporter(
+                        "--check-public-js",
+                        "--require-issued",
+                        "--public-js",
+                        str(candidate),
+                        "--public-config",
+                        str(config),
+                    )
+
+                    self.assertNotEqual(checked.returncode, 0)
+                    if case == "stale":
+                        self.assertIn("stale public core", checked.stderr)
+                    else:
+                        self.assertIn("must contain only", checked.stderr)
+
+    def test_non_portuguese_review_document_drift_invalidates_issued_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            documents = copy_review_documents(folder)
+            document_root = documents["TERMOS.md"].parent
+            write_json(
+                folder,
+                "LIVE_REVIEW_CLOSURE.local.json",
+                ready_live_review_closure(
+                    ready_public_config(live_mode=False),
+                    document_overrides=documents,
+                ),
+            )
+            output = folder / "public-live-receipt.js"
+            generated = run_exporter(
+                *generation_args(
+                    config,
+                    external,
+                    revenue,
+                    output,
+                    "--document-root",
+                    str(document_root),
+                )
+            )
+            self.assertEqual(generated.returncode, 0, generated.stderr)
+
+            brazil_document = documents["BRAZIL_COMPLIANCE.md"]
+            brazil_document.write_text(
+                brazil_document.read_text(encoding="utf-8")
+                + "\nMaterial post-review compliance drift.\n",
+                encoding="utf-8",
+            )
+            checked = run_exporter(
+                "--check-public-js",
+                "--require-issued",
+                "--public-js",
+                str(output),
+                "--public-config",
+                str(config),
+                "--document-root",
+                str(document_root),
+            )
+
+            self.assertNotEqual(checked.returncode, 0)
+            self.assertIn("stale public core", checked.stderr)
+
+    def test_issuance_uses_one_immutable_config_closure_and_document_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            documents = copy_review_documents(folder)
+            document_root = documents["TERMOS.md"].parent
+            closure_path = write_json(
+                folder,
+                "LIVE_REVIEW_CLOSURE.local.json",
+                ready_live_review_closure(
+                    ready_public_config(live_mode=False),
+                    document_overrides=documents,
+                ),
+            )
+            original_brazil_text = documents["BRAZIL_COMPLIANCE.md"].read_text(
+                encoding="utf-8"
+            )
+            original_brazil_digest = public_review_document_digest(
+                "BRAZIL_COMPLIANCE.md",
+                original_brazil_text,
+            )
+            output = folder / "public-live-receipt.js"
+            barrier = folder / "receipt-snapshot-barrier"
+            ready_marker = pathlib.Path(f"{barrier}.ready")
+            release_marker = pathlib.Path(f"{barrier}.release")
+            environment = os.environ.copy()
+            environment["NODE_ENV"] = "test"
+            environment["STRANGE_COMPANY_TEST_RECEIPT_SNAPSHOT_BARRIER"] = str(
+                barrier
+            )
+            process = subprocess.Popen(
+                [
+                    "node",
+                    str(EXPORTER.relative_to(ROOT)),
+                    *generation_args(
+                        config,
+                        external,
+                        revenue,
+                        output,
+                        "--document-root",
+                        str(document_root),
+                    ),
+                ],
+                cwd=ROOT,
+                encoding="utf-8",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=environment,
+            )
+            try:
+                deadline = time.monotonic() + 10
+                while not ready_marker.exists() and process.poll() is None:
+                    if time.monotonic() >= deadline:
+                        self.fail("receipt exporter did not reach the snapshot barrier")
+                    time.sleep(0.01)
+                if process.poll() is not None:
+                    stdout, stderr = process.communicate()
+                    self.fail(
+                        f"receipt exporter exited before snapshot swap: {stdout}{stderr}"
+                    )
+
+                swapped_config = ready_public_config(live_mode=False)
+                swapped_config["operatorName"] = "Swapped operator after snapshot"
+                write_public_config(folder, swapped_config)
+                swapped_brazil_text = (
+                    original_brazil_text + "\nSwapped compliance bytes after snapshot.\n"
+                )
+                documents["BRAZIL_COMPLIANCE.md"].write_text(
+                    swapped_brazil_text,
+                    encoding="utf-8",
+                )
+                swapped_closure = json.loads(
+                    closure_path.read_text(encoding="utf-8")
+                )
+                swapped_closure["mode"] = "template"
+                write_json(folder, closure_path.name, swapped_closure)
+                release_marker.write_text("release\n", encoding="utf-8")
+
+                stdout, stderr = process.communicate(timeout=30)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.communicate()
+
+            self.assertEqual(process.returncode, 0, f"{stdout}{stderr}")
+            receipt = read_receipt(output)
+            self.assertEqual(receipt["core"]["operatorName"], "Strange Works Studio")
+            self.assertEqual(
+                receipt["core"]["reviewDocuments"]["BRAZIL_COMPLIANCE.md"],
+                original_brazil_digest,
+            )
+            self.assertNotEqual(
+                receipt["core"]["reviewDocuments"]["BRAZIL_COMPLIANCE.md"],
+                public_review_document_digest(
+                    "BRAZIL_COMPLIANCE.md",
+                    swapped_brazil_text,
+                ),
             )
 
     def test_export_fails_closed_when_live_review_closure_is_missing(self) -> None:
@@ -823,7 +1147,7 @@ class PublicLiveReceiptTests(unittest.TestCase):
             self.assertEqual(checked.returncode, 0, checked.stderr)
             self.assertEqual(read_receipt(output)["coreSha256"], original_digest)
 
-    def test_legal_document_digests_normalize_line_endings_and_detect_drift(self) -> None:
+    def test_review_document_digests_normalize_bom_and_line_endings_and_detect_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             folder = pathlib.Path(tmp)
             config, external, revenue = ready_files(folder)
@@ -858,10 +1182,12 @@ class PublicLiveReceiptTests(unittest.TestCase):
                 *generation_args(config, external, revenue, output, *document_args)
             )
             self.assertEqual(generated.returncode, 0, generated.stderr)
-            issued_terms_digest = read_receipt(output)["core"]["legalDocuments"]["terms"]["sha256"]
+            issued_terms_digest = read_receipt(output)["core"]["reviewDocuments"]["TERMOS.md"]
 
             normalized_terms = terms_text.replace("\r\n", "\n").replace("\r", "\n")
-            terms.write_bytes(normalized_terms.replace("\n", "\r\n").encode("utf-8"))
+            terms.write_bytes(
+                b"\xef\xbb\xbf" + normalized_terms.replace("\n", "\r\n").encode("utf-8")
+            )
             line_ending_only = run_exporter(
                 "--check-public-js",
                 "--require-issued",
@@ -874,7 +1200,7 @@ class PublicLiveReceiptTests(unittest.TestCase):
             self.assertEqual(line_ending_only.returncode, 0, line_ending_only.stderr)
             self.assertEqual(
                 issued_terms_digest,
-                legal_document_digest("TERMOS.md", normalized_terms),
+                public_review_document_digest("TERMOS.md", normalized_terms),
             )
 
             terms.write_bytes(f"{normalized_terms}\nMaterial legal drift.\n".encode("utf-8"))

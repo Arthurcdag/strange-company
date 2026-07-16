@@ -76,7 +76,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [REVIEW_READY_PACKET.md](REVIEW_READY_PACKET.md): AI-prepared review brief for the remaining human/legal/compliance sign-off fields.
 - [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md): developer/operator instructions for creating the support inbox, Google Form, Sheet ledger, review dates, Stripe invoice route, and bank evidence.
 - [HUMAN_REVIEW_PACKET.md](HUMAN_REVIEW_PACKET.md): AI-prepared packet for the manual human/legal/accounting/payment evidence needed before live intake.
-- [LIVE_REVIEW_CLOSURE.template.json](LIVE_REVIEW_CLOSURE.template.json): blank local packet for closing the four public review-date blockers while keeping `liveMode` false.
+- [LIVE_REVIEW_CLOSURE.template.json](LIVE_REVIEW_CLOSURE.template.json): blank local packet for closing the four public review-date blockers against all nine canonical reviewed documents while keeping `liveMode` false.
 - [CONKA8_LAW_INSTRUCTIONS.md](CONKA8_LAW_INSTRUCTIONS.md): law-sensitive operating instructions for conka8, including AI/human boundaries and launch stop rules.
 - [REVENUE_PILOT.md](REVENUE_PILOT.md): how the prototype moves toward the first controlled paid offer.
 - [SATELLITE_COMPANY.md](SATELLITE_COMPANY.md): how a separate for-profit company can net profit without breaking the sealed Strange Company charter.
@@ -127,11 +127,11 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 
 - [public.html](public.html): public GitHub Pages documentation and AMA surface; the paid desk stays hidden and disabled until strict live readiness passes.
 - [public-config.js](public-config.js): public support inbox, Google Form URL, service names, and prices.
-- [public-live-receipt.js](public-live-receipt.js): public-only fail-closed lease; paid intake stays closed until the document-bound review closure and all four other private readiness and operating-capacity validators pass, the receipt envelope is issued, and its seven-day validity has not expired.
+- [public-live-receipt.js](public-live-receipt.js): public-only fail-closed schema-v3 lease; its `reviewDocuments` core binds all nine canonical reviewed documents, and paid intake stays closed until the document-bound review closure and all four other private readiness and operating-capacity validators pass, the receipt envelope is issued, and its seven-day validity has not expired.
 - [public-ama-answers.js](public-ama-answers.js): public-safe AMA answer archive loaded by the static page; empty until approved answers are exported.
 - [public.js](public.js): payment-safe public request packet builder.
 - [tools/build_public_site.js](tools/build_public_site.js): cross-platform builder/checker for the GitHub Pages public bundle.
-- [tools/export_public_live_receipt.js](tools/export_public_live_receipt.js): two-phase exporter that validates the document-bound human-review closure plus revenue, external-live, reviewer-capacity, and delivery-review packets, then emits a public-only, config-bound seven-day receipt while `liveMode` remains false; `--revoke` replaces any lease with a closed placeholder without private packets.
+- [tools/export_public_live_receipt.js](tools/export_public_live_receipt.js): two-phase exporter that validates the document-bound human-review closure plus revenue, external-live, reviewer-capacity, and delivery-review packets, then emits a public-only, config-bound schema-v3 seven-day receipt whose exact `reviewDocuments` map covers all nine reviewed paths while `liveMode` remains false; `--revoke` replaces any lease with a closed placeholder without private packets.
 - [tools/preflight_public_launch.js](tools/preflight_public_launch.js): launch preflight for public/private separation, URL allowlists, live-mode config, and sensitive-data guard coverage.
 - [tools/audit_company_functionality.js](tools/audit_company_functionality.js): repo-level audit for Strange Company, the satellite operator, and the external live-operation gate.
 - [tools/audit_evolution_log.js](tools/audit_evolution_log.js): public-safe audit for `EVOLUTION_LOG.md`, requiring objective, changed artifacts, verification commands, and a result for each evolution pass.
@@ -222,10 +222,14 @@ four other private validators pass while
 separate human flip last, and run `node tools/preflight_public_launch.js
 --deployment`. The receipt carries no private packet data or hashes. Its core
 and full envelope have independent SHA-256 integrity checks, the browser
-recomputes both, and the lease expires after seven days. The core also binds
-the normalized UTF-8 contents of `TERMOS.md` and `AVISO_DE_PRIVACIDADE.md`
-through fixed-path, domain-separated SHA-256 hashes, so changing either public
-legal document requires a new receipt. This is a
+recomputes both, and the lease expires after seven days. The schema-v3 core's
+exact `reviewDocuments` map binds the normalized UTF-8 contents of `TERMOS.md`,
+`TERMS.md`, `AVISO_DE_PRIVACIDADE.md`, `PRIVACY.md`, `BRAZIL_COMPLIANCE.md`,
+`BRAZIL_COMPLIANCE_AGENTS.md`, `CONKA8_LAW_INSTRUCTIONS.md`,
+`AI_LEGAL_HANDOFF.md`, and `HUMAN_REVIEW_PACKET.md` through canonical-path,
+domain-separated SHA-256 hashes. The public bundle includes all nine so the
+browser can refetch and rehash every reviewed path; changing any one requires
+renewed human review and a new receipt. This is a
 process-integrity receipt, not external certification or cryptographic proof
 that a specific operator ran the validators. VAU independently rechecks the
 private packets, so a missing, expired, stale, config-mismatched, or

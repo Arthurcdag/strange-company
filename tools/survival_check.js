@@ -6,6 +6,17 @@ const vm = require("vm");
 const root = path.resolve(__dirname, "..");
 const failures = [];
 const evidence = [];
+const PUBLIC_REVIEW_DOCUMENT_PATHS = Object.freeze([
+  "TERMOS.md",
+  "TERMS.md",
+  "AVISO_DE_PRIVACIDADE.md",
+  "PRIVACY.md",
+  "BRAZIL_COMPLIANCE.md",
+  "BRAZIL_COMPLIANCE_AGENTS.md",
+  "CONKA8_LAW_INSTRUCTIONS.md",
+  "AI_LEGAL_HANDOFF.md",
+  "HUMAN_REVIEW_PACKET.md",
+]);
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
@@ -76,7 +87,10 @@ function checkStaticSurvivalSurface() {
   const publicHtml = read("public.html");
   const publicJs = read("public.js");
   const publicConfig = read("public-config.js");
+  const publicReceipt = read("public-live-receipt.js");
   const publicAnswers = read("public-ama-answers.js");
+  const receiptExporter = read("tools/export_public_live_receipt.js");
+  const publicSiteBuilder = read("tools/build_public_site.js");
 
   assert(charter.includes("lawfully survive, grow, and compound"), "CHARTER.md must preserve the lawful survival objective.", "charter survival objective", "CHARTER.md");
   assert(charter.includes("Does it avoid creating a single point of failure?"), "CHARTER.md must keep the single-point-of-failure test.", "single-point-of-failure test", "CHARTER.md");
@@ -136,6 +150,21 @@ function checkStaticSurvivalSurface() {
   assert(read("tools/export_public_live_receipt.js").includes("privatePacketHashesExcluded"), "the public live receipt must exclude hashes of private packets.", "public live receipt private hash exclusion", "tools/export_public_live_receipt.js");
   assert(read("tools/export_public_live_receipt.js").includes("--live-review-closure"), "the public live receipt must require the document-bound human review packet for issuance.", "public receipt live review closure gate", "tools/export_public_live_receipt.js");
   assert(publicJs.includes("liveReviewClosureValidatorPassed"), "the browser must require the public-safe human-review validator attestation.", "public receipt browser review gate", "public.js");
+  assert(receiptExporter.includes("schemaVersion: 3") && publicReceipt.includes('"schemaVersion": 3'), "the exporter and placeholder must use public receipt schema v3.", "public receipt schema v3", "tools/export_public_live_receipt.js, public-live-receipt.js");
+  assert(receiptExporter.includes("reviewDocuments") && publicJs.includes("reviewDocuments"), "the exporter and browser must use the nine-document reviewDocuments core.", "public receipt nine-document core", "tools/export_public_live_receipt.js, public.js");
+  assert(receiptExporter.includes("STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1") && publicJs.includes("STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1"), "the exporter and browser must share the review-document digest domain.", "review-document digest domain", "STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1");
+  assert(receiptExporter.includes("STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2") && publicJs.includes("STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2"), "the exporter and browser must share the v2 public core digest domain.", "public core digest domain", "STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2");
+  assert(receiptExporter.includes("STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3") && publicJs.includes("STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3"), "the exporter and browser must share the v3 public envelope digest domain.", "public envelope digest domain", "STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3");
+  for (const documentPath of PUBLIC_REVIEW_DOCUMENT_PATHS) {
+    const quotedPath = JSON.stringify(documentPath);
+    assert(liveReviewTemplate.includes(quotedPath), `live review template must name canonical document ${documentPath}.`, `closure document ${documentPath}`, "LIVE_REVIEW_CLOSURE.template.json");
+    assert(receiptExporter.includes(quotedPath), `public receipt exporter must bind runtime document ${documentPath}.`, `receipt document ${documentPath}`, "tools/export_public_live_receipt.js");
+    assert(publicJs.includes(quotedPath), `public browser must revalidate runtime document ${documentPath}.`, `browser document ${documentPath}`, "public.js");
+    assert(publicSiteBuilder.includes(quotedPath), `public bundle must require runtime document ${documentPath}.`, `bundle document ${documentPath}`, "tools/build_public_site.js");
+  }
+  assert(!receiptExporter.includes("legalDocuments") && !publicJs.includes("legalDocuments") && !publicReceipt.includes('"legalDocuments"'), "legacy two-document legalDocuments cores must be removed.", "legacy two-document core removed", "receipt exporter, browser, placeholder");
+  assert(publicSiteBuilder.includes("sourceBytes.length !== bundledBytes.length") && publicSiteBuilder.includes("sourceBytes.equals(bundledBytes)"), "public bundle must enforce size and byte parity for every reviewed document.", "public bundle reviewed-document parity", "tools/build_public_site.js");
+  assert(publicSiteBuilder.includes('"--document-root"') && publicSiteBuilder.includes('path.join(root, "tools", "export_public_live_receipt.js")'), "public bundle must validate its receipt against the bundled document root with the trusted root exporter.", "public bundle receipt validation", "tools/build_public_site.js");
   assert(brazilCompliance.includes("Keep `public-config.js` at `liveMode: false`"), "BRAZIL_COMPLIANCE.md must keep the liveMode stop rule.", "Brazil liveMode stop rule", "BRAZIL_COMPLIANCE.md");
   assert(brazilAgents.includes("Human must close"), "BRAZIL_COMPLIANCE_AGENTS.md must keep human closure language.", "Brazil compliance human closure", "BRAZIL_COMPLIANCE_AGENTS.md");
   assert(aiHandoff.includes("Before setting `liveMode: true`"), "AI_LEGAL_HANDOFF.md must gate live mode on human review.", "AI human review live gate", "AI_LEGAL_HANDOFF.md");

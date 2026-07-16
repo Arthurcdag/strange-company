@@ -16,6 +16,26 @@ Keep `EXTERNAL_LIVE_PACKET.local.json` local and uncommitted.
 Keep `LIVE_REVIEW_CLOSURE.local.json` local and uncommitted. Its schema-v2
 document digests bind each approval to the exact normalized bytes reviewed;
 regenerate and repeat human review whenever a required document changes.
+The resulting public receipt uses schema v3 and replaces the former two-file
+legal core with an exact `reviewDocuments` map for all nine canonical paths.
+Each runtime digest uses `STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1`, the
+canonical path, and BOM-stripped, LF-normalized UTF-8 text. The map contains
+only public document digests; it never contains private packet hashes.
+
+## Nine-Document Runtime Ledger
+
+Every file below must be present in the deployed bundle, match the human-review
+closure, and match the browser-recomputed schema-v3 receipt digest:
+
+- `TERMOS.md`
+- `TERMS.md`
+- `AVISO_DE_PRIVACIDADE.md`
+- `PRIVACY.md`
+- `BRAZIL_COMPLIANCE.md`
+- `BRAZIL_COMPLIANCE_AGENTS.md`
+- `CONKA8_LAW_INSTRUCTIONS.md`
+- `AI_LEGAL_HANDOFF.md`
+- `HUMAN_REVIEW_PACKET.md`
 
 ## Current Gate Shape
 
@@ -126,8 +146,8 @@ satellite_is_revenue_operator:
 | Google Form test row | operator | Closed 2026-05-24: safe test response reached the private Sheet | `googleFormVerified` |
 | Terms review | operator/lawyer | `TERMOS.md`, `TERMS.md`, offer, refund/cancellation, support, and invoice flow reviewed | `termsReviewedAt` |
 | Privacy review | operator/lawyer | `AVISO_DE_PRIVACIDADE.md`, `PRIVACY.md`, LGPD contact, retention, processors, and rights path reviewed | `privacyReviewedAt` |
-| Brazil compliance review | operator/accountant/lawyer | CNPJ/entity route, NFS-e or fiscal receipt route, payment support, tax/accounting note, LGPD route | `brazilComplianceReviewedAt` |
-| AI handoff review | operator/lawyer | AI-prepared legal/compliance text accepted, changed, or rejected by a human | `aiHandoffReviewedAt` |
+| Brazil compliance review | operator/accountant/lawyer | `BRAZIL_COMPLIANCE.md`, `BRAZIL_COMPLIANCE_AGENTS.md`, `CONKA8_LAW_INSTRUCTIONS.md`, CNPJ/entity route, NFS-e or fiscal receipt route, payment support, tax/accounting note, and LGPD route reviewed | `brazilComplianceReviewedAt` |
+| AI handoff review | operator/lawyer | `AI_LEGAL_HANDOFF.md` and `HUMAN_REVIEW_PACKET.md`; AI-prepared legal/compliance text accepted, changed, or rejected by a human | `aiHandoffReviewedAt` |
 | Stripe route | operator/accountant | Hosted Invoices enabled, test invoice created, payout route and reconciliation owner confirmed | local packet only |
 | Bank route | operator/accountant | Business bank/account route and responsible party recorded | local packet only |
 | Final attestation | responsible operator | No secrets in repo, Strange Company remains sealed, satellite is revenue operator | local packet only |
@@ -142,6 +162,7 @@ Use this section every time the project advances one review gate:
    - `node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready`
    - `node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json`
    - if both pass, copy only `termsReviewedAt`, `privacyReviewedAt`, `brazilComplianceReviewedAt`, and `aiHandoffReviewedAt` into `public-config.js`; keep `liveMode: false`.
+   - run `node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js` and stop unless the dates and all nine document digests remain bound.
 4. Validate final live readiness only after payment, bank, support, Google, and attestation evidence also exists:
    - `node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js`
    - `node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js`
@@ -224,7 +245,7 @@ If any command fails, keep `liveMode: false`. If all pass and status has no hard
 
 Stop and keep live intake closed if:
 
-- any required review document changed after review and the schema-v2 closure digest was not regenerated and re-reviewed,
+- any of the nine required review documents changed after review and the schema-v2 closure digest plus schema-v3 public receipt were not regenerated and re-reviewed,
 - CNPJ/entity, NFS-e, fiscal receipt, payment, or LGPD route is uncertain,
 - Stripe or bank evidence is missing,
 - AI-generated legal/compliance text is being treated as final human approval,

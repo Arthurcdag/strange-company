@@ -19,36 +19,38 @@ README = ROOT / "README.md"
 PREFLIGHT = ROOT / "tools" / "preflight_public_launch.js"
 AUDIT = ROOT / "tools" / "audit_company_functionality.js"
 SURVIVAL = ROOT / "tools" / "survival_check.js"
-LEGAL_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_PUBLIC_LEGAL_DOCUMENT_V1"
-LEGAL_DOCUMENT_PATHS = ("TERMOS.md", "AVISO_DE_PRIVACIDADE.md")
+REVIEW_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1"
+REVIEW_DOCUMENT_PATHS = (
+    "TERMOS.md",
+    "TERMS.md",
+    "AVISO_DE_PRIVACIDADE.md",
+    "PRIVACY.md",
+    "BRAZIL_COMPLIANCE.md",
+    "BRAZIL_COMPLIANCE_AGENTS.md",
+    "CONKA8_LAW_INSTRUCTIONS.md",
+    "AI_LEGAL_HANDOFF.md",
+    "HUMAN_REVIEW_PACKET.md",
+)
 
 
-def public_legal_document_contents() -> dict[str, str]:
+def public_review_document_contents() -> dict[str, str]:
     return {
         document_path: (ROOT / document_path).read_text(encoding="utf-8")
-        for document_path in LEGAL_DOCUMENT_PATHS
+        for document_path in REVIEW_DOCUMENT_PATHS
     }
 
 
-def legal_document_digest(document_path: str, contents: str) -> str:
+def review_document_digest(document_path: str, contents: str) -> str:
     normalized = contents.removeprefix("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
-    payload = f"{LEGAL_DOCUMENT_DIGEST_DOMAIN}\npath={document_path}\n{normalized}"
+    payload = f"{REVIEW_DOCUMENT_DIGEST_DOMAIN}\npath={document_path}\n{normalized}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def legal_document_core(contents: dict[str, str] | None = None) -> dict[str, object]:
-    documents = contents or public_legal_document_contents()
+def review_document_core(contents: dict[str, str] | None = None) -> dict[str, str]:
+    documents = public_review_document_contents() if contents is None else contents
     return {
-        "terms": {
-            "path": "TERMOS.md",
-            "sha256": legal_document_digest("TERMOS.md", documents["TERMOS.md"]),
-        },
-        "privacy": {
-            "path": "AVISO_DE_PRIVACIDADE.md",
-            "sha256": legal_document_digest(
-                "AVISO_DE_PRIVACIDADE.md", documents["AVISO_DE_PRIVACIDADE.md"]
-            ),
-        },
+        document_path: review_document_digest(document_path, documents[document_path])
+        for document_path in REVIEW_DOCUMENT_PATHS
     }
 
 
@@ -64,17 +66,23 @@ def evaluate_public_readiness(
     config: dict[str, object],
     receipt: dict[str, object],
     readiness_now_ms: int | None = None,
-    legal_documents: dict[str, str] | None = None,
+    review_documents: dict[str, str] | None = None,
     served_receipt: dict[str, object] | None = None,
     refresh_from_server: bool = False,
 ) -> dict[str, object]:
-    documents = legal_documents or public_legal_document_contents()
+    documents = public_review_document_contents() if review_documents is None else review_documents
     served_receipt_payload = receipt if served_receipt is None else served_receipt
     receipt_script = render_receipt(served_receipt_payload)
-    runner = f"""
+    with tempfile.TemporaryDirectory() as fixture_tmp:
+        documents_path = pathlib.Path(fixture_tmp) / "review-documents.json"
+        documents_path.write_text(
+            json.dumps(documents, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        runner = f"""
       const fs = require("fs");
       const vm = require("vm");
-      const legalDocuments = {json.dumps(documents)};
+      const reviewDocuments = JSON.parse(fs.readFileSync({json.dumps(str(documents_path))}, "utf8"));
       const receiptScript = {json.dumps(receipt_script)};
       const context = {{
         window: {{ PUBLIC_ORDER_CONFIG: {json.dumps(config)}, PUBLIC_LIVE_RECEIPT: {json.dumps(receipt)} }},
@@ -88,8 +96,8 @@ def evaluate_public_readiness(
           if (key === "public-live-receipt.js") {{
             return {{ ok: true, text: async () => receiptScript }};
           }}
-          const found = Object.prototype.hasOwnProperty.call(legalDocuments, key);
-          return {{ ok: found, text: async () => found ? legalDocuments[key] : "" }};
+          const found = Object.prototype.hasOwnProperty.call(reviewDocuments, key);
+          return {{ ok: found, text: async () => found ? reviewDocuments[key] : "" }};
         }},
       }};
       vm.createContext(context);
@@ -111,15 +119,82 @@ def evaluate_public_readiness(
           readinessNow === null ? Date.now() : readinessNow
         )));
       }})().catch((error) => {{ console.error(error); process.exit(1); }});
-    """
-    result = subprocess.run(
-        ["node", "-e", runner],
-        cwd=ROOT,
-        check=False,
-        encoding="utf-8",
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+        """
+        result = subprocess.run(
+            ["node", "-e", runner],
+            cwd=ROOT,
+            check=False,
+            encoding="utf-8",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    if result.returncode != 0:
+        raise AssertionError(result.stderr)
+    return json.loads(result.stdout)
+
+
+def run_browser_refresh_probe(
+    receipts: list[dict[str, object]],
+    probe_source: str,
+    *,
+    config: dict[str, object] | None = None,
+) -> dict[str, object]:
+    public_config = config or ready_public_config(live_mode=True)
+    documents = public_review_document_contents()
+    receipt_scripts = [render_receipt(receipt) for receipt in receipts]
+    with tempfile.TemporaryDirectory() as fixture_tmp:
+        documents_path = pathlib.Path(fixture_tmp) / "review-documents.json"
+        documents_path.write_text(
+            json.dumps(documents, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        runner = f"""
+          const fs = require("fs");
+          const vm = require("vm");
+          const reviewDocuments = JSON.parse(fs.readFileSync({json.dumps(str(documents_path))}, "utf8"));
+          const receiptScripts = {json.dumps(receipt_scripts)};
+          let receiptFetches = 0;
+          let documentFetches = 0;
+          const context = {{
+            window: {{
+              PUBLIC_ORDER_CONFIG: {json.dumps(public_config)},
+              PUBLIC_LIVE_RECEIPT: {json.dumps(receipts[0] if receipts else {})},
+              setTimeout() {{ return 1; }},
+              clearTimeout() {{}},
+              setInterval() {{ return 1; }},
+            }},
+            document: {{ addEventListener() {{}}, querySelector() {{ return null; }}, visibilityState: "visible" }},
+            crypto: require("crypto").webcrypto,
+            TextEncoder,
+            Intl,
+            URL,
+            fetch: async (resource) => {{
+              const key = String(resource);
+              if (key === "public-live-receipt.js") {{
+                const index = Math.min(receiptFetches, receiptScripts.length - 1);
+                receiptFetches += 1;
+                return {{ ok: index >= 0, text: async () => index >= 0 ? receiptScripts[index] : "" }};
+              }}
+              documentFetches += 1;
+              const found = Object.prototype.hasOwnProperty.call(reviewDocuments, key);
+              return {{ ok: found, text: async () => found ? reviewDocuments[key] : "" }};
+            }},
+          }};
+          vm.createContext(context);
+          vm.runInContext(fs.readFileSync({json.dumps(str(PUBLIC_JS))}, "utf8"), context);
+          (async () => {{
+            {probe_source}
+          }})().catch((error) => {{ console.error(error); process.exit(1); }});
+        """
+        result = subprocess.run(
+            ["node", "-e", runner],
+            cwd=ROOT,
+            check=False,
+            encoding="utf-8",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=15,
+        )
     if result.returncode != 0:
         raise AssertionError(result.stderr)
     return json.loads(result.stdout)
@@ -156,7 +231,7 @@ def recompute_receipt_digests(receipt: dict[str, object]) -> dict[str, object]:
     core["flags"].pop("liveMode", None)
     core_json = json.dumps(core, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
     receipt["coreSha256"] = hashlib.sha256(
-        f"STRANGE_COMPANY_PUBLIC_LIVE_CORE_V1\n{core_json}".encode("utf-8")
+        f"STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2\n{core_json}".encode("utf-8")
     ).hexdigest()
     envelope = {
         "schemaVersion": receipt["schemaVersion"],
@@ -170,7 +245,7 @@ def recompute_receipt_digests(receipt: dict[str, object]) -> dict[str, object]:
     }
     envelope_json = json.dumps(envelope, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
     receipt["envelopeSha256"] = hashlib.sha256(
-        f"STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V2\n{envelope_json}".encode("utf-8")
+        f"STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3\n{envelope_json}".encode("utf-8")
     ).hexdigest()
     return receipt
 
@@ -194,13 +269,13 @@ def issued_receipt(config: dict[str, object]) -> dict[str, object]:
             "brazilComplianceReviewedAt": config["brazilComplianceReviewedAt"],
             "aiHandoffReviewedAt": config["aiHandoffReviewedAt"],
         },
-        "legalDocuments": legal_document_core(),
+        "reviewDocuments": review_document_core(),
         "services": config["services"],
     }
     issued_at = datetime.now(timezone.utc).replace(microsecond=0)
     valid_until = issued_at + timedelta(days=7)
     receipt = {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "mode": "public",
         "status": "local_packet_validators_passed",
         "issuedAt": issued_at.isoformat(timespec="milliseconds").replace("+00:00", "Z"),
@@ -257,12 +332,19 @@ class PublicAmaTests(unittest.TestCase):
         self.assertIn("return JSON.parse(source.slice(prefix.length, -2));", js)
         self.assertNotIn("localStorage", js)
         self.assertIn("if (!readiness.liveReady)", js)
-        self.assertIn("refreshPublicLiveReceiptVerification();", js)
-        self.assertIn("await waitForLatestPublicLiveReceiptRefresh();", js)
-        self.assertIn("PUBLIC_LIVE_RECEIPT_REFRESH_EPOCH", js)
+        self.assertIn("PUBLIC_LIVE_RECEIPT_REFRESH_IN_FLIGHT", js)
+        self.assertIn("PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_FORCED", js)
+        self.assertIn("PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_REVALIDATES_DOCUMENTS", js)
+        self.assertIn("PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED", js)
+        self.assertIn("PUBLIC_REVIEW_DOCUMENT_VERIFICATION_TTL_MS = 15 * 60 * 1000", js)
         self.assertIn('document.addEventListener("visibilitychange"', js)
         self.assertIn("controller.abort()", js)
         self.assertIn("5000", js)
+        self.assertIn('"STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1"', js)
+        self.assertIn("Promise.all(PUBLIC_REVIEW_DOCUMENT_PATHS.map", js)
+        self.assertIn("receipt.schemaVersion === 3", js)
+        self.assertIn("STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2", js)
+        self.assertIn("STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V3", js)
         self.assertIn("window.PUBLIC_AMA_ANSWERS", PUBLIC_AMA_ANSWERS_JS.read_text(encoding="utf-8"))
 
     def test_paid_order_desk_fails_closed_and_hands_off_to_ama(self) -> None:
@@ -277,9 +359,16 @@ class PublicAmaTests(unittest.TestCase):
         self.assertIn('id="publicOrderForm" hidden aria-hidden="true"', html)
         self.assertIn('id="publicOrderFields" hidden disabled', html)
         self.assertIn(
-            "refreshPublicLiveReceiptVerification();\n    await waitForLatestPublicLiveReceiptRefresh();",
+            "await refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });",
             paid_setup,
         )
+
+        ama_setup = js[js.index("function setupAmaForm()") : js.index("function renderPacket(")]
+        self.assertNotIn("refreshPublicLiveReceiptVerification", ama_setup)
+        dom_ready = js[js.index('document.addEventListener("DOMContentLoaded"') :]
+        self.assertNotIn('document.addEventListener("DOMContentLoaded", async', dom_ready)
+        self.assertLess(dom_ready.index("setupAmaForm();"), dom_ready.index("refreshPublicLiveReceiptVerification"))
+        self.assertLess(dom_ready.index("setupForm();"), dom_ready.index("refreshPublicLiveReceiptVerification"))
 
         for snippet in (
             "function setPublicOrderAvailability()",
@@ -292,6 +381,105 @@ class PublicAmaTests(unittest.TestCase):
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, js)
+
+    def test_dom_ready_attaches_handlers_before_receipt_fetch_and_ama_is_independent(self) -> None:
+        config = ready_public_config(live_mode=True)
+        config["supportInboxVerified"] = False
+        receipt_script = render_receipt({})
+        runner = f"""
+          const fs = require("fs");
+          const vm = require("vm");
+          const handlers = {{}};
+          const documentHandlers = {{}};
+          const makeElement = (name) => ({{
+            hidden: false,
+            disabled: false,
+            value: "",
+            innerHTML: "",
+            classList: {{ add() {{}} }},
+            setAttribute() {{}},
+            reset() {{}},
+            addEventListener(type, callback) {{ handlers[`${{name}}:${{type}}`] = callback; }}
+          }});
+          const elements = {{
+            "#publicAmaForm": makeElement("ama"),
+            "#publicAmaOutput": makeElement("ama-output"),
+            "#publicOrderForm": makeElement("order"),
+            "#publicOrderFields": makeElement("order-fields"),
+            "#publicOrderClosed": makeElement("order-closed"),
+            "#publicService": makeElement("service"),
+            "#publicAmount": makeElement("amount")
+          }};
+          let receiptFetches = 0;
+          let documentFetches = 0;
+          let resolveReceipt;
+          const context = {{
+            window: {{
+              PUBLIC_ORDER_CONFIG: {json.dumps(config)},
+              PUBLIC_LIVE_RECEIPT: {{}},
+              setTimeout() {{ return 1; }},
+              clearTimeout() {{}},
+              setInterval() {{ return 1; }}
+            }},
+            document: {{
+              visibilityState: "visible",
+              querySelector(selector) {{ return elements[selector] || null; }},
+              addEventListener(type, callback) {{ documentHandlers[type] = callback; }}
+            }},
+            crypto: require("crypto").webcrypto,
+            TextEncoder,
+            Intl,
+            URL,
+            fetch: async (resource) => {{
+              if (String(resource) === "public-live-receipt.js") {{
+                receiptFetches += 1;
+                return new Promise((resolve) => {{
+                  resolveReceipt = () => resolve({{ ok: true, text: async () => {json.dumps(receipt_script)} }});
+                }});
+              }}
+              documentFetches += 1;
+              return {{ ok: false, text: async () => "" }};
+            }}
+          }};
+          vm.createContext(context);
+          vm.runInContext(fs.readFileSync({json.dumps(str(PUBLIC_JS))}, "utf8"), context);
+          (async () => {{
+            const domReturnValue = documentHandlers.DOMContentLoaded();
+            const handlersAttachedImmediately = Boolean(handlers["ama:submit"] && handlers["order:submit"]);
+            const fetchesBeforeAma = receiptFetches;
+            handlers["ama:submit"]({{ preventDefault() {{}} }});
+            const amaTriggeredReceiptFetch = receiptFetches !== fetchesBeforeAma;
+            const amaTriggeredDocumentFetch = documentFetches !== 0;
+            resolveReceipt();
+            await context.waitForLatestPublicLiveReceiptRefresh();
+            process.stdout.write(JSON.stringify({{
+              domReturnedPromise: Boolean(domReturnValue && typeof domReturnValue.then === "function"),
+              handlersAttachedImmediately,
+              amaTriggeredReceiptFetch,
+              amaTriggeredDocumentFetch,
+              receiptFetches,
+              documentFetches
+            }}));
+          }})().catch((error) => {{ console.error(error); process.exit(1); }});
+        """
+        result = subprocess.run(
+            ["node", "-e", runner],
+            cwd=ROOT,
+            check=False,
+            encoding="utf-8",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=10,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        outcome = json.loads(result.stdout)
+
+        self.assertFalse(outcome["domReturnedPromise"])
+        self.assertTrue(outcome["handlersAttachedImmediately"])
+        self.assertFalse(outcome["amaTriggeredReceiptFetch"])
+        self.assertFalse(outcome["amaTriggeredDocumentFetch"])
+        self.assertEqual(outcome["receiptFetches"], 1)
+        self.assertEqual(outcome["documentFetches"], 0)
 
     def test_live_mode_alone_cannot_open_paid_intake(self) -> None:
         config = ready_public_config(live_mode=True)
@@ -318,12 +506,12 @@ class PublicAmaTests(unittest.TestCase):
             * 1000
         )
         expired_open_tab = evaluate_public_readiness(config, valid_receipt, expiry_ms + 1)
-        drifted_documents = public_legal_document_contents()
-        drifted_documents["TERMOS.md"] += "\nMaterial legal drift after receipt issuance.\n"
-        legal_document_drift = evaluate_public_readiness(
+        drifted_documents = public_review_document_contents()
+        drifted_documents["AI_LEGAL_HANDOFF.md"] += "\nMaterial review drift after receipt issuance.\n"
+        review_document_drift = evaluate_public_readiness(
             config,
             valid_receipt,
-            legal_documents=drifted_documents,
+            review_documents=drifted_documents,
         )
 
         self.assertFalse(without_receipt["receiptReady"])
@@ -340,8 +528,66 @@ class PublicAmaTests(unittest.TestCase):
         self.assertFalse(extra_field["liveReady"])
         self.assertFalse(expired_open_tab["receiptReady"])
         self.assertFalse(expired_open_tab["liveReady"])
-        self.assertFalse(legal_document_drift["receiptReady"])
-        self.assertFalse(legal_document_drift["liveReady"])
+        self.assertFalse(review_document_drift["receiptReady"])
+        self.assertFalse(review_document_drift["liveReady"])
+
+    def test_review_document_manifest_fails_closed_on_shape_and_fetch_drift(self) -> None:
+        config = ready_public_config(live_mode=True)
+
+        malformed_receipts: list[dict[str, object]] = []
+
+        missing = issued_receipt(config)
+        del missing["core"]["reviewDocuments"]["HUMAN_REVIEW_PACKET.md"]
+        malformed_receipts.append(recompute_receipt_digests(missing))
+
+        extra = issued_receipt(config)
+        extra["core"]["reviewDocuments"]["UNREVIEWED.md"] = "a" * 64
+        malformed_receipts.append(recompute_receipt_digests(extra))
+
+        substituted = issued_receipt(config)
+        digest = substituted["core"]["reviewDocuments"].pop("BRAZIL_COMPLIANCE.md")
+        substituted["core"]["reviewDocuments"]["docs/BRAZIL_COMPLIANCE.md"] = digest
+        malformed_receipts.append(recompute_receipt_digests(substituted))
+
+        uppercase = issued_receipt(config)
+        uppercase["core"]["reviewDocuments"]["TERMS.md"] = "A" * 64
+        malformed_receipts.append(recompute_receipt_digests(uppercase))
+
+        for receipt in malformed_receipts:
+            with self.subTest(review_documents=receipt["core"]["reviewDocuments"]):
+                model = evaluate_public_readiness(config, receipt)
+                self.assertFalse(model["receiptReady"])
+                self.assertFalse(model["liveReady"])
+
+        unavailable_documents = public_review_document_contents()
+        del unavailable_documents["CONKA8_LAW_INSTRUCTIONS.md"]
+        unavailable = evaluate_public_readiness(
+            config,
+            issued_receipt(config),
+            review_documents=unavailable_documents,
+        )
+        self.assertFalse(unavailable["receiptReady"])
+        self.assertFalse(unavailable["liveReady"])
+
+    def test_review_document_hashes_normalize_bom_and_line_endings(self) -> None:
+        config = ready_public_config(live_mode=True)
+        documents = public_review_document_contents()
+        normalized = (
+            documents["BRAZIL_COMPLIANCE_AGENTS.md"]
+            .removeprefix("\ufeff")
+            .replace("\r\n", "\n")
+            .replace("\r", "\n")
+        )
+        documents["BRAZIL_COMPLIANCE_AGENTS.md"] = "\ufeff" + normalized.replace("\n", "\r\n")
+
+        model = evaluate_public_readiness(
+            config,
+            issued_receipt(config),
+            review_documents=documents,
+        )
+
+        self.assertTrue(model["receiptReady"])
+        self.assertTrue(model["liveReady"])
 
     def test_server_side_receipt_revocation_closes_an_already_open_page(self) -> None:
         from tests.test_public_live_receipt import read_receipt
@@ -362,96 +608,89 @@ class PublicAmaTests(unittest.TestCase):
         self.assertFalse(after_revalidation["receiptReady"])
         self.assertFalse(after_revalidation["liveReady"])
 
-    def test_newer_revocation_wins_when_receipt_refreshes_finish_out_of_order(self) -> None:
-        from tests.test_public_live_receipt import read_receipt
-
+    def test_receipt_refresh_coalesces_and_bounds_document_rechecks(self) -> None:
         config = ready_public_config(live_mode=True)
         active_receipt = issued_receipt(config)
-        revoked_receipt = read_receipt(ROOT / "public-live-receipt.js")
-        legal_documents = public_legal_document_contents()
-        runner = f"""
-          const fs = require("fs");
-          const vm = require("vm");
-          const legalDocuments = {json.dumps(legal_documents)};
-          const receiptScripts = [
-            {json.dumps(render_receipt(active_receipt))},
-            {json.dumps(render_receipt(revoked_receipt))},
-            {json.dumps(render_receipt(active_receipt))},
-            {json.dumps(render_receipt(revoked_receipt))}
-          ];
-          const pendingReceiptResponses = [];
-          let receiptFetchIndex = 0;
-          const context = {{
-            window: {{ PUBLIC_ORDER_CONFIG: {json.dumps(config)}, PUBLIC_LIVE_RECEIPT: {json.dumps(active_receipt)} }},
-            document: {{ addEventListener() {{}}, querySelector() {{ return null; }}, visibilityState: "visible" }},
-            crypto: require("crypto").webcrypto,
-            TextEncoder,
-            Intl,
-            URL,
-            fetch: async (resource) => {{
-              const key = String(resource);
-              if (key === "public-live-receipt.js") {{
-                const body = receiptScripts[receiptFetchIndex++];
-                return new Promise((resolve) => {{
-                  pendingReceiptResponses.push(() => resolve({{ ok: true, text: async () => body }}));
-                }});
-              }}
-              const found = Object.prototype.hasOwnProperty.call(legalDocuments, key);
-              return {{ ok: found, text: async () => found ? legalDocuments[key] : "" }};
-            }},
-          }};
-          vm.createContext(context);
-          vm.runInContext(fs.readFileSync({json.dumps(str(PUBLIC_JS))}, "utf8"), context);
-          (async () => {{
-            const older = context.refreshPublicLiveReceiptVerification();
-            const newer = context.refreshPublicLiveReceiptVerification();
-            pendingReceiptResponses[1]();
-            await newer;
-            const afterNewer = context.publicReadinessModel();
-            pendingReceiptResponses[0]();
-            await older;
-            const afterOlder = context.publicReadinessModel();
+        changed_receipt = issued_receipt(config)
+        changed_issued_at = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(minutes=2)
+        changed_receipt["issuedAt"] = changed_issued_at.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        changed_receipt["validUntil"] = (changed_issued_at + timedelta(days=7)).isoformat(
+            timespec="milliseconds"
+        ).replace("+00:00", "Z")
+        recompute_receipt_digests(changed_receipt)
 
-            const submitRefresh = context.refreshPublicLiveReceiptVerification();
-            let submitWaitFinished = false;
-            const submitWait = context.waitForLatestPublicLiveReceiptRefresh()
-              .then((value) => {{ submitWaitFinished = true; return value; }});
-            const newerDuringSubmit = context.refreshPublicLiveReceiptVerification();
-            pendingReceiptResponses[2]();
-            await submitRefresh;
-            await Promise.resolve();
-            const submitWaitedForNewer = !submitWaitFinished;
-            pendingReceiptResponses[3]();
-            await newerDuringSubmit;
-            const submitVerified = await submitWait;
-            const afterSubmitOverlap = context.publicReadinessModel();
-            process.stdout.write(JSON.stringify({{
-              afterNewer,
-              afterOlder,
-              submitWaitedForNewer,
-              submitVerified,
-              afterSubmitOverlap
-            }}));
-          }})().catch((error) => {{ console.error(error); process.exit(1); }});
-        """
-        result = subprocess.run(
-            ["node", "-e", runner],
-            cwd=ROOT,
-            check=False,
-            encoding="utf-8",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=10,
+        outcome = run_browser_refresh_probe(
+            [active_receipt, active_receipt, active_receipt, active_receipt, changed_receipt],
+            """
+              const firstForced = context.refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+              const secondForced = context.refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+              const forcedCallsCoalesced = firstForced === secondForced;
+              await Promise.all([firstForced, secondForced]);
+              const afterCoalesced = { receiptFetches, documentFetches };
+
+              await context.refreshPublicLiveReceiptVerification();
+              const afterLightweightPoll = { receiptFetches, documentFetches };
+
+              await context.refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+              const afterForcedRecheck = { receiptFetches, documentFetches };
+
+              vm.runInContext(
+                "PUBLIC_REVIEW_DOCUMENTS_VERIFIED_AT -= PUBLIC_REVIEW_DOCUMENT_VERIFICATION_TTL_MS + 1",
+                context
+              );
+              await context.refreshPublicLiveReceiptVerification();
+              const afterTtlExpiry = { receiptFetches, documentFetches };
+
+              await context.refreshPublicLiveReceiptVerification();
+              const afterEnvelopeChange = { receiptFetches, documentFetches };
+              process.stdout.write(JSON.stringify({
+                forcedCallsCoalesced,
+                afterCoalesced,
+                afterLightweightPoll,
+                afterForcedRecheck,
+                afterTtlExpiry,
+                afterEnvelopeChange,
+                finalReadiness: context.publicReadinessModel()
+              }));
+            """,
+            config=config,
         )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        outcome = json.loads(result.stdout)
 
-        self.assertFalse(outcome["afterNewer"]["liveReady"])
-        self.assertFalse(outcome["afterOlder"]["receiptReady"])
-        self.assertFalse(outcome["afterOlder"]["liveReady"])
-        self.assertTrue(outcome["submitWaitedForNewer"])
-        self.assertFalse(outcome["submitVerified"])
-        self.assertFalse(outcome["afterSubmitOverlap"]["liveReady"])
+        self.assertTrue(outcome["forcedCallsCoalesced"])
+        self.assertEqual(outcome["afterCoalesced"], {"receiptFetches": 1, "documentFetches": 9})
+        self.assertEqual(outcome["afterLightweightPoll"], {"receiptFetches": 2, "documentFetches": 9})
+        self.assertEqual(outcome["afterForcedRecheck"], {"receiptFetches": 3, "documentFetches": 18})
+        self.assertEqual(outcome["afterTtlExpiry"], {"receiptFetches": 4, "documentFetches": 27})
+        self.assertEqual(outcome["afterEnvelopeChange"], {"receiptFetches": 5, "documentFetches": 36})
+        self.assertTrue(outcome["finalReadiness"]["liveReady"])
+
+    def test_malformed_and_placeholder_receipts_skip_document_fetches(self) -> None:
+        config = ready_public_config(live_mode=True)
+        malformed = issued_receipt(config)
+        del malformed["core"]["reviewDocuments"]["HUMAN_REVIEW_PACKET.md"]
+        recompute_receipt_digests(malformed)
+
+        outcome = run_browser_refresh_probe(
+            [{}, malformed],
+            """
+              await context.refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+              await Promise.resolve();
+              const afterPlaceholder = { receiptFetches, documentFetches };
+              await context.refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+              const afterMalformed = { receiptFetches, documentFetches };
+              process.stdout.write(JSON.stringify({
+                afterPlaceholder,
+                afterMalformed,
+                readiness: context.publicReadinessModel()
+              }));
+            """,
+            config=config,
+        )
+
+        self.assertEqual(outcome["afterPlaceholder"], {"receiptFetches": 1, "documentFetches": 0})
+        self.assertEqual(outcome["afterMalformed"], {"receiptFetches": 2, "documentFetches": 0})
+        self.assertFalse(outcome["readiness"]["receiptReady"])
+        self.assertFalse(outcome["readiness"]["liveReady"])
 
     def test_browser_accepts_an_untampered_real_exporter_receipt(self) -> None:
         from tests.test_public_live_receipt import (
