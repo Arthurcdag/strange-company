@@ -9,10 +9,14 @@ from pathlib import Path
 
 from tools.vau_company_evolution import (
     CompanyEvent,
+    LIVE_REVIEW_CLOSURE_EVIDENCE,
+    apply_state_delta,
     build_current_state,
     company_operational_ready,
     continuous_evolution_goal,
     hard_blockers,
+    live_review_closure_config_bound,
+    live_review_dates_ready,
     operational_blockers,
     public_live_ready,
     recommended_next_actions,
@@ -345,6 +349,88 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
             self.assertIn("humanReviewClosureEvidence", hard_blockers(state))
             self.assertFalse(public_live_ready(state))
 
+    def test_closure_readiness_is_atomic_and_config_bound_to_all_review_dates(self) -> None:
+        config = write_public_config(
+            terms="2026-07-01",
+            privacy="2026-07-01",
+            brazil="2026-07-01",
+            ai_handoff="",
+        )
+        state = build_current_state(
+            config,
+            write_reviewer_tracker([]),
+            live_review_closure=write_live_review_closure("2026-07-01"),
+        )
+
+        self.assertFalse(live_review_dates_ready(state))
+        self.assertFalse(state["gates"]["liveReviewClosureReady"])
+        self.assertFalse(live_review_closure_config_bound(state))
+        self.assertEqual(state["evidence"]["liveReviewClosure"], "")
+        self.assertEqual(hard_blockers(state)[0], "humanReviewClosureEvidence")
+        self.assertIn("aiHandoffReviewedAt", hard_blockers(state))
+
+    def test_impossible_simulated_closure_state_is_normalized_fail_closed(self) -> None:
+        state = build_current_state(write_public_config(), write_reviewer_tracker([]))
+        state["gates"]["liveReviewClosureReady"] = True
+        state["evidence"]["liveReviewClosure"] = "impossible-unbound-claim"
+
+        normalized = create_initial_future(state)[0].state
+        delta_normalized = apply_state_delta(
+            state,
+            {"metrics.tooling_maturity": {"op": "increment", "value": 1}},
+        )
+
+        for candidate in (normalized, delta_normalized):
+            self.assertFalse(candidate["gates"]["liveReviewClosureReady"])
+            self.assertEqual(candidate["evidence"]["liveReviewClosure"], "")
+            self.assertEqual(hard_blockers(candidate)[0], "humanReviewClosureEvidence")
+
+    def test_closure_boolean_and_dates_without_canonical_evidence_fail_closed(self) -> None:
+        state = build_current_state(
+            write_public_config(
+                terms="2026-07-01",
+                privacy="2026-07-01",
+                brazil="2026-07-01",
+                ai_handoff="2026-07-01",
+            ),
+            write_reviewer_tracker([]),
+        )
+        self.assertTrue(live_review_dates_ready(state))
+
+        for evidence_marker in ("", "validator:passed; dates:not-bound"):
+            with self.subTest(evidence_marker=evidence_marker):
+                impossible = json.loads(json.dumps(state))
+                impossible["gates"]["liveReviewClosureReady"] = True
+                impossible["evidence"]["liveReviewClosure"] = evidence_marker
+
+                normalized = create_initial_future(impossible)[0].state
+
+                self.assertFalse(normalized["gates"]["liveReviewClosureReady"])
+                self.assertEqual(normalized["evidence"]["liveReviewClosure"], "")
+                self.assertFalse(live_review_closure_config_bound(normalized))
+                self.assertEqual(
+                    hard_blockers(normalized)[0],
+                    "humanReviewClosureEvidence",
+                )
+
+    def test_depth_one_prioritizes_atomic_config_bound_closure(self) -> None:
+        state = build_current_state(write_public_config(), write_reviewer_tracker([]))
+        result = run_cycle(state, depth=1, max_branches_to_keep=1)
+
+        self.assertEqual(result["hard_blockers"][0], "humanReviewClosureEvidence")
+        self.assertTrue(result["recommended_next_actions"])
+        first_action = result["recommended_next_actions"][0]
+        self.assertIn("LIVE_REVIEW_CLOSURE.local.json", first_action["action"])
+        self.assertIn("--require-ready --public-config public-config.js", first_action["action"])
+        self.assertEqual(first_action["events"], ["human_review_closure_evidence_ready"])
+
+        predicted = result["predicted_futures"]
+        self.assertEqual(len(predicted), 1)
+        predicted_state = predicted[0]["state"]
+        self.assertTrue(live_review_dates_ready(predicted_state))
+        self.assertTrue(live_review_closure_config_bound(predicted_state))
+        self.assertTrue(predicted_state["gates"]["liveReviewClosureReady"])
+
     def test_ready_revenue_evidence_local_index_removes_payment_blocker(self) -> None:
         path = write_public_config(
             terms="2026-06-01",
@@ -526,7 +612,8 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
 
         actions = [item["action"] for item in result["recommended_next_actions"]]
         joined_actions = "\n".join(actions)
-        self.assertIn("Get human review on terms", joined_actions)
+        self.assertIn("LIVE_REVIEW_CLOSURE.local.json", actions[0])
+        self.assertIn("--require-ready --public-config public-config.js", actions[0])
         self.assertIn("REVIEWER_CANDIDATE_TRACKER.local.json", joined_actions)
         self.assertIn("--require-one", joined_actions)
         self.assertIn("private Stripe/bank/fiscal evidence", joined_actions)
@@ -703,6 +790,7 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
                 "googleFormVerified": True,
             }
         )
+        state["evidence"]["liveReviewClosure"] = LIVE_REVIEW_CLOSURE_EVIDENCE
         state["metrics"]["human_reviewers_found"] = 4
 
         goal = continuous_evolution_goal(state)
@@ -724,6 +812,7 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         state["gates"]["privateExternalLiveEvidenceReady"] = True
         state["gates"]["publicLiveReceiptReady"] = True
         state["gates"]["liveReviewClosureReady"] = True
+        state["evidence"]["liveReviewClosure"] = LIVE_REVIEW_CLOSURE_EVIDENCE
         state["gates"]["humanReviewersReady"] = True
         state["gates"]["deliveryReviewLoopReady"] = True
         state["metrics"]["human_reviewers_found"] = 4
@@ -754,6 +843,7 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
             humanReviewersReady=True,
             deliveryReviewLoopReady=True,
         )
+        state["evidence"]["liveReviewClosure"] = LIVE_REVIEW_CLOSURE_EVIDENCE
         state["metrics"]["human_reviewers_found"] = 4
 
         events = generate_company_events(create_initial_future(state)[0])
@@ -782,6 +872,7 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
             humanReviewersReady=True,
             deliveryReviewLoopReady=True,
         )
+        state["evidence"]["liveReviewClosure"] = LIVE_REVIEW_CLOSURE_EVIDENCE
         state["metrics"]["human_reviewers_found"] = 4
 
         events = generate_company_events(create_initial_future(state)[0])
@@ -872,6 +963,38 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
 
         self.assertEqual(surviving[0].timeline[0].name, "reviewer_candidate_added")
         self.assertGreaterEqual(surviving[0].confidence, 1.0)
+
+    def test_incomplete_exact_name_closure_event_cannot_inherit_predicted_evidence(self) -> None:
+        state = build_current_state(write_public_config(), write_reviewer_tracker([]))
+        predicted = simulate_company_futures(
+            create_initial_future(state),
+            depth=1,
+            max_branches_to_keep=1,
+        )
+        self.assertTrue(live_review_closure_config_bound(predicted[0].state))
+
+        incomplete_event = CompanyEvent(
+            name="human_review_closure_evidence_ready",
+            domain="compliance",
+            probability_hint=1.0,
+            strategic_value=2.2,
+            tags=("hard_gate", "manual", "compliance"),
+            state_delta={"gates.liveReviewClosureReady": True},
+            requires_real_evidence=True,
+        )
+
+        surviving = update_futures_with_real_event(predicted, incomplete_event, state)
+        observed_state = apply_state_delta(state, incomplete_event.state_delta)
+
+        self.assertFalse(live_review_closure_config_bound(surviving[0].state))
+        self.assertFalse(surviving[0].state["gates"]["liveReviewClosureReady"])
+        self.assertEqual(surviving[0].state["evidence"]["liveReviewClosure"], "")
+        self.assertEqual(surviving[0].state, observed_state)
+        self.assertEqual(hard_blockers(surviving[0].state)[0], "humanReviewClosureEvidence")
+        self.assertEqual(
+            surviving[0].timeline[0].state_delta,
+            incomplete_event.state_delta,
+        )
 
     def test_recommended_actions_are_serializable(self) -> None:
         path = write_public_config()

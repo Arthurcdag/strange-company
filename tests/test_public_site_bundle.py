@@ -65,6 +65,8 @@ class PublicSiteBundleTests(unittest.TestCase):
                 "tools/evolution_goal_status.js",
                 "tools/generate_evolution_next_packet.js",
                 "tools/local_evidence_status.js",
+                "tools/check_live_review_closure_conformance.js",
+                "tools/vau_company_evolution.py",
                 "tools/validate_live_review_closure.js",
                 "tools/render_live_review_public_config_patch.js",
                 "tools/export_public_live_receipt.js",
@@ -75,6 +77,21 @@ class PublicSiteBundleTests(unittest.TestCase):
             ):
                 with self.subTest(relative=relative):
                     self.assertTrue((output / relative).exists(), f"missing {relative}")
+
+            bundled_conformance = subprocess.run(
+                ["node", "tools/check_live_review_closure_conformance.js"],
+                cwd=output,
+                check=False,
+                encoding="utf-8",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=120,
+            )
+            self.assertEqual(bundled_conformance.returncode, 0, bundled_conformance.stderr)
+            self.assertIn(
+                "Live review closure conformance passed.",
+                bundled_conformance.stdout,
+            )
 
             builder = BUILD_PUBLIC_SITE.read_text(encoding="utf-8")
             for review_document in REVIEW_DOCUMENT_PATHS:

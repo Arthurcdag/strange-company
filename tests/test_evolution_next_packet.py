@@ -38,6 +38,12 @@ class EvolutionNextPacketTests(unittest.TestCase):
         self.assertIn("## Do This Next", result.stdout)
         self.assertIn("Blocker: humanReviewClosureEvidence", result.stdout)
         self.assertIn("draft_live_review_closure.js", result.stdout)
+        self.assertIn("Lane phase: missing", result.stdout)
+        self.assertIn("Live review closure phase: missing", result.stdout)
+        self.assertIn(
+            "--require-ready --public-config public-config.js",
+            result.stdout,
+        )
         self.assertIn("termsReviewedAt", result.stdout)
         self.assertIn("Review Closure Workflow", result.stdout)
         self.assertIn("LIVE_REVIEW_CLOSURE.local.json", result.stdout)
@@ -48,6 +54,7 @@ class EvolutionNextPacketTests(unittest.TestCase):
         self.assertIn("Ready lanes:", result.stdout)
         self.assertIn("liveReviewClosure", result.stdout)
         self.assertIn("node tools/local_evidence_status.js --json", result.stdout)
+        self.assertIn("node tools/check_live_review_closure_conformance.js", result.stdout)
         self.assertIn("privatePaymentFiscalEvidence", result.stdout)
         self.assertIn("privateExternalLiveEvidence", result.stdout)
         self.assertIn("External Live Blockers", result.stdout)

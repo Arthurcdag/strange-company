@@ -49,6 +49,15 @@ function checkExternalLivePacketGate() {
   assert(result.status === 0, `external live packet gate regression failed:\n${output}`);
 }
 
+function checkLiveReviewClosureConformance() {
+  const result = spawnSync(process.execPath, ["tools/check_live_review_closure_conformance.js"], {
+    cwd: root,
+    encoding: "utf8"
+  });
+  const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
+  assert(result.status === 0, `live review closure conformance failed:\n${output}`);
+}
+
 function checkPublicLiveReceipt() {
   const receiptArgs = [
     "tools/export_public_live_receipt.js",
@@ -1249,6 +1258,8 @@ function checkEvolutionGoalStatusContract() {
     ["status review closure actions", statusTool, "reviewClosureActions"],
     ["status review closure local packet", statusTool, "LIVE_REVIEW_CLOSURE.local.json"],
     ["status review closure renderer", statusTool, "render_live_review_public_config_patch.js"],
+    ["status review closure phase", statusTool, "liveReviewClosurePhase"],
+    ["status config-bound closure validator", statusTool, "--require-ready --public-config public-config.js"],
     ["status local evidence command", statusTool, "tools/local_evidence_status.js"],
     ["status local evidence summary", statusTool, "localEvidence"],
     ["status local evidence dir override", statusTool, "--local-evidence-dir"],
@@ -1287,6 +1298,8 @@ function checkEvolutionNextPacketContract() {
     ["next packet review closure source", generator, "reviewClosureActions"],
     ["next packet local evidence section", generator, "Local Evidence Matrix"],
     ["next packet local evidence validation command", generator, "node tools/local_evidence_status.js --json"],
+    ["next packet closure phase", generator, "Live review closure phase"],
+    ["next packet closure conformance command", generator, "node tools/check_live_review_closure_conformance.js"],
     ["next packet stop liveMode", generator, "Do not set `liveMode: true`"],
     ["next packet no private data", generator, "Do not put CPF, CNPJ, bank data"],
     ["next packet local ignored", gitignore, "EVOLUTION_NEXT_ACTION.local.md"],
@@ -1319,6 +1332,11 @@ function checkLocalEvidenceStatusContract() {
     ["local evidence status system name", statusTool, "STRANGE_COMPANY_LOCAL_EVIDENCE_STATUS"],
     ["local evidence status local dir override", statusTool, "--local-dir"],
     ["local evidence status live review lane", statusTool, "LIVE_REVIEW_CLOSURE.local.json"],
+    ["local evidence status missing closure phase", statusTool, "missing"],
+    ["local evidence status invalid closure phase", statusTool, "invalid"],
+    ["local evidence status unbound closure phase", statusTool, "document_ready_unbound"],
+    ["local evidence status bound closure phase", statusTool, "config_bound_ready"],
+    ["local evidence status config binding", statusTool, "--public-config"],
     ["local evidence status revenue lane", statusTool, "REVENUE_SETUP_EVIDENCE_INDEX.local.json"],
     ["local evidence status validator stderr guard", statusTool, "without printing ignored packet contents or validator stderr"],
     ["local evidence status syntax workflow", validateWorkflow, "node --check tools/local_evidence_status.js"],
@@ -1341,6 +1359,7 @@ function checkLiveReviewClosureContract() {
   const draft = read("tools/draft_live_review_closure.js");
   const renderer = read("tools/render_live_review_public_config_patch.js");
   const validator = read("tools/validate_live_review_closure.js");
+  const conformance = read("tools/check_live_review_closure_conformance.js");
   const receiptExporter = read("tools/export_public_live_receipt.js");
   const publicJs = read("public.js");
   const publicReceipt = read("public-live-receipt.js");
@@ -1357,6 +1376,7 @@ function checkLiveReviewClosureContract() {
     ["README live review draft tool", readme, "tools/draft_live_review_closure.js"],
     ["README live review validator", readme, "tools/validate_live_review_closure.js"],
     ["README live review renderer", readme, "tools/render_live_review_public_config_patch.js"],
+    ["README live review conformance checker", readme, "tools/check_live_review_closure_conformance.js"],
     ["human review live closure local packet", humanReview, "LIVE_REVIEW_CLOSURE.local.json"],
     ["human review live closure ready command", humanReview, "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready"],
     ["human review config-bound closure command", humanReview, "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js"],
@@ -1376,6 +1396,15 @@ function checkLiveReviewClosureContract() {
     ["live review validator public config binding", validator, "--public-config"],
     ["live review validator canonical digest map", validator, "documentDigests"],
     ["live review validator keeps liveMode false", validator, "liveMode must remain false"],
+    ["live review conformance system", conformance, "STRANGE_COMPANY_LIVE_REVIEW_CLOSURE_CONFORMANCE"],
+    ["live review conformance missing phase", conformance, 'phase: "missing"'],
+    ["live review conformance invalid phase", conformance, 'phase: "invalid"'],
+    ["live review conformance unbound phase", conformance, 'phase: "document_ready_unbound"'],
+    ["live review conformance bound phase", conformance, 'phase: "config_bound_ready"'],
+    ["live review conformance local status", conformance, "tools/local_evidence_status.js"],
+    ["live review conformance evolution status", conformance, "tools/evolution_goal_status.js"],
+    ["live review conformance next packet", conformance, "tools/generate_evolution_next_packet.js"],
+    ["live review conformance VAU", conformance, "tools/vau_company_evolution.py"],
     ["public receipt live review argument", receiptExporter, "--live-review-closure"],
     ["public receipt authoritative review validator", receiptExporter, "validate_live_review_closure.js"],
     ["public receipt review validator attestation", receiptExporter, "liveReviewClosureValidatorPassed"],
@@ -1398,10 +1427,15 @@ function checkLiveReviewClosureContract() {
     ["live review renderer syntax workflow", validateWorkflow, "node --check tools/render_live_review_public_config_patch.js"],
     ["live review validator syntax workflow", validateWorkflow, "node --check tools/validate_live_review_closure.js"],
     ["live review validator CI template check", validateWorkflow, "node tools/validate_live_review_closure.js --template-ok"],
+    ["live review conformance CI syntax", validateWorkflow, "node --check tools/check_live_review_closure_conformance.js"],
+    ["live review conformance CI execution", validateWorkflow, "node tools/check_live_review_closure_conformance.js"],
     ["live review pages template check", pagesWorkflow, "node tools/validate_live_review_closure.js --template-ok"],
+    ["live review conformance pages execution", pagesWorkflow, "node tools/check_live_review_closure_conformance.js"],
     ["live review public bundle copy", builder, "LIVE_REVIEW_CLOSURE.template.json"],
     ["live review validator public bundle copy", builder, "tools/validate_live_review_closure.js"],
     ["live review renderer public bundle copy", builder, "tools/render_live_review_public_config_patch.js"],
+    ["live review conformance public bundle copy", builder, "tools/check_live_review_closure_conformance.js"],
+    ["VAU public bundle copy", builder, "tools/vau_company_evolution.py"],
     ["public bundle reviewed-document size parity", builder, "sourceBytes.length !== bundledBytes.length"],
     ["public bundle reviewed-document byte parity", builder, "sourceBytes.equals(bundledBytes)"],
     ["public bundle receipt document-root validation", builder, '"--document-root"'],
@@ -1489,6 +1523,7 @@ compileJavaScript("tools/audit_evolution_log.js");
 compileJavaScript("tools/evolution_goal_status.js");
 compileJavaScript("tools/generate_evolution_next_packet.js");
 compileJavaScript("tools/local_evidence_status.js");
+compileJavaScript("tools/check_live_review_closure_conformance.js");
 compileJavaScript("tools/draft_live_review_closure.js");
 compileJavaScript("tools/render_live_review_public_config_patch.js");
 compileJavaScript("tools/export_public_live_receipt.js");
@@ -1508,6 +1543,7 @@ compileJavaScript("tools/validate_public_ama_queue.js");
 compileJavaScript("tools/draft_delivery_review_checklist.js");
 compileJavaScript("tools/validate_delivery_review_checklist.js");
 checkExternalLivePacketGate();
+checkLiveReviewClosureConformance();
 checkPublicLiveReceipt();
 checkPublicSurface();
 checkPrivateUrlAllowlists();

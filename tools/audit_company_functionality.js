@@ -223,6 +223,18 @@ function auditDocs() {
   assertIncludes("tools/vau_company_evolution.py", "validate_external_live_packet.js", "VAU authoritative external live validator");
   assertIncludes("tools/vau_company_evolution.py", "--public-live-receipt", "VAU public live receipt argument");
   assertIncludes("tools/vau_company_evolution.py", "publicLiveReceiptReady", "VAU public live receipt gate");
+  assertIncludes("tools/vau_company_evolution.py", "live_review_closure_config_bound", "VAU atomic config-bound closure invariant");
+  assertIncludes("tools/vau_company_evolution.py", "validator:passed; public-dates:matched", "VAU canonical closure evidence marker");
+  assertIncludes("tools/local_evidence_status.js", "document_ready_unbound", "local evidence document-ready unbound phase");
+  assertIncludes("tools/local_evidence_status.js", "config_bound_ready", "local evidence config-bound ready phase");
+  assertIncludes("tools/evolution_goal_status.js", "liveReviewClosurePhase", "evolution status shared closure phase");
+  assertIncludes("tools/evolution_goal_status.js", "--require-ready --public-config public-config.js", "evolution status strict closure validator");
+  assertIncludes("tools/generate_evolution_next_packet.js", "Live review closure phase", "next packet shared closure phase");
+  assertIncludes("tools/check_live_review_closure_conformance.js", "STRANGE_COMPANY_LIVE_REVIEW_CLOSURE_CONFORMANCE", "live review closure conformance checker");
+  assertIncludes("tools/check_live_review_closure_conformance.js", "tools/local_evidence_status.js", "closure conformance local status surface");
+  assertIncludes("tools/check_live_review_closure_conformance.js", "tools/evolution_goal_status.js", "closure conformance goal status surface");
+  assertIncludes("tools/check_live_review_closure_conformance.js", "tools/generate_evolution_next_packet.js", "closure conformance next packet surface");
+  assertIncludes("tools/check_live_review_closure_conformance.js", "tools/vau_company_evolution.py", "closure conformance VAU surface");
   assertIncludes("public-live-receipt.js", '"status": "not_issued"', "public live receipt fail-closed placeholder");
   assertIncludes("tools/export_public_live_receipt.js", "local_packet_validators_passed", "public live receipt issued status");
   assertIncludes("tools/export_public_live_receipt.js", "privatePacketHashesExcluded", "public live receipt private hash exclusion");
@@ -247,6 +259,8 @@ function auditDocs() {
   assertIncludes("tools/build_public_site.js", "sourceBytes.equals(bundledBytes)", "public bundle reviewed-document byte parity");
   assertIncludes("tools/build_public_site.js", '"--document-root"', "public bundle receipt document-root validation");
   assertIncludes("tools/build_public_site.js", 'path.join(root, "tools", "export_public_live_receipt.js")', "public bundle receipt uses root exporter");
+  assertIncludes("tools/build_public_site.js", "tools/check_live_review_closure_conformance.js", "public bundle closure conformance checker");
+  assertIncludes("tools/build_public_site.js", "tools/vau_company_evolution.py", "public bundle VAU engine");
   for (const documentPath of PUBLIC_REVIEW_DOCUMENT_PATHS) {
     const quotedPath = JSON.stringify(documentPath);
     assertIncludes("LIVE_REVIEW_CLOSURE.template.json", quotedPath, `closure canonical document ${documentPath}`);
@@ -284,6 +298,7 @@ function auditDocs() {
   assertIncludes("REVENUE_SETUP_EVIDENCE_PACKET.md", "REVENUE_SETUP_EVIDENCE_INDEX.template.json", "revenue setup packet template link");
   assertIncludes("REVENUE_SETUP_EVIDENCE_PACKET.md", "--require-all", "revenue setup packet full readiness command");
   assertIncludes("HUMAN_REVIEW_PACKET.md", "Manual Close Sheet", "human review manual close sheet");
+  assertIncludes("HUMAN_REVIEW_PACKET.md", "node tools/check_live_review_closure_conformance.js", "human review closure conformance command");
   assertIncludes("HUMAN_REVIEW_PACKET.md", "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js", "human review config-bound validation command");
   assertIncludes("HUMAN_REVIEW_PACKET.md", "Do not put Sheet URLs, Stripe dashboard URLs, bank metadata, tax IDs, private reviewer notes, or credentials in `public-config.js`.", "human review public config boundary");
   assertIncludes("HUMAN_REVIEW_PACKET.md", "CONKA8_LAW_INSTRUCTIONS.md", "human review packet conka8 link");

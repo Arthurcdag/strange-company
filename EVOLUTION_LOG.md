@@ -440,3 +440,54 @@ Result: all nine public reviewed files now form one exact runtime digest set;
 any missing path, substituted key, content drift, receipt edit, or stale lease
 keeps paid intake fail-closed. This is process-integrity evidence only, and
 `liveMode` remains false until the separate human decision and external gates.
+
+## 2026-07-16 - Atomic Review Closure Control Plane
+
+Objective: make closure readiness, the operator handoff, and VAU mean the same
+thing from a missing packet through final public-config binding.
+
+Changed:
+
+- Added explicit `missing`, `invalid`, `document_ready_unbound`, and
+  `config_bound_ready` phases to the local closure lane; only the final phase is
+  counted as ready.
+- Made evolution status and the next-action packet consume that phase directly,
+  expose the strict config-bound validator, and select the date renderer only
+  for document-ready unbound evidence.
+- Made VAU closure transitions atomic across all four review-date gates and the
+  canonical config-bound validation marker, normalized impossible states
+  fail-closed, promoted closure to the first hard-blocker recommendation, and
+  replayed predicted futures from the observed real-event delta so an
+  incomplete same-name event cannot inherit optimistic closure evidence.
+- Added `tools/check_live_review_closure_conformance.js` with disposable fixtures
+  that exercise local status, goal status, the next packet, and VAU across all
+  four phases without writing repo outputs or printing private packet contents.
+- Wired the checker and phase contract through CI, Pages preflight, launch
+  preflight, survival, functionality audit, tests, README, human handoff, and
+  VAU guidance; packaged the checker and VAU together in the public bundle.
+- Refreshed the schema-v3 fail-closed public receipt placeholder after the
+  reviewed human handoff document changed; no live lease was issued.
+
+Verified with:
+
+- `node --check tools\local_evidence_status.js`
+- `node --check tools\evolution_goal_status.js`
+- `node --check tools\generate_evolution_next_packet.js`
+- `node --check tools\check_live_review_closure_conformance.js`
+- `python -m unittest tests.test_local_evidence_status tests.test_evolution_goal_status tests.test_evolution_next_packet tests.test_live_review_closure_conformance tests.test_vau_company_evolution`
+- Focused result: 66 tests passed.
+- `node tools\check_live_review_closure_conformance.js --json`
+- `python -m unittest discover -s tests`
+- Full discovery result: 247 tests passed; 1 skipped.
+- `node tools\audit_evolution_log.js`
+- `node tools\preflight_public_launch.js --deployment`
+- `node tools\audit_company_functionality.js`
+- `node tools\build_public_site.js --check --output .public-site-build.local --force`
+- `node tools\survival_check.js`
+
+Result: missing, malformed, document-ready unbound, and config-bound closure now
+produce one shared phase across the three status surfaces, while VAU matches
+their readiness and blocker state and keeps closure first until it is bound.
+This is control-plane conformance evidence only; no external review, legal, tax,
+payment, privacy, fiscal, or launch gate was claimed complete, and `liveMode`
+remains false.

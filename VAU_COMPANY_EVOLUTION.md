@@ -70,6 +70,17 @@ When evaluating live-decision readiness, pass the document-bound human-review cl
   --depth 1
 ```
 
+VAU treats closure as one atomic transition: `liveReviewClosureReady` cannot be
+true unless `termsReviewedAt`, `privacyReviewedAt`,
+`brazilComplianceReviewedAt`, and `aiHandoffReviewedAt` are all true and the
+closure is bound to the current public config. When closure is open it remains
+the first hard-blocker recommendation, including at depth 1. Verify this shared
+contract with:
+
+```powershell
+node tools/check_live_review_closure_conformance.js
+```
+
 ## Rules
 
 VAU may recommend a future, but it cannot create real-world evidence.
@@ -107,8 +118,8 @@ wrong branches.
 
 ## Current Interpretation
 
-The current public config has support and Google Form verification complete, but
-review dates are blank and `liveMode` is false. That means the useful evolution
+The current public config has support verification recorded, but the Google
+Form route and review dates remain unverified and `liveMode` is false. That means the useful evolution
 path is:
 
 1. complete the document-bound human/legal/privacy/Brazil/AI review closure, then publish only its review dates,

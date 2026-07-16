@@ -113,6 +113,7 @@ function checkStaticSurvivalSurface() {
   assert(read("tools/evolution_goal_status.js").includes("selectedHandoff"), "evolution goal status must select one deterministic operator handoff.", "evolution status selected handoff", "tools/evolution_goal_status.js");
   assert(read("tools/evolution_goal_status.js").includes("privateExternalLiveEvidence"), "evolution goal status must block readiness on private external live evidence.", "evolution status external live blocker", "tools/evolution_goal_status.js");
   assert(read("tools/evolution_goal_status.js").includes("humanReviewClosureEvidence"), "evolution goal status must block readiness on missing or stale document-bound human review evidence.", "evolution status review closure blocker", "tools/evolution_goal_status.js");
+  assert(read("tools/evolution_goal_status.js").includes("liveReviewClosurePhase"), "evolution goal status must expose the authoritative closure phase.", "evolution status closure phase", "tools/evolution_goal_status.js");
   assert(evolutionLog.includes("Evolution Status Report"), "EVOLUTION_LOG.md must record the status-report pass.", "evolution status report log", "EVOLUTION_LOG.md");
   assert(read("tools/generate_evolution_next_packet.js").includes("EVOLUTION_NEXT_ACTION.local.md"), "evolution next action packet generator must be executable.", "evolution next action packet tool", "tools/generate_evolution_next_packet.js");
   assert(read("tools/generate_evolution_next_packet.js").includes("Review Closure Workflow"), "evolution next action packet must expose the review-closure workflow.", "evolution next packet review closure workflow", "tools/generate_evolution_next_packet.js");
@@ -122,6 +123,10 @@ function checkStaticSurvivalSurface() {
   assert(evolutionLog.includes("Evolution Next Action Packet"), "EVOLUTION_LOG.md must record the next-action packet pass.", "evolution next action log", "EVOLUTION_LOG.md");
   assert(read("tools/local_evidence_status.js").includes("STRANGE_COMPANY_LOCAL_EVIDENCE_STATUS"), "local evidence status tool must be executable.", "local evidence status tool", "tools/local_evidence_status.js");
   assert(read("tools/local_evidence_status.js").includes("LIVE_REVIEW_CLOSURE.local.json"), "local evidence status tool must track live-review closure evidence.", "local evidence status live review lane", "tools/local_evidence_status.js");
+  assert(read("tools/local_evidence_status.js").includes("document_ready_unbound") && read("tools/local_evidence_status.js").includes("config_bound_ready"), "local evidence status must distinguish document-ready from config-bound closure.", "local evidence status closure phases", "tools/local_evidence_status.js");
+  assert(read("tools/check_live_review_closure_conformance.js").includes("STRANGE_COMPANY_LIVE_REVIEW_CLOSURE_CONFORMANCE"), "live review closure conformance must be executable.", "live review closure conformance", "tools/check_live_review_closure_conformance.js");
+  assert(read("tools/check_live_review_closure_conformance.js").includes("tools/local_evidence_status.js") && read("tools/check_live_review_closure_conformance.js").includes("tools/evolution_goal_status.js") && read("tools/check_live_review_closure_conformance.js").includes("tools/generate_evolution_next_packet.js") && read("tools/check_live_review_closure_conformance.js").includes("tools/vau_company_evolution.py"), "live review closure conformance must exercise every operator status surface.", "live review closure conformance surfaces", "tools/check_live_review_closure_conformance.js");
+  assert(publicSiteBuilder.includes("tools/check_live_review_closure_conformance.js") && publicSiteBuilder.includes("tools/vau_company_evolution.py"), "the public bundle must package the executable closure conformance stack.", "public bundle closure conformance stack", "tools/build_public_site.js");
   assert(read("tools/local_evidence_status.js").includes("REVENUE_SETUP_EVIDENCE_INDEX.local.json"), "local evidence status tool must track revenue setup evidence.", "local evidence status revenue lane", "tools/local_evidence_status.js");
   assert(evolutionLog.includes("Local Evidence Status Matrix"), "EVOLUTION_LOG.md must record the local evidence status pass.", "local evidence status log", "EVOLUTION_LOG.md");
   assert(evolutionLog.includes("Live Review Closure Packet"), "EVOLUTION_LOG.md must record the live-review closure pass.", "live review closure log", "EVOLUTION_LOG.md");
@@ -134,6 +139,8 @@ function checkStaticSurvivalSurface() {
   assert(read("tools/validate_live_review_closure.js").includes("STRANGE_COMPANY_REVIEW_DOCUMENT_V1"), "live review closure validator must use domain-separated document digests.", "live review closure digest domain", "tools/validate_live_review_closure.js");
   assert(read("tools/render_live_review_public_config_patch.js").includes("LIVE_REVIEW_PUBLIC_CONFIG_PATCH"), "live review public config patch renderer must be executable.", "live review patch renderer", "tools/render_live_review_public_config_patch.js");
   assert(humanReviewPacket.includes("node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready"), "HUMAN_REVIEW_PACKET.md must include the live-review closure ready command.", "human review closure ready command", "HUMAN_REVIEW_PACKET.md");
+  assert(humanReviewPacket.includes("node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js"), "HUMAN_REVIEW_PACKET.md must include the config-bound closure command.", "human review config-bound closure command", "HUMAN_REVIEW_PACKET.md");
+  assert(humanReviewPacket.includes("node tools/check_live_review_closure_conformance.js"), "HUMAN_REVIEW_PACKET.md must include the closure conformance command.", "human review closure conformance command", "HUMAN_REVIEW_PACKET.md");
   assert(humanReviewPacket.includes("node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json"), "HUMAN_REVIEW_PACKET.md must include the live-review patch render command.", "human review patch render command", "HUMAN_REVIEW_PACKET.md");
   assert(operationsRunbook.includes("Delivery Review Checklist"), "OPERATIONS_RUNBOOK.md must document the delivery review checklist.", "delivery review checklist docs", "OPERATIONS_RUNBOOK.md");
   assert(deliveryReviewLoop.includes("DELIVERY_REVIEW_CHECKLIST.local.json"), "DELIVERY_REVIEW_LOOP.md must keep completed delivery evidence local.", "delivery checklist local evidence rule", "DELIVERY_REVIEW_LOOP.md");
@@ -144,6 +151,7 @@ function checkStaticSurvivalSurface() {
   assert(read("tools/vau_company_evolution.py").includes("--external-live-packet"), "VAU must read the private external live packet.", "VAU external live packet input", "tools/vau_company_evolution.py");
   assert(read("tools/vau_company_evolution.py").includes("--live-review-closure"), "VAU must read the document-bound live review closure.", "VAU live review closure input", "tools/vau_company_evolution.py");
   assert(read("tools/vau_company_evolution.py").includes("validate_live_review_closure.js"), "VAU must use the authoritative live review closure validator.", "VAU live review validator", "tools/vau_company_evolution.py");
+  assert(read("tools/vau_company_evolution.py").includes("live_review_closure_config_bound"), "VAU must enforce atomic config-bound closure readiness.", "VAU closure invariant", "tools/vau_company_evolution.py");
   assert(read("tools/vau_company_evolution.py").includes("privateExternalLiveEvidenceReady"), "VAU must keep external live evidence as a hard gate.", "VAU external live evidence gate", "tools/vau_company_evolution.py");
   assert(read("tools/vau_company_evolution.py").includes("validate_revenue_setup_evidence_index.js"), "VAU must use the authoritative revenue evidence validator.", "VAU revenue evidence validator", "tools/vau_company_evolution.py");
   assert(read("tools/vau_company_evolution.py").includes("publicLiveReceiptReady"), "VAU must keep the public live receipt as a hard gate.", "VAU public live receipt gate", "tools/vau_company_evolution.py");
@@ -289,6 +297,7 @@ try {
 if (!failures.length) {
   checkStaticSurvivalSurface();
   checkCommand("external live packet gate regression", ["tools/check_external_live_packet_gate.js"]);
+  checkCommand("live review closure conformance", ["tools/check_live_review_closure_conformance.js"]);
   checkCommand("public launch preflight", ["tools/preflight_public_launch.js"]);
   checkCommand("company functionality audit", ["tools/audit_company_functionality.js"]);
 }

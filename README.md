@@ -135,14 +135,15 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [tools/preflight_public_launch.js](tools/preflight_public_launch.js): launch preflight for public/private separation, URL allowlists, live-mode config, and sensitive-data guard coverage.
 - [tools/audit_company_functionality.js](tools/audit_company_functionality.js): repo-level audit for Strange Company, the satellite operator, and the external live-operation gate.
 - [tools/audit_evolution_log.js](tools/audit_evolution_log.js): public-safe audit for `EVOLUTION_LOG.md`, requiring objective, changed artifacts, verification commands, and a result for each evolution pass.
-- [tools/evolution_goal_status.js](tools/evolution_goal_status.js): public-safe active-goal status report with one deterministic `selectedHandoff`; strict readiness requires review closure, config-bound revenue/external evidence, reviewer and delivery capacity, and an issued public live receipt.
+- [tools/evolution_goal_status.js](tools/evolution_goal_status.js): public-safe active-goal status report with one deterministic `selectedHandoff`; it consumes the same explicit review-closure phase as local evidence status, and strict readiness requires config-bound closure, revenue/external evidence, reviewer and delivery capacity, and an issued public live receipt.
 - [tools/generate_evolution_next_packet.js](tools/generate_evolution_next_packet.js): local packet generator for `EVOLUTION_NEXT_ACTION.local.md`, putting the selected handoff first and retaining the remaining blocker backlog.
-- [tools/local_evidence_status.js](tools/local_evidence_status.js): public-safe status report for ignored local evidence lanes; it reports missing, partial, ready, or invalid packets without printing private packet contents.
+- [tools/local_evidence_status.js](tools/local_evidence_status.js): public-safe status report for ignored local evidence lanes; the review-closure lane exposes `missing`, `invalid`, `document_ready_unbound`, or `config_bound_ready` while no private packet contents are printed.
+- [tools/check_live_review_closure_conformance.js](tools/check_live_review_closure_conformance.js): executable four-scenario contract proving the three status surfaces share the closure phase and VAU agrees on closure readiness, blocking, and first hard-gate priority.
 - [tools/survival_check.js](tools/survival_check.js): survival drill that confirms the charter, resilience model, receipt chain, Brazil/AI gates, public/private boundary, and expected live-gate behavior still hold.
 - [tools/google_apps_script_create_intake_form.gs](tools/google_apps_script_create_intake_form.gs): Apps Script builder for creating the Google Form intake and linking it to the private Sheet ledger.
 - [tools/draft_external_live_packet.js](tools/draft_external_live_packet.js): public-config-to-local-packet draft generator for `EXTERNAL_LIVE_PACKET.local.json`.
 - [tools/draft_live_review_closure.js](tools/draft_live_review_closure.js): local draft generator for `LIVE_REVIEW_CLOSURE.local.json`; it snapshots normalized, path-bound SHA-256 digests for every document that must receive human review.
-- [tools/validate_live_review_closure.js](tools/validate_live_review_closure.js): local validator for the ignored live-review closure packet; `--require-ready` recomputes every required document digest and rejects review-to-issuance drift before dates can be copied into `public-config.js`.
+- [tools/validate_live_review_closure.js](tools/validate_live_review_closure.js): local validator for the ignored live-review closure packet; `--require-ready` recomputes every required document digest, while adding `--public-config public-config.js` is the authoritative final config-bound readiness gate.
 - [tools/render_live_review_public_config_patch.js](tools/render_live_review_public_config_patch.js): renders the public-safe review-date patch from a ready `LIVE_REVIEW_CLOSURE.local.json` while keeping `liveMode` false.
 - [tools/draft_reviewer_candidate_tracker.js](tools/draft_reviewer_candidate_tracker.js): local draft generator for `REVIEWER_CANDIDATE_TRACKER.local.json`.
 - [tools/draft_revenue_setup_evidence_index.js](tools/draft_revenue_setup_evidence_index.js): local draft generator for `REVENUE_SETUP_EVIDENCE_INDEX.local.json`.
@@ -171,6 +172,7 @@ node tools/preflight_public_launch.js
 node tools/audit_evolution_log.js
 node tools/evolution_goal_status.js --json
 node tools/local_evidence_status.js --json
+node tools/check_live_review_closure_conformance.js
 node tools/generate_evolution_next_packet.js
 node tools/build_public_site.js --check --output .public-site-build.local --force
 node tools/survival_check.js
@@ -181,6 +183,13 @@ To see which ignored local evidence lanes are missing, partial, ready, or invali
 ```bash
 node tools/local_evidence_status.js --json
 ```
+
+For `liveReviewClosure`, use its explicit `phase`: draft absent is `missing`,
+malformed or document-stale evidence is `invalid`, digest-valid evidence whose
+dates are not yet copied into the current public config is
+`document_ready_unbound`, and only the strict config-bound validator produces
+`config_bound_ready`. The unbound phase selects the safe date-patch renderer;
+it never invents review dates or edits `public-config.js` automatically.
 
 To burn down the reviewer-capacity blocker without faking evidence, create `REVIEWER_CANDIDATE_TRACKER.local.json` from the template and run:
 

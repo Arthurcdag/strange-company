@@ -18,9 +18,10 @@ const localEvidenceDir = argValue("--local-evidence-dir", root);
 const publicLiveReceiptPath = argValue("--public-live-receipt", path.join(root, "public-live-receipt.js"));
 const termsDocumentPath = argValue("--terms-doc", path.join(root, "TERMOS.md"));
 const privacyDocumentPath = argValue("--privacy-doc", path.join(root, "AVISO_DE_PRIVACIDADE.md"));
-const liveReviewClosurePath = path.join(localEvidenceDir, "LIVE_REVIEW_CLOSURE.local.json");
 const REVIEW_CLOSURE_FIELDS = ["termsReviewedAt", "privacyReviewedAt", "brazilComplianceReviewedAt", "aiHandoffReviewedAt"];
 const REVIEW_CLOSURE_EVIDENCE_BLOCKER = "humanReviewClosureEvidence";
+const REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND = "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready";
+const REVIEW_CLOSURE_VALIDATOR_COMMAND = "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js";
 
 function readText(filePath) {
   return fs.readFileSync(filePath, "utf8");
@@ -115,6 +116,7 @@ function summarizeLocalEvidence(localEvidence) {
       label: lane.label,
       localFile: lane.localFile,
       status: lane.status,
+      phase: lane.phase || null,
       ready: lane.ready,
       nextAction: lane.nextAction,
     })),
@@ -168,17 +170,34 @@ function liveGateRows(config) {
   ];
 }
 
-function reviewClosureActions(hardBlockers) {
+function reviewClosureActions(hardBlockers, phase) {
   if (!hardBlockers.some((blocker) => (
     REVIEW_CLOSURE_FIELDS.includes(blocker) || blocker === REVIEW_CLOSURE_EVIDENCE_BLOCKER
   ))) {
     return [];
   }
+  if (phase === "document_ready_unbound") {
+    return [
+      "Render the date-only public config patch: node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json.",
+      "Copy only termsReviewedAt, privacyReviewedAt, brazilComplianceReviewedAt, and aiHandoffReviewedAt into public-config.js; keep liveMode false.",
+      `Confirm the config-bound closure: ${REVIEW_CLOSURE_VALIDATOR_COMMAND}.`,
+    ];
+  }
+  if (phase === "invalid") {
+    return [
+      "Inspect and repair the existing LIVE_REVIEW_CLOSURE.local.json with real human-review evidence; do not overwrite or fabricate it.",
+      `Recheck the document-bound packet: ${REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND}.`,
+      "After document validation passes, render the date-only patch: node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json.",
+      "Copy only the four approved review dates into public-config.js while liveMode remains false.",
+      `Confirm the final config binding: ${REVIEW_CLOSURE_VALIDATOR_COMMAND}.`,
+    ];
+  }
   return [
     "Draft LIVE_REVIEW_CLOSURE.local.json: node tools/draft_live_review_closure.js --write-local",
-    "Fill real human review evidence locally, including documentDigests for every canonical reviewed document, then run node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready.",
+    `Fill or repair real human review evidence locally, including documentDigests for every canonical reviewed document, then run ${REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND}.`,
     "Render the date-only public config patch: node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json.",
     "Copy only termsReviewedAt, privacyReviewedAt, brazilComplianceReviewedAt, and aiHandoffReviewedAt into public-config.js; keep liveMode false until external live and revenue gates pass.",
+    `Confirm the final config binding: ${REVIEW_CLOSURE_VALIDATOR_COMMAND}.`,
   ];
 }
 
@@ -189,22 +208,6 @@ function evidenceLane(localEvidence, id) {
 function blockerFromLane(localEvidence, id, blocker) {
   const lane = evidenceLane(localEvidence, id);
   return lane && lane.ready ? [] : [{ ...blocker, laneId: id }];
-}
-
-function liveReviewClosureMatchesConfig(config, closurePath) {
-  try {
-    const packet = JSON.parse(readText(closurePath));
-    const patch = packet && typeof packet === "object" ? packet.publicConfigPatch : null;
-    return Boolean(
-      patch
-      && typeof patch === "object"
-      && REVIEW_CLOSURE_FIELDS.every((field) => (
-        String(patch[field] || "").trim() === String(config[field] || "").trim()
-      ))
-    );
-  } catch (_error) {
-    return false;
-  }
 }
 
 function issuedPublicLiveReceiptReady(configPath, receiptPath, termsPath, privacyPath) {
@@ -230,8 +233,11 @@ function issuedPublicLiveReceiptReady(configPath, receiptPath, termsPath, privac
 function laneHandoff(localEvidence, options) {
   const lane = evidenceLane(localEvidence, options.laneId);
   const laneStatus = lane ? lane.status : "missing";
+  const lanePhase = lane ? lane.phase : null;
   let command = options.validatorCommand;
-  if (laneStatus === "missing") {
+  if (lanePhase && options.phaseCommands && options.phaseCommands[lanePhase]) {
+    command = options.phaseCommands[lanePhase];
+  } else if (laneStatus === "missing") {
     command = options.draftCommand;
   } else if (laneStatus === "ready" && options.readyCommand) {
     command = options.readyCommand;
@@ -240,6 +246,7 @@ function laneHandoff(localEvidence, options) {
     blockerId: options.blockerId,
     laneId: options.laneId,
     laneStatus,
+    lanePhase,
     priority: options.priority,
     command,
     validatorCommand: options.validatorCommand,
@@ -266,8 +273,13 @@ function selectHandoff({
       laneId: "liveReviewClosure",
       priority: "hard_gate",
       draftCommand: "node tools/draft_live_review_closure.js --write-local",
-      validatorCommand: "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready",
+      validatorCommand: REVIEW_CLOSURE_VALIDATOR_COMMAND,
       readyCommand: "node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json",
+      phaseCommands: {
+        missing: "node tools/draft_live_review_closure.js --write-local",
+        invalid: REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND,
+        document_ready_unbound: "node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json",
+      },
       whyNow: "Document-bound human review closure evidence must validate and its four dates must match public-config.js before any other live-readiness handoff.",
     });
   }
@@ -409,14 +421,11 @@ function evolutionMode(hardBlockers, publicRouteBlockers, operationalBlockers, l
   };
 }
 
-function buildStatus(config, logText, localEvidence, publicLiveReceiptReady, closurePath) {
+function buildStatus(config, logText, localEvidence, publicLiveReceiptReady) {
   const localEvidenceSummary = summarizeLocalEvidence(localEvidence);
   const closureLane = evidenceLane(localEvidenceSummary, "liveReviewClosure");
-  const closureEvidenceReady = Boolean(
-    closureLane
-    && closureLane.ready
-    && liveReviewClosureMatchesConfig(config, closurePath)
-  );
+  const closurePhase = closureLane ? closureLane.phase : "missing";
+  const closureEvidenceReady = closurePhase === "config_bound_ready";
   const evidenceRows = [
     ...liveGateRows(config).filter((row) => row.id !== "liveMode"),
     {
@@ -424,7 +433,7 @@ function buildStatus(config, logText, localEvidence, publicLiveReceiptReady, clo
       label: "document-bound human review closure evidence matching the public review dates",
       passed: closureEvidenceReady,
       command: "node tools/draft_live_review_closure.js --write-local",
-      validatorCommand: "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready",
+      validatorCommand: REVIEW_CLOSURE_VALIDATOR_COMMAND,
       nextAction: "Validate LIVE_REVIEW_CLOSURE.local.json against every canonical reviewed document, then make the four public review dates exactly match its publicConfigPatch while liveMode remains false.",
     },
     {
@@ -480,7 +489,7 @@ function buildStatus(config, logText, localEvidence, publicLiveReceiptReady, clo
     ...revenueBlockers.map((blocker) => blocker.id),
     ...externalLiveBlockers.map((blocker) => blocker.id),
   ];
-  const closureActions = reviewClosureActions(hardBlockers);
+  const closureActions = reviewClosureActions(hardBlockers, closurePhase);
   const passes = evolutionPasses(logText);
   const latestPass = summarizeLatestPass(passes[passes.length - 1]);
   const modeState = evolutionMode(
@@ -528,6 +537,7 @@ function buildStatus(config, logText, localEvidence, publicLiveReceiptReady, clo
     hardBlockers,
     publicRouteBlockers: publicRouteBlockers.map((blocker) => blocker.id),
     publicLiveReceiptReady,
+    liveReviewClosurePhase: closurePhase,
     selectedHandoff,
     reviewClosureActions: closureActions,
     reviewClosureEvidenceBlockers,
@@ -563,6 +573,7 @@ function printText(status) {
   console.log(`Public live ready: ${status.publicLiveReady}`);
   console.log(`Company operational ready: ${status.companyOperationalReady}`);
   console.log(`liveMode: ${status.liveMode}`);
+  console.log(`Live review closure phase: ${status.liveReviewClosurePhase}`);
   console.log(`Evolution passes logged: ${status.evolutionPassCount}`);
   if (status.latestPass) {
     console.log(`Latest pass: ${status.latestPass.date} - ${status.latestPass.title}`);
@@ -616,7 +627,6 @@ const status = buildStatus(
     termsDocumentPath,
     privacyDocumentPath,
   ),
-  liveReviewClosurePath,
 );
 
 if (asJson) {

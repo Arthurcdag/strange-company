@@ -57,6 +57,14 @@ At the time this packet was created, the repo already had:
 
 The remaining live blockers are outside-repo evidence: human terms review, human privacy review, Brazil compliance review, AI handoff review, Stripe route, bank route, and final attestation.
 
+Local evidence status, evolution goal status, and the next-action packet report
+one of four phases: `missing`, `invalid`, `document_ready_unbound`, or
+`config_bound_ready`. A packet with valid document digests but dates not yet
+copied into the current public config is only `document_ready_unbound`; render
+its date-only patch, keep `liveMode: false`, then run the strict config-bound
+validator. VAU remains blocked and closure-first until all four dates and that
+binding pass together.
+
 ## AI Can Prepare
 
 AI may prepare:
@@ -163,6 +171,7 @@ Use this section every time the project advances one review gate:
    - `node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json`
    - if both pass, copy only `termsReviewedAt`, `privacyReviewedAt`, `brazilComplianceReviewedAt`, and `aiHandoffReviewedAt` into `public-config.js`; keep `liveMode: false`.
    - run `node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js` and stop unless the dates and all nine document digests remain bound.
+   - run `node tools/check_live_review_closure_conformance.js` and stop if the status surfaces disagree on phase or VAU disagrees on closure readiness, blocking, or first hard-gate priority.
 4. Validate final live readiness only after payment, bank, support, Google, and attestation evidence also exists:
    - `node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js`
    - `node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js`
@@ -178,6 +187,7 @@ Use this section every time the project advances one review gate:
    - `node tools/export_public_live_receipt.js --check-public-js --require-issued`
    - `node tools/preflight_public_launch.js`
    - `node tools/evolution_goal_status.js --json`
+   - `node tools/check_live_review_closure_conformance.js`
 7. Only when all checked items are complete, external Form responses remain
    disabled, status has no hard, public-route, or operational blockers, and a
    human approves the decision, make the separate `liveMode: true` change; run

@@ -57,7 +57,10 @@ function localEvidenceMatrix(status) {
     return "- unavailable";
   }
   return localEvidence.lanes
-    .map((lane) => `- ${lane.id}: ${lane.status} (${lane.localFile})`)
+    .map((lane) => {
+      const phase = lane.phase ? `; phase=${lane.phase}` : "";
+      return `- ${lane.id}: ${lane.status}${phase} (${lane.localFile})`;
+    })
     .join("\n");
 }
 
@@ -70,6 +73,7 @@ function selectedHandoff(status) {
     `- Blocker: ${handoff.blockerId}`,
     `- Evidence lane: ${handoff.laneId || "none"}`,
     `- Lane status: ${handoff.laneStatus}`,
+    `- Lane phase: ${handoff.lanePhase || "n/a"}`,
     `- Priority: ${handoff.priority}`,
     `- Do: \`${handoff.command}\``,
     `- Validate: \`${handoff.validatorCommand}\``,
@@ -113,6 +117,7 @@ function packet(status) {
     `Public live ready: ${status.publicLiveReady}`,
     `Company operational ready: ${status.companyOperationalReady}`,
     `liveMode: ${status.liveMode}`,
+    `Live review closure phase: ${status.liveReviewClosurePhase}`,
     `Latest logged pass: ${latest}`,
     "",
     "## Do This Next",
@@ -141,7 +146,7 @@ function packet(status) {
     "",
     "## Document-Bound Review Closure Prerequisite",
     "",
-    "`LIVE_REVIEW_CLOSURE.local.json` is a hard prerequisite even when all four public review dates are populated. It must pass the authoritative validator against the current canonical document digests, and its `publicConfigPatch` dates must exactly match `public-config.js` while `liveMode` remains false.",
+    "`LIVE_REVIEW_CLOSURE.local.json` is a hard prerequisite even when all four public review dates are populated. Final readiness requires `node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js`, which checks the current canonical document digests and exact `publicConfigPatch` date binding while `liveMode` remains false.",
     "",
     "A missing, invalid, document-stale, or date-mismatched closure packet keeps `humanReviewClosureEvidence` open and keeps the selected handoff on the closure lane.",
     "",
@@ -166,6 +171,7 @@ function packet(status) {
     checklist([
       "Run `node tools/evolution_goal_status.js --json`.",
       "Run `node tools/local_evidence_status.js --json`.",
+      "Run `node tools/check_live_review_closure_conformance.js`.",
       "Run `node tools/audit_evolution_log.js`.",
       "Run `node tools/preflight_public_launch.js`.",
       "Run `node tools/build_public_site.js --check --output .public-site-build.local --force`.",

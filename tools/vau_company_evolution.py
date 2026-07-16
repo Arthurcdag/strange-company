@@ -51,6 +51,13 @@ LIVE_REVIEW_FIELDS = {
     "brazilCompliance": "brazilComplianceReviewedAt",
     "aiHandoff": "aiHandoffReviewedAt",
 }
+LIVE_REVIEW_GATE_NAMES = (
+    "termsReviewed",
+    "privacyReviewed",
+    "brazilComplianceReviewed",
+    "aiHandoffReviewed",
+)
+LIVE_REVIEW_CLOSURE_EVIDENCE = "validator:passed; public-dates:matched"
 LIVE_REVIEW_REQUIRED_DOCUMENTS = {
     "terms": {"TERMOS.md", "TERMS.md"},
     "privacy": {"AVISO_DE_PRIVACIDADE.md", "PRIVACY.md"},
@@ -203,6 +210,36 @@ def set_path(data: dict[str, Any], path: str, value: Any) -> None:
     current[parts[-1]] = value
 
 
+def live_review_dates_ready(state: dict[str, Any]) -> bool:
+    gates = state.get("gates", {})
+    return isinstance(gates, dict) and all(
+        gates.get(gate_name) is True for gate_name in LIVE_REVIEW_GATE_NAMES
+    )
+
+
+def live_review_closure_config_bound(state: dict[str, Any]) -> bool:
+    gates = state.get("gates", {})
+    evidence = state.get("evidence", {})
+    return bool(
+        isinstance(gates, dict)
+        and isinstance(evidence, dict)
+        and gates.get("liveReviewClosureReady") is True
+        and live_review_dates_ready(state)
+        and evidence.get("liveReviewClosure") == LIVE_REVIEW_CLOSURE_EVIDENCE
+    )
+
+
+def enforce_live_review_invariant(state: dict[str, Any]) -> dict[str, Any]:
+    gates = state.get("gates")
+    evidence = state.get("evidence")
+    if isinstance(gates, dict) and not live_review_closure_config_bound(state):
+        if gates.get("liveReviewClosureReady") is True:
+            gates["liveReviewClosureReady"] = False
+        if isinstance(evidence, dict) and evidence.get("liveReviewClosure"):
+            evidence["liveReviewClosure"] = ""
+    return state
+
+
 def apply_state_delta(state: dict[str, Any], delta: dict[str, Any]) -> dict[str, Any]:
     updated = copy.deepcopy(state)
     for path, value in delta.items():
@@ -227,7 +264,7 @@ def apply_state_delta(state: dict[str, Any], delta: dict[str, Any]) -> dict[str,
                 raise ValueError(f"Unsupported state delta operation: {operation}")
         else:
             set_path(updated, path, value)
-    return updated
+    return enforce_live_review_invariant(updated)
 
 
 def _read_bool_config(text: str, field_name: str, default: bool = False) -> bool:
@@ -448,6 +485,8 @@ def _infer_live_review_closure(
         str(terms_document),
         "--privacy-doc",
         str(privacy_document),
+        "--public-config",
+        str(public_config),
     ):
         return False, ""
 
@@ -467,7 +506,7 @@ def _infer_live_review_closure(
         if not packet_date or packet_date != config_date:
             return False, ""
 
-    return True, "validator:passed; public-dates:matched"
+    return True, LIVE_REVIEW_CLOSURE_EVIDENCE
 
 
 def _infer_public_live_receipt(
@@ -699,6 +738,12 @@ def build_current_state(
     privacy_reviewed_at = _read_string_config(text, "privacyReviewedAt")
     brazil_reviewed_at = _read_string_config(text, "brazilComplianceReviewedAt")
     ai_handoff_reviewed_at = _read_string_config(text, "aiHandoffReviewedAt")
+    review_date_gates = {
+        "termsReviewed": bool(terms_reviewed_at),
+        "privacyReviewed": bool(privacy_reviewed_at),
+        "brazilComplianceReviewed": bool(brazil_reviewed_at),
+        "aiHandoffReviewed": bool(ai_handoff_reviewed_at),
+    }
     human_reviewers_found, reviewers_ready = infer_reviewer_metrics(reviewer_tracker)
     payment_fiscal_evidence_ready, payment_fiscal_evidence = _infer_revenue_evidence(
         revenue_evidence_index,
@@ -714,6 +759,11 @@ def build_current_state(
         terms_document,
         privacy_document,
     )
+    live_review_closure_ready = bool(
+        live_review_closure_ready and all(review_date_gates.values())
+    )
+    if not live_review_closure_ready:
+        live_review_closure_evidence = ""
     public_live_receipt_ready, public_live_receipt_evidence = _infer_public_live_receipt(
         public_live_receipt,
         public_config,
@@ -739,10 +789,7 @@ def build_current_state(
         "gates": {
             "supportInboxVerified": _read_bool_config(text, "supportInboxVerified"),
             "googleFormVerified": _read_bool_config(text, "googleFormVerified"),
-            "termsReviewed": bool(terms_reviewed_at),
-            "privacyReviewed": bool(privacy_reviewed_at),
-            "brazilComplianceReviewed": bool(brazil_reviewed_at),
-            "aiHandoffReviewed": bool(ai_handoff_reviewed_at),
+            **review_date_gates,
             "privatePaymentFiscalEvidenceReady": payment_fiscal_evidence_ready,
             "privateExternalLiveEvidenceReady": external_live_evidence_ready,
             "liveReviewClosureReady": live_review_closure_ready,
@@ -786,6 +833,8 @@ def build_current_state(
 def hard_blockers(state: dict[str, Any]) -> list[str]:
     gates = state.get("gates", {})
     blockers: list[str] = []
+    if not live_review_closure_config_bound(state):
+        blockers.append("humanReviewClosureEvidence")
     if not gates.get("termsReviewed"):
         blockers.append("termsReviewedAt")
     if not gates.get("privacyReviewed"):
@@ -794,8 +843,6 @@ def hard_blockers(state: dict[str, Any]) -> list[str]:
         blockers.append("brazilComplianceReviewedAt")
     if not gates.get("aiHandoffReviewed"):
         blockers.append("aiHandoffReviewedAt")
-    if not gates.get("liveReviewClosureReady"):
-        blockers.append("humanReviewClosureEvidence")
     if not gates.get("privatePaymentFiscalEvidenceReady"):
         blockers.append("private payment/fiscal evidence")
     if not gates.get("privateExternalLiveEvidenceReady"):
@@ -919,10 +966,20 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
                 domain="compliance",
                 probability_hint=0.24,
                 strategic_value=2.2,
-                tags=("hard_gate", "manual", "compliance", "document_bound_evidence"),
+                tags=(
+                    "hard_gate",
+                    "top_priority",
+                    "manual",
+                    "compliance",
+                    "document_bound_evidence",
+                ),
                 state_delta={
+                    "gates.termsReviewed": True,
+                    "gates.privacyReviewed": True,
+                    "gates.brazilComplianceReviewed": True,
+                    "gates.aiHandoffReviewed": True,
                     "gates.liveReviewClosureReady": True,
-                    "evidence.liveReviewClosure": "validator:passed; public-dates:matched",
+                    "evidence.liveReviewClosure": LIVE_REVIEW_CLOSURE_EVIDENCE,
                 },
                 requires_real_evidence=True,
                 reason=(
@@ -930,9 +987,10 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
                     "bound to the current canonical reviewed documents."
                 ),
                 next_action=(
-                    "Complete LIVE_REVIEW_CLOSURE.local.json with current documentDigests, run "
+                    "Complete LIVE_REVIEW_CLOSURE.local.json with current documentDigests, copy its exact four "
+                    "review dates into public-config.js, then run "
                     "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json "
-                    "--require-ready, and keep liveMode false."
+                    "--require-ready --public-config public-config.js, and keep liveMode false."
                 ),
             )
         )
@@ -985,18 +1043,9 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
         "public live readiness receipt" in hard
         and get_path(state, "gates.privatePaymentFiscalEvidenceReady", False)
         and get_path(state, "gates.privateExternalLiveEvidenceReady", False)
-        and get_path(state, "gates.liveReviewClosureReady", False)
+        and live_review_closure_config_bound(state)
         and get_path(state, "gates.humanReviewersReady", False)
         and get_path(state, "gates.deliveryReviewLoopReady", False)
-        and all(
-            get_path(state, f"gates.{gate}", False)
-            for gate in (
-                "termsReviewed",
-                "privacyReviewed",
-                "brazilComplianceReviewed",
-                "aiHandoffReviewed",
-            )
-        )
     ):
         events.append(
             CompanyEvent(
@@ -1295,7 +1344,11 @@ def simulate_company_futures(
     if max_branches_to_keep < 1:
         raise ValueError("max branches must be at least one")
 
-    active = list(futures)
+    active = []
+    for future in futures:
+        normalized = future.clone()
+        normalized.state = enforce_live_review_invariant(normalized.state)
+        active.append(normalized)
     for _step in range(depth):
         new_futures: list[CompanyFuture] = []
         for future in active:
@@ -1306,13 +1359,23 @@ def simulate_company_futures(
                 new_future.probability *= score_event_likelihood(event, future)
                 new_future.evolution_score += event.strategic_value
                 new_futures.append(new_future)
-        new_futures.sort(key=lambda item: item.branch_score, reverse=True)
+        new_futures.sort(
+            key=lambda item: (
+                bool(
+                    item.observed_events < len(item.timeline)
+                    and "top_priority" in item.timeline[item.observed_events].tags
+                ),
+                item.branch_score,
+            ),
+            reverse=True,
+        )
         active = new_futures[:max_branches_to_keep]
     return active
 
 
 def create_initial_future(current_state: dict[str, Any]) -> list[CompanyFuture]:
-    return [CompanyFuture(state=copy.deepcopy(current_state))]
+    normalized_state = enforce_live_review_invariant(copy.deepcopy(current_state))
+    return [CompanyFuture(state=normalized_state)]
 
 
 def tokenize(text: str) -> set[str]:
@@ -1349,20 +1412,33 @@ def update_futures_with_real_event(
     real_event: CompanyEvent,
     current_state: dict[str, Any],
 ) -> list[CompanyFuture]:
+    def correct_with_observation(future: CompanyFuture) -> CompanyFuture:
+        corrected = future.clone()
+        observed_index = corrected.observed_events
+        if observed_index < len(corrected.timeline):
+            corrected.timeline[observed_index] = real_event
+        else:
+            corrected.timeline.append(real_event)
+        corrected.observed_events = observed_index + 1
+
+        corrected_state = apply_state_delta(current_state, real_event.state_delta)
+        for pending_event in corrected.timeline[corrected.observed_events :]:
+            corrected_state = apply_state_delta(corrected_state, pending_event.state_delta)
+        corrected.state = corrected_state
+        return corrected
+
     surviving: list[CompanyFuture] = []
     for future in predicted_futures:
         similarity = compare_events(real_event, future.next_predicted_event)
         if similarity >= 0.7:
-            corrected = future.clone()
+            corrected = correct_with_observation(future)
             corrected.confidence = min(1.0, corrected.confidence + 0.15)
             corrected.probability *= 1.0 + similarity * 0.1
-            corrected.observed_events += 1
             surviving.append(corrected)
         elif similarity >= 0.35:
-            corrected = future.clone()
+            corrected = correct_with_observation(future)
             corrected.confidence *= 0.7
             corrected.probability *= 0.55 + similarity * 0.25
-            corrected.observed_events += 1
             surviving.append(corrected)
 
     if not surviving:
@@ -1399,6 +1475,7 @@ def recommended_next_actions(
                     "events": set(),
                     "score": 0.0,
                     "requires_real_evidence": False,
+                    "priority": 0,
                 },
             )
             urgency_discount = 1.0 / float(index + 1)
@@ -1408,8 +1485,14 @@ def recommended_next_actions(
             record["requires_real_evidence"] = (
                 record["requires_real_evidence"] or event.requires_real_evidence
             )
+            if "top_priority" in event.tags:
+                record["priority"] = 1
 
-    ordered = sorted(action_scores.values(), key=lambda item: item["score"], reverse=True)
+    ordered = sorted(
+        action_scores.values(),
+        key=lambda item: (item["priority"], item["score"]),
+        reverse=True,
+    )
     return [
         {
             "action": item["action"],
@@ -1428,6 +1511,7 @@ def run_cycle(
     max_branches_to_keep: int,
     real_event: CompanyEvent | None = None,
 ) -> dict[str, Any]:
+    current_state = enforce_live_review_invariant(copy.deepcopy(current_state))
     predicted = simulate_company_futures(
         create_initial_future(current_state),
         depth,

@@ -17,6 +17,12 @@ VALIDATE_WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
 PAGES_WORKFLOW = ROOT / ".github" / "workflows" / "pages.yml"
 BUILD_PUBLIC_SITE = ROOT / "tools" / "build_public_site.js"
 REVIEW_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_REVIEW_DOCUMENT_V1"
+REVIEW_DATE_FIELDS = (
+    "termsReviewedAt",
+    "privacyReviewedAt",
+    "brazilComplianceReviewedAt",
+    "aiHandoffReviewedAt",
+)
 
 
 def review_document_digest(canonical_path: str) -> str:
@@ -91,6 +97,20 @@ def live_review_ready_payload() -> dict[str, object]:
     return payload
 
 
+def write_public_config(path: pathlib.Path, dates: dict[str, str]) -> pathlib.Path:
+    config = {
+        "jurisdiction": "BR",
+        "aiGeneratedLegalDocsRequireHumanReview": True,
+        **dates,
+        "liveMode": False,
+    }
+    path.write_text(
+        f"window.PUBLIC_ORDER_CONFIG = {json.dumps(config)};\n",
+        encoding="utf-8",
+    )
+    return path
+
+
 class LocalEvidenceStatusTests(unittest.TestCase):
     def test_missing_lanes_report_public_safe_status(self) -> None:
         with tempfile.TemporaryDirectory() as workspace:
@@ -105,11 +125,42 @@ class LocalEvidenceStatusTests(unittest.TestCase):
             self.assertEqual(data["missingLaneCount"], data["laneCount"])
             self.assertNotIn(workspace, result.stdout)
 
-    def test_ready_live_review_closure_is_counted_without_printing_contents(self) -> None:
+            lane = next(item for item in data["lanes"] if item["id"] == "liveReviewClosure")
+            self.assertEqual(lane["status"], "missing")
+            self.assertEqual(lane["phase"], "missing")
+            self.assertFalse(lane["ready"])
+            self.assertFalse(lane["finalReady"])
+            self.assertIn("draft_live_review_closure.js", lane["commands"]["draft"])
+            self.assertIn("--require-ready", lane["commands"]["validateDocuments"])
+            self.assertNotIn("--public-config", lane["commands"]["validateDocuments"])
+            self.assertIn(
+                "--require-ready --public-config public-config.js",
+                lane["commands"]["validateConfigBinding"],
+            )
+
+    def test_invalid_live_review_closure_has_explicit_invalid_phase(self) -> None:
         with tempfile.TemporaryDirectory() as workspace:
             target = pathlib.Path(workspace) / "LIVE_REVIEW_CLOSURE.local.json"
-            target.write_text(
-                json.dumps(live_review_ready_payload(), indent=2),
+            target.write_text("{", encoding="utf-8")
+
+            result = run_status("--json", "--local-dir", workspace)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            data = json.loads(result.stdout)
+            lane = next(item for item in data["lanes"] if item["id"] == "liveReviewClosure")
+            self.assertEqual(lane["status"], "invalid")
+            self.assertEqual(lane["phase"], "invalid")
+            self.assertFalse(lane["ready"])
+            self.assertFalse(lane["finalReady"])
+            self.assertNotIn("could not read JSON", result.stdout)
+
+    def test_document_stale_live_review_closure_is_invalid(self) -> None:
+        with tempfile.TemporaryDirectory() as workspace:
+            workspace_path = pathlib.Path(workspace)
+            payload = live_review_ready_payload()
+            payload["reviewGates"]["terms"]["documentDigests"]["TERMOS.md"] = "0" * 64
+            (workspace_path / "LIVE_REVIEW_CLOSURE.local.json").write_text(
+                json.dumps(payload, indent=2),
                 encoding="utf-8",
             )
 
@@ -118,9 +169,78 @@ class LocalEvidenceStatusTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             data = json.loads(result.stdout)
             lane = next(item for item in data["lanes"] if item["id"] == "liveReviewClosure")
+            self.assertEqual(lane["status"], "invalid")
+            self.assertEqual(lane["phase"], "invalid")
+            self.assertFalse(lane["ready"])
+            self.assertEqual(data["invalidLaneCount"], 1)
+
+    def test_document_ready_live_review_closure_stays_unbound(self) -> None:
+        with tempfile.TemporaryDirectory() as workspace:
+            workspace_path = pathlib.Path(workspace)
+            target = pathlib.Path(workspace) / "LIVE_REVIEW_CLOSURE.local.json"
+            payload = live_review_ready_payload()
+            target.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            public_config = write_public_config(
+                workspace_path / "public-config.js",
+                {field: "" for field in REVIEW_DATE_FIELDS},
+            )
+
+            result = run_status(
+                "--json",
+                "--local-dir",
+                workspace,
+                "--public-config",
+                str(public_config),
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            data = json.loads(result.stdout)
+            lane = next(item for item in data["lanes"] if item["id"] == "liveReviewClosure")
+            checks = {check["id"]: check for check in lane["checks"]}
+            self.assertEqual(lane["status"], "partial")
+            self.assertEqual(lane["phase"], "document_ready_unbound")
+            self.assertFalse(lane["ready"])
+            self.assertFalse(lane["finalReady"])
+            self.assertTrue(checks["document_ready"]["passed"])
+            self.assertFalse(checks["config_bound_ready"]["passed"])
+            self.assertFalse(checks["document_ready"]["bindsPublicConfig"])
+            self.assertTrue(checks["config_bound_ready"]["bindsPublicConfig"])
+            self.assertIn("Apply only the four approved review dates", lane["nextAction"])
+            self.assertNotIn("terms-reviewer", result.stdout)
+
+    def test_config_bound_live_review_closure_is_finally_ready(self) -> None:
+        with tempfile.TemporaryDirectory() as workspace:
+            workspace_path = pathlib.Path(workspace)
+            payload = live_review_ready_payload()
+            target = workspace_path / "LIVE_REVIEW_CLOSURE.local.json"
+            target.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            public_config = write_public_config(
+                workspace_path / "public-config.js",
+                {
+                    field: str(payload["publicConfigPatch"][field])
+                    for field in REVIEW_DATE_FIELDS
+                },
+            )
+
+            result = run_status(
+                "--json",
+                "--local-dir",
+                workspace,
+                "--public-config",
+                str(public_config),
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            data = json.loads(result.stdout)
+            lane = next(item for item in data["lanes"] if item["id"] == "liveReviewClosure")
+            checks = {check["id"]: check for check in lane["checks"]}
             self.assertEqual(lane["status"], "ready")
+            self.assertEqual(lane["phase"], "config_bound_ready")
             self.assertTrue(lane["ready"])
+            self.assertTrue(lane["finalReady"])
             self.assertEqual(data["readyLaneCount"], 1)
+            self.assertTrue(checks["document_ready"]["passed"])
+            self.assertTrue(checks["config_bound_ready"]["passed"])
             self.assertNotIn("terms-reviewer", result.stdout)
 
     def test_invalid_local_packet_is_reported_without_validator_stderr(self) -> None:
