@@ -59,6 +59,7 @@ window.PUBLIC_LIVE_RECEIPT = Object.freeze({
     "privatePacketDataExcluded": true,
     "privatePacketHashesExcluded": true,
     "localPacketValidatorsPassed": false,
+    "liveReviewClosureValidatorPassed": false,
     "reviewerCandidateTrackerReady": false,
     "deliveryReviewChecklistReady": false,
     "operationalValidatorsPassed": false,

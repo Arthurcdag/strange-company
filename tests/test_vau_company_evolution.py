@@ -22,7 +22,7 @@ from tools.vau_company_evolution import (
     update_futures_with_real_event,
     create_initial_future,
 )
-from tests.test_evolution_goal_status import valid_external_live_payload
+from tests.test_evolution_goal_status import live_review_ready_payload, valid_external_live_payload
 from tests.test_revenue_setup_evidence_index import valid_evidence_payload
 from tests.test_reviewer_candidate_tracker import candidate as reviewer_candidate
 from tests.test_public_live_receipt import generation_args, ready_files, run_exporter
@@ -143,6 +143,13 @@ def write_external_live_packet(ready: bool = False, review_date: str = "2026-07-
     )
     temp = tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False)
     json.dump(payload, temp, ensure_ascii=False, indent=2)
+    temp.close()
+    return Path(temp.name)
+
+
+def write_live_review_closure(review_date: str = "2026-07-01") -> Path:
+    temp = tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False)
+    json.dump(live_review_ready_payload(review_date), temp, ensure_ascii=False, indent=2)
     temp.close()
     return Path(temp.name)
 
@@ -287,8 +294,56 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         blockers = hard_blockers(state)
         self.assertNotIn("termsReviewedAt", blockers)
         self.assertNotIn("privacyReviewedAt", blockers)
+        self.assertIn("humanReviewClosureEvidence", blockers)
         self.assertIn("private payment/fiscal evidence", blockers)
         self.assertIn("private external live evidence", blockers)
+
+    def test_ready_document_bound_closure_matches_public_dates(self) -> None:
+        config = write_public_config(
+            terms="2026-07-01",
+            privacy="2026-07-01",
+            brazil="2026-07-01",
+            ai_handoff="2026-07-01",
+        )
+        state = build_current_state(
+            config,
+            write_reviewer_tracker([]),
+            live_review_closure=write_live_review_closure(),
+        )
+
+        self.assertTrue(state["gates"]["liveReviewClosureReady"])
+        self.assertEqual(
+            state["evidence"]["liveReviewClosure"],
+            "validator:passed; public-dates:matched",
+        )
+        self.assertNotIn("humanReviewClosureEvidence", hard_blockers(state))
+        self.assertFalse(state["snapshot"]["liveMode"])
+
+    def test_invalid_or_date_stale_closure_fails_closed(self) -> None:
+        config = write_public_config(
+            terms="2026-07-01",
+            privacy="2026-07-01",
+            brazil="2026-07-01",
+            ai_handoff="2026-07-01",
+        )
+        invalid = tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False)
+        invalid.write("{")
+        invalid.close()
+        invalid_state = build_current_state(
+            config,
+            write_reviewer_tracker([]),
+            live_review_closure=Path(invalid.name),
+        )
+        stale_state = build_current_state(
+            config,
+            write_reviewer_tracker([]),
+            live_review_closure=write_live_review_closure("2026-06-30"),
+        )
+
+        for state in (invalid_state, stale_state):
+            self.assertFalse(state["gates"]["liveReviewClosureReady"])
+            self.assertIn("humanReviewClosureEvidence", hard_blockers(state))
+            self.assertFalse(public_live_ready(state))
 
     def test_ready_revenue_evidence_local_index_removes_payment_blocker(self) -> None:
         path = write_public_config(
@@ -529,6 +584,7 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
             tracker,
             revenue_evidence_index=revenue,
             external_live_packet=external,
+            live_review_closure=write_live_review_closure("2026-05-25"),
         )
 
         goal = continuous_evolution_goal(state)
@@ -640,6 +696,7 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
                 "privatePaymentFiscalEvidenceReady": True,
                 "privateExternalLiveEvidenceReady": True,
                 "publicLiveReceiptReady": True,
+                "liveReviewClosureReady": True,
                 "humanReviewersReady": True,
                 "deliveryReviewLoopReady": True,
                 "supportInboxVerified": False,
@@ -666,6 +723,7 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
         state["gates"]["privatePaymentFiscalEvidenceReady"] = True
         state["gates"]["privateExternalLiveEvidenceReady"] = True
         state["gates"]["publicLiveReceiptReady"] = True
+        state["gates"]["liveReviewClosureReady"] = True
         state["gates"]["humanReviewersReady"] = True
         state["gates"]["deliveryReviewLoopReady"] = True
         state["metrics"]["human_reviewers_found"] = 4
@@ -692,6 +750,7 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
             privatePaymentFiscalEvidenceReady=True,
             privateExternalLiveEvidenceReady=False,
             publicLiveReceiptReady=True,
+            liveReviewClosureReady=True,
             humanReviewersReady=True,
             deliveryReviewLoopReady=True,
         )
@@ -719,6 +778,7 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
             privatePaymentFiscalEvidenceReady=True,
             privateExternalLiveEvidenceReady=True,
             publicLiveReceiptReady=False,
+            liveReviewClosureReady=True,
             humanReviewersReady=True,
             deliveryReviewLoopReady=True,
         )
@@ -729,6 +789,8 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
 
         self.assertIn("public live readiness receipt", hard_blockers(state))
         self.assertIn("public_live_receipt_issued", event_names)
+        receipt_event = next(event for event in events if event.name == "public_live_receipt_issued")
+        self.assertIn("--live-review-closure LIVE_REVIEW_CLOSURE.local.json", receipt_event.next_action)
         self.assertFalse(public_live_ready(state))
         self.assertNotIn("controlled_pilot_request_qualified", event_names)
         self.assertNotIn("live_mode_ready_for_human_flip", event_names)
@@ -765,6 +827,7 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
                 revenue_evidence_index=revenue,
                 external_live_packet=external,
                 public_live_receipt=receipt,
+                live_review_closure=folder / "LIVE_REVIEW_CLOSURE.local.json",
                 terms_document=terms_document,
                 privacy_document=privacy_document,
                 delivery_review_checklist=folder / "DELIVERY_REVIEW_CHECKLIST.local.json",
@@ -781,6 +844,7 @@ class VAUCompanyEvolutionTests(unittest.TestCase):
                 revenue_evidence_index=revenue,
                 external_live_packet=external,
                 public_live_receipt=receipt,
+                live_review_closure=folder / "LIVE_REVIEW_CLOSURE.local.json",
                 terms_document=terms_document,
                 privacy_document=privacy_document,
                 delivery_review_checklist=folder / "DELIVERY_REVIEW_CHECKLIST.local.json",

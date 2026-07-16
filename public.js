@@ -270,7 +270,7 @@ async function publicLiveReceiptReady(config = PUBLIC_ORDER_CONFIG, receipt = CU
     if (!(
       receipt
       && hasExactKeys(receipt, ["schemaVersion", "mode", "status", "issuedAt", "validUntil", "core", "coreSha256", "attestations", "envelopeSha256"])
-      && hasExactKeys(attestations, ["publicOnly", "privatePacketDataExcluded", "privatePacketHashesExcluded", "localPacketValidatorsPassed", "reviewerCandidateTrackerReady", "deliveryReviewChecklistReady", "operationalValidatorsPassed", "digestCoversCanonicalPublicCoreExceptLiveMode", "digestCoversReceiptEnvelopeExceptLiveMode"])
+      && hasExactKeys(attestations, ["publicOnly", "privatePacketDataExcluded", "privatePacketHashesExcluded", "localPacketValidatorsPassed", "liveReviewClosureValidatorPassed", "reviewerCandidateTrackerReady", "deliveryReviewChecklistReady", "operationalValidatorsPassed", "digestCoversCanonicalPublicCoreExceptLiveMode", "digestCoversReceiptEnvelopeExceptLiveMode"])
       && receipt.schemaVersion === 2
       && receipt.mode === "public"
       && receipt.status === "local_packet_validators_passed"
@@ -281,6 +281,7 @@ async function publicLiveReceiptReady(config = PUBLIC_ORDER_CONFIG, receipt = CU
       && attestations.privatePacketDataExcluded === true
       && attestations.privatePacketHashesExcluded === true
       && attestations.localPacketValidatorsPassed === true
+      && attestations.liveReviewClosureValidatorPassed === true
       && attestations.reviewerCandidateTrackerReady === true
       && attestations.deliveryReviewChecklistReady === true
       && attestations.operationalValidatorsPassed === true

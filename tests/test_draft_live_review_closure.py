@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import re
 import subprocess
 import tempfile
 import unittest
@@ -9,6 +11,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "tools" / "draft_live_review_closure.js"
+REVIEW_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_REVIEW_DOCUMENT_V1"
+
+
+def review_document_digest(canonical_path: str, contents: str) -> str:
+    normalized = contents.removeprefix("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
+    payload = f"{REVIEW_DOCUMENT_DIGEST_DOMAIN}\npath={canonical_path}\n{normalized}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def run_node(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -27,12 +36,19 @@ class DraftLiveReviewClosureTests(unittest.TestCase):
 
         payload = json.loads(process.stdout.strip())
 
+        self.assertEqual(payload["schemaVersion"], 2)
         self.assertEqual(payload["mode"], "local-draft")
         self.assertEqual(payload["attestation"]["operator"], "OpsBot")
         self.assertEqual(payload["source"], "public-config.js")
         self.assertFalse(payload["publicConfigPatch"]["liveMode"])
         self.assertIn("reviewGates", payload)
         self.assertIn("draftInstructions", payload)
+        for gate in payload["reviewGates"].values():
+            self.assertEqual(set(gate["documentDigests"]), set(gate["documentsReviewed"]))
+            for canonical_path, digest in gate["documentDigests"].items():
+                self.assertRegex(digest, re.compile(r"^[0-9a-f]{64}$"))
+                contents = (ROOT / canonical_path).read_bytes().decode("utf-8")
+                self.assertEqual(digest, review_document_digest(canonical_path, contents))
 
     def test_write_local_file_respects_force(self) -> None:
         with tempfile.TemporaryDirectory() as workspace:

@@ -1,17 +1,52 @@
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const vm = require("vm");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
 const requireReady = args.includes("--require-ready");
 const templateOk = args.includes("--template-ok") || !requireReady;
-const packetArg = args.find((arg) => !arg.startsWith("--"));
+
+function argValue(name) {
+  const index = args.indexOf(name);
+  const value = index >= 0 ? args[index + 1] : "";
+  return value && !String(value).startsWith("--") ? String(value) : "";
+}
+
+const VALUE_OPTIONS = new Set(["--document-root", "--terms-doc", "--privacy-doc", "--public-config"]);
+const positionalArgs = [];
+for (let index = 0; index < args.length; index += 1) {
+  const arg = args[index];
+  if (VALUE_OPTIONS.has(arg)) {
+    index += 1;
+  } else if (!arg.startsWith("--")) {
+    positionalArgs.push(arg);
+  }
+}
+
+const packetArg = positionalArgs[0];
 const packetPath = packetArg
   ? path.resolve(process.cwd(), packetArg)
   : path.join(root, "LIVE_REVIEW_CLOSURE.template.json");
+const documentRoot = argValue("--document-root")
+  ? path.resolve(process.cwd(), argValue("--document-root"))
+  : root;
+const termsDocumentPath = argValue("--terms-doc")
+  ? path.resolve(process.cwd(), argValue("--terms-doc"))
+  : path.join(documentRoot, "TERMOS.md");
+const privacyDocumentPath = argValue("--privacy-doc")
+  ? path.resolve(process.cwd(), argValue("--privacy-doc"))
+  : path.join(documentRoot, "AVISO_DE_PRIVACIDADE.md");
+const publicConfigArg = argValue("--public-config");
+const publicConfigPath = publicConfigArg
+  ? path.resolve(process.cwd(), publicConfigArg)
+  : "";
 
 const failures = [];
 const warnings = [];
+const REVIEW_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_REVIEW_DOCUMENT_V1";
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 
 const GATE_CONFIG_FIELDS = {
   terms: "termsReviewedAt",
@@ -55,6 +90,57 @@ function isBlank(value) {
   return value === undefined || value === null || String(value).trim() === "";
 }
 
+function loadPublicConfig(filePath) {
+  try {
+    const source = fs.readFileSync(filePath, "utf8");
+    const sandbox = { window: {} };
+    vm.runInNewContext(source, sandbox, {
+      filename: filePath,
+      timeout: 1000,
+      contextCodeGeneration: { strings: false, wasm: false },
+    });
+    const config = sandbox.window.PUBLIC_ORDER_CONFIG;
+    if (!isPlainObject(config)) {
+      throw new Error("must assign window.PUBLIC_ORDER_CONFIG to an object");
+    }
+    return config;
+  } catch (error) {
+    fail(`could not load public config ${filePath}: ${error.message}`);
+    return null;
+  }
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function sameStringSet(actual, expected) {
+  if (!Array.isArray(actual) || actual.some((value) => typeof value !== "string")) {
+    return false;
+  }
+  return JSON.stringify([...actual].sort()) === JSON.stringify([...expected].sort());
+}
+
+function normalizeDocumentText(value) {
+  return String(value).replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+}
+
+function reviewDocumentDigest(canonicalPath, contents) {
+  return crypto
+    .createHash("sha256")
+    .update(
+      `${REVIEW_DOCUMENT_DIGEST_DOMAIN}\npath=${canonicalPath}\n${normalizeDocumentText(contents)}`,
+      "utf8"
+    )
+    .digest("hex");
+}
+
+function documentSourcePath(canonicalPath) {
+  if (canonicalPath === "TERMOS.md") return termsDocumentPath;
+  if (canonicalPath === "AVISO_DE_PRIVACIDADE.md") return privacyDocumentPath;
+  return path.join(documentRoot, canonicalPath);
+}
+
 function isIsoDate(value) {
   if (isBlank(value)) {
     return false;
@@ -68,7 +154,7 @@ function isIsoDate(value) {
 }
 
 function requireObject(obj, sectionPath) {
-  if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
+  if (!isPlainObject(obj)) {
     fail(`${sectionPath} must be an object.`);
     return false;
   }
@@ -141,8 +227,8 @@ function scanForSecrets(value, currentPath = "$") {
 }
 
 function validateShape(packet) {
-  if (packet.schemaVersion !== 1) {
-    fail("schemaVersion must be 1.");
+  if (packet.schemaVersion !== 2) {
+    fail("schemaVersion must be 2.");
   }
   if (isBlank(packet.mode)) {
     fail("mode is required.");
@@ -177,6 +263,7 @@ function validateOptionalGateFormats(packet) {
   const gates = packet.reviewGates || {};
   for (const [gateId, configField] of Object.entries(GATE_CONFIG_FIELDS)) {
     const gate = gates[gateId] || {};
+    const section = `sections.reviewGates.${gateId}`;
     requireDate(gate, "reviewedAt", `sections.reviewGates.${gateId}`, false);
     if (!isBlank(gate.reviewedAt) && !isBlank((packet.publicConfigPatch || {})[configField]) && gate.reviewedAt !== packet.publicConfigPatch[configField]) {
       fail(`sections.reviewGates.${gateId}.reviewedAt must match sections.publicConfigPatch.${configField}.`);
@@ -184,8 +271,26 @@ function validateOptionalGateFormats(packet) {
     if (gate.aiOnlyApproval === true) {
       fail(`sections.reviewGates.${gateId}.aiOnlyApproval must remain false.`);
     }
-    if (gate.documentsReviewed !== undefined && !Array.isArray(gate.documentsReviewed)) {
-      fail(`sections.reviewGates.${gateId}.documentsReviewed must be an array.`);
+    const requiredDocuments = REQUIRED_DOCUMENTS[gateId];
+    if (!sameStringSet(gate.documentsReviewed, requiredDocuments)) {
+      fail(`${section}.documentsReviewed must contain exactly: ${requiredDocuments.join(", ")}.`);
+    }
+
+    const digests = gate.documentDigests;
+    if (!isPlainObject(digests)) {
+      fail(`${section}.documentDigests must be an object.`);
+    } else {
+      const digestKeys = Object.keys(digests);
+      if (!sameStringSet(digestKeys, requiredDocuments)) {
+        fail(`${section}.documentDigests must have exactly these canonical path keys: ${requiredDocuments.join(", ")}.`);
+      }
+      for (const canonicalPath of requiredDocuments) {
+        const digest = digests[canonicalPath];
+        const blankTemplatePlaceholder = packet.mode === "template" && isBlank(digest);
+        if (!blankTemplatePlaceholder && (typeof digest !== "string" || !SHA256_PATTERN.test(digest))) {
+          fail(`${section}.documentDigests[${JSON.stringify(canonicalPath)}] must be a lowercase SHA-256 hex digest.`);
+        }
+      }
     }
   }
   requireDate(packet.attestation || {}, "reviewedAt", "sections.attestation", false);
@@ -207,6 +312,10 @@ function validateReady(packet) {
   const patch = packet.publicConfigPatch || {};
   const attestation = packet.attestation || {};
 
+  if (packet.mode === "template" || packet.mode === "local-draft") {
+    fail(`mode ${JSON.stringify(packet.mode)} is non-evidence and cannot pass --require-ready.`);
+  }
+
   for (const [gateId, configField] of Object.entries(GATE_CONFIG_FIELDS)) {
     const gate = gates[gateId] || {};
     const section = `sections.reviewGates.${gateId}`;
@@ -216,10 +325,19 @@ function validateReady(packet) {
     if (gate.reviewedAt && patch[configField] && gate.reviewedAt !== patch[configField]) {
       fail(`${section}.reviewedAt must match sections.publicConfigPatch.${configField}.`);
     }
-    const documents = Array.isArray(gate.documentsReviewed) ? gate.documentsReviewed : [];
-    for (const document of REQUIRED_DOCUMENTS[gateId]) {
-      if (!documents.includes(document)) {
-        fail(`${section}.documentsReviewed must include ${document}.`);
+    const digests = isPlainObject(gate.documentDigests) ? gate.documentDigests : {};
+    for (const canonicalPath of REQUIRED_DOCUMENTS[gateId]) {
+      let contents;
+      const sourcePath = documentSourcePath(canonicalPath);
+      try {
+        contents = fs.readFileSync(sourcePath, "utf8");
+      } catch (error) {
+        fail(`${section}.documentDigests could not verify canonical document ${canonicalPath}: ${error.message}`);
+        continue;
+      }
+      const expectedDigest = reviewDocumentDigest(canonicalPath, contents);
+      if (digests[canonicalPath] !== expectedDigest) {
+        fail(`${section}.documentDigests[${JSON.stringify(canonicalPath)}] does not match canonical document ${canonicalPath}.`);
       }
     }
     for (const flag of REQUIRED_TRUE_FLAGS[gateId]) {
@@ -243,6 +361,16 @@ function validateReady(packet) {
   }
 }
 
+function validatePublicConfigDates(packet, publicConfig) {
+  if (!publicConfig) return;
+  const patch = packet.publicConfigPatch || {};
+  for (const configField of Object.values(GATE_CONFIG_FIELDS)) {
+    if (patch[configField] !== publicConfig[configField]) {
+      fail(`sections.publicConfigPatch.${configField} must exactly match public config ${configField}.`);
+    }
+  }
+}
+
 const packet = readJson(packetPath);
 validateShape(packet);
 scanForSecrets(packet);
@@ -252,6 +380,11 @@ validateTemplate(packet);
 
 if (requireReady) {
   validateReady(packet);
+  if (args.includes("--public-config") && !publicConfigPath) {
+    fail("--public-config requires a path.");
+  } else if (publicConfigPath) {
+    validatePublicConfigDates(packet, loadPublicConfig(publicConfigPath));
+  }
 }
 
 if (failures.length) {

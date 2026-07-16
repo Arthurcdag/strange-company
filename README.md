@@ -127,11 +127,11 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 
 - [public.html](public.html): public GitHub Pages documentation and AMA surface; the paid desk stays hidden and disabled until strict live readiness passes.
 - [public-config.js](public-config.js): public support inbox, Google Form URL, service names, and prices.
-- [public-live-receipt.js](public-live-receipt.js): public-only fail-closed lease; paid intake stays closed until all four private readiness and operating-capacity validators pass, the receipt envelope is issued, and its seven-day validity has not expired.
+- [public-live-receipt.js](public-live-receipt.js): public-only fail-closed lease; paid intake stays closed until the document-bound review closure and all four other private readiness and operating-capacity validators pass, the receipt envelope is issued, and its seven-day validity has not expired.
 - [public-ama-answers.js](public-ama-answers.js): public-safe AMA answer archive loaded by the static page; empty until approved answers are exported.
 - [public.js](public.js): payment-safe public request packet builder.
 - [tools/build_public_site.js](tools/build_public_site.js): cross-platform builder/checker for the GitHub Pages public bundle.
-- [tools/export_public_live_receipt.js](tools/export_public_live_receipt.js): two-phase exporter that validates revenue, external-live, reviewer-capacity, and delivery-review packets and emits a public-only, config-bound seven-day receipt while `liveMode` remains false; `--revoke` replaces any lease with a closed placeholder without private packets.
+- [tools/export_public_live_receipt.js](tools/export_public_live_receipt.js): two-phase exporter that validates the document-bound human-review closure plus revenue, external-live, reviewer-capacity, and delivery-review packets, then emits a public-only, config-bound seven-day receipt while `liveMode` remains false; `--revoke` replaces any lease with a closed placeholder without private packets.
 - [tools/preflight_public_launch.js](tools/preflight_public_launch.js): launch preflight for public/private separation, URL allowlists, live-mode config, and sensitive-data guard coverage.
 - [tools/audit_company_functionality.js](tools/audit_company_functionality.js): repo-level audit for Strange Company, the satellite operator, and the external live-operation gate.
 - [tools/audit_evolution_log.js](tools/audit_evolution_log.js): public-safe audit for `EVOLUTION_LOG.md`, requiring objective, changed artifacts, verification commands, and a result for each evolution pass.
@@ -141,8 +141,8 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [tools/survival_check.js](tools/survival_check.js): survival drill that confirms the charter, resilience model, receipt chain, Brazil/AI gates, public/private boundary, and expected live-gate behavior still hold.
 - [tools/google_apps_script_create_intake_form.gs](tools/google_apps_script_create_intake_form.gs): Apps Script builder for creating the Google Form intake and linking it to the private Sheet ledger.
 - [tools/draft_external_live_packet.js](tools/draft_external_live_packet.js): public-config-to-local-packet draft generator for `EXTERNAL_LIVE_PACKET.local.json`.
-- [tools/draft_live_review_closure.js](tools/draft_live_review_closure.js): local draft generator for `LIVE_REVIEW_CLOSURE.local.json`, covering only the four public review-date blockers.
-- [tools/validate_live_review_closure.js](tools/validate_live_review_closure.js): local validator for the ignored live-review closure packet; use `--require-ready` before copying review dates into `public-config.js`.
+- [tools/draft_live_review_closure.js](tools/draft_live_review_closure.js): local draft generator for `LIVE_REVIEW_CLOSURE.local.json`; it snapshots normalized, path-bound SHA-256 digests for every document that must receive human review.
+- [tools/validate_live_review_closure.js](tools/validate_live_review_closure.js): local validator for the ignored live-review closure packet; `--require-ready` recomputes every required document digest and rejects review-to-issuance drift before dates can be copied into `public-config.js`.
 - [tools/render_live_review_public_config_patch.js](tools/render_live_review_public_config_patch.js): renders the public-safe review-date patch from a ready `LIVE_REVIEW_CLOSURE.local.json` while keeping `liveMode` false.
 - [tools/draft_reviewer_candidate_tracker.js](tools/draft_reviewer_candidate_tracker.js): local draft generator for `REVIEWER_CANDIDATE_TRACKER.local.json`.
 - [tools/draft_revenue_setup_evidence_index.js](tools/draft_revenue_setup_evidence_index.js): local draft generator for `REVENUE_SETUP_EVIDENCE_INDEX.local.json`.
@@ -206,16 +206,18 @@ To reduce the private payment/fiscal hard blocker, complete `REVENUE_SETUP_EVIDE
 node tools/draft_revenue_setup_evidence_index.js --write-local
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-payment
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-tax
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
 node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
 node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
 node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
-node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --live-review-closure LIVE_REVIEW_CLOSURE.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
 node tools/export_public_live_receipt.js --check-public-js --require-issued
-python tools/vau_company_evolution.py --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --public-live-receipt public-live-receipt.js --depth 1
+python tools/vau_company_evolution.py --live-review-closure LIVE_REVIEW_CLOSURE.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --public-live-receipt public-live-receipt.js --depth 1
 ```
 
-Run the receipt exporter only after all four private validators pass while
+Run the receipt exporter only after the document-bound review closure and all
+four other private validators pass while
 `liveMode` is still `false`; keep that pre-flip config unpublished, make the
 separate human flip last, and run `node tools/preflight_public_launch.js
 --deployment`. The receipt carries no private packet data or hashes. Its core

@@ -13,7 +13,9 @@ node tools/draft_external_live_packet.js --write-local
 ```
 
 Keep `EXTERNAL_LIVE_PACKET.local.json` local and uncommitted.
-Keep `LIVE_REVIEW_CLOSURE.local.json` local and uncommitted.
+Keep `LIVE_REVIEW_CLOSURE.local.json` local and uncommitted. Its schema-v2
+document digests bind each approval to the exact normalized bytes reviewed;
+regenerate and repeat human review whenever a required document changes.
 
 ## Current Gate Shape
 
@@ -136,7 +138,7 @@ Use this section every time the project advances one review gate:
 
 1. Run `node tools/generate_external_live_gap_packet.js`.
 2. Copy the produced field names into the manual close sheet.
-3. For the four public review-date fields only, update `LIVE_REVIEW_CLOSURE.local.json` and run:
+3. For the four public review-date fields only, generate or update `LIVE_REVIEW_CLOSURE.local.json`, confirm that each human reviewed the exact files represented by its path-bound digests, and run:
    - `node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready`
    - `node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json`
    - if both pass, copy only `termsReviewedAt`, `privacyReviewedAt`, `brazilComplianceReviewedAt`, and `aiHandoffReviewedAt` into `public-config.js`; keep `liveMode: false`.
@@ -151,7 +153,7 @@ Use this section every time the project advances one review gate:
    - run `node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready` once roles are filled,
    - complete `DELIVERY_REVIEW_CHECKLIST.local.json` and run `node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready`.
 6. Export the public-only receipt while `liveMode` remains `false`, then run the pre-live checks:
-   - `node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force`
+   - `node tools/export_public_live_receipt.js --live-review-closure LIVE_REVIEW_CLOSURE.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force`
    - `node tools/export_public_live_receipt.js --check-public-js --require-issued`
    - `node tools/preflight_public_launch.js`
    - `node tools/evolution_goal_status.js --json`
@@ -204,11 +206,12 @@ Run this sequence before publishing:
 
 ```bash
 node tools/check_external_live_packet_gate.js
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
 node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
 node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
 node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
-node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --live-review-closure LIVE_REVIEW_CLOSURE.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
 node tools/export_public_live_receipt.js --check-public-js --require-issued
 node tools/preflight_public_launch.js
 node tools/evolution_goal_status.js --json
@@ -221,7 +224,7 @@ If any command fails, keep `liveMode: false`. If all pass and status has no hard
 
 Stop and keep live intake closed if:
 
-- terms or privacy changed after review and were not re-reviewed,
+- any required review document changed after review and the schema-v2 closure digest was not regenerated and re-reviewed,
 - CNPJ/entity, NFS-e, fiscal receipt, payment, or LGPD route is uncertain,
 - Stripe or bank evidence is missing,
 - AI-generated legal/compliance text is being treated as final human approval,

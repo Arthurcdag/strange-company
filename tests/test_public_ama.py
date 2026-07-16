@@ -212,6 +212,7 @@ def issued_receipt(config: dict[str, object]) -> dict[str, object]:
             "privatePacketDataExcluded": True,
             "privatePacketHashesExcluded": True,
             "localPacketValidatorsPassed": True,
+            "liveReviewClosureValidatorPassed": True,
             "reviewerCandidateTrackerReady": True,
             "deliveryReviewChecklistReady": True,
             "operationalValidatorsPassed": True,

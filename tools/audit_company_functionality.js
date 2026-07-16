@@ -218,6 +218,10 @@ function auditDocs() {
   assertIncludes("tools/export_public_live_receipt.js", "--public-config", "public live receipt config binding");
   assertIncludes("tools/export_public_live_receipt.js", "--reviewer-tracker", "public live receipt reviewer-capacity gate");
   assertIncludes("tools/export_public_live_receipt.js", "--delivery-review-checklist", "public live receipt delivery-review gate");
+  assertIncludes("tools/export_public_live_receipt.js", "--live-review-closure", "public live receipt document-bound human-review gate");
+  assertIncludes("tools/export_public_live_receipt.js", "validate_live_review_closure.js", "public live receipt authoritative human-review validator");
+  assertIncludes("tools/export_public_live_receipt.js", "liveReviewClosureValidatorPassed", "public live receipt human-review validator attestation");
+  assertIncludes("public.js", "liveReviewClosureValidatorPassed", "public browser human-review validator attestation gate");
   assertIncludes("tools/export_public_live_receipt.js", "envelopeSha256", "public live receipt full-envelope integrity");
   assertIncludes("tools/export_public_live_receipt.js", "RECEIPT_VALIDITY_MS", "public live receipt expiry window");
   assertIncludes("PUBLIC_AMA_PUBLICATION_PACKET.md", "Manual Close Sheet", "public AMA publication close sheet");

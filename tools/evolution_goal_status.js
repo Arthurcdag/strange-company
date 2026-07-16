@@ -18,7 +18,9 @@ const localEvidenceDir = argValue("--local-evidence-dir", root);
 const publicLiveReceiptPath = argValue("--public-live-receipt", path.join(root, "public-live-receipt.js"));
 const termsDocumentPath = argValue("--terms-doc", path.join(root, "TERMOS.md"));
 const privacyDocumentPath = argValue("--privacy-doc", path.join(root, "AVISO_DE_PRIVACIDADE.md"));
+const liveReviewClosurePath = path.join(localEvidenceDir, "LIVE_REVIEW_CLOSURE.local.json");
 const REVIEW_CLOSURE_FIELDS = ["termsReviewedAt", "privacyReviewedAt", "brazilComplianceReviewedAt", "aiHandoffReviewedAt"];
+const REVIEW_CLOSURE_EVIDENCE_BLOCKER = "humanReviewClosureEvidence";
 
 function readText(filePath) {
   return fs.readFileSync(filePath, "utf8");
@@ -167,12 +169,14 @@ function liveGateRows(config) {
 }
 
 function reviewClosureActions(hardBlockers) {
-  if (!hardBlockers.some((blocker) => REVIEW_CLOSURE_FIELDS.includes(blocker))) {
+  if (!hardBlockers.some((blocker) => (
+    REVIEW_CLOSURE_FIELDS.includes(blocker) || blocker === REVIEW_CLOSURE_EVIDENCE_BLOCKER
+  ))) {
     return [];
   }
   return [
     "Draft LIVE_REVIEW_CLOSURE.local.json: node tools/draft_live_review_closure.js --write-local",
-    "Fill real human review evidence locally, then run node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready.",
+    "Fill real human review evidence locally, including documentDigests for every canonical reviewed document, then run node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready.",
     "Render the date-only public config patch: node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json.",
     "Copy only termsReviewedAt, privacyReviewedAt, brazilComplianceReviewedAt, and aiHandoffReviewedAt into public-config.js; keep liveMode false until external live and revenue gates pass.",
   ];
@@ -185,6 +189,22 @@ function evidenceLane(localEvidence, id) {
 function blockerFromLane(localEvidence, id, blocker) {
   const lane = evidenceLane(localEvidence, id);
   return lane && lane.ready ? [] : [{ ...blocker, laneId: id }];
+}
+
+function liveReviewClosureMatchesConfig(config, closurePath) {
+  try {
+    const packet = JSON.parse(readText(closurePath));
+    const patch = packet && typeof packet === "object" ? packet.publicConfigPatch : null;
+    return Boolean(
+      patch
+      && typeof patch === "object"
+      && REVIEW_CLOSURE_FIELDS.every((field) => (
+        String(patch[field] || "").trim() === String(config[field] || "").trim()
+      ))
+    );
+  } catch (_error) {
+    return false;
+  }
 }
 
 function issuedPublicLiveReceiptReady(configPath, receiptPath, termsPath, privacyPath) {
@@ -232,6 +252,7 @@ function laneHandoff(localEvidence, options) {
 
 function selectHandoff({
   reviewBlockers,
+  reviewClosureEvidenceBlockers,
   revenueBlockers,
   externalLiveBlockers,
   publicRouteBlockers,
@@ -239,18 +260,19 @@ function selectHandoff({
   localEvidence,
   liveMode,
 }) {
-  const hardLaneCandidates = [];
-  if (reviewBlockers.length) {
-    hardLaneCandidates.push(laneHandoff(localEvidence, {
-      blockerId: "humanReviewClosure",
+  if (reviewBlockers.length || reviewClosureEvidenceBlockers.length) {
+    return laneHandoff(localEvidence, {
+      blockerId: REVIEW_CLOSURE_EVIDENCE_BLOCKER,
       laneId: "liveReviewClosure",
       priority: "hard_gate",
       draftCommand: "node tools/draft_live_review_closure.js --write-local",
       validatorCommand: "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready",
       readyCommand: "node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json",
-      whyNow: "One closure packet addresses the current human review-date blockers without changing liveMode.",
-    }));
+      whyNow: "Document-bound human review closure evidence must validate and its four dates must match public-config.js before any other live-readiness handoff.",
+    });
   }
+
+  const hardLaneCandidates = [];
   if (revenueBlockers.length) {
     hardLaneCandidates.push(laneHandoff(localEvidence, {
       blockerId: "privatePaymentFiscalEvidence",
@@ -387,27 +409,49 @@ function evolutionMode(hardBlockers, publicRouteBlockers, operationalBlockers, l
   };
 }
 
-function buildStatus(config, logText, localEvidence, publicLiveReceiptReady) {
+function buildStatus(config, logText, localEvidence, publicLiveReceiptReady, closurePath) {
+  const localEvidenceSummary = summarizeLocalEvidence(localEvidence);
+  const closureLane = evidenceLane(localEvidenceSummary, "liveReviewClosure");
+  const closureEvidenceReady = Boolean(
+    closureLane
+    && closureLane.ready
+    && liveReviewClosureMatchesConfig(config, closurePath)
+  );
   const evidenceRows = [
     ...liveGateRows(config).filter((row) => row.id !== "liveMode"),
+    {
+      id: REVIEW_CLOSURE_EVIDENCE_BLOCKER,
+      label: "document-bound human review closure evidence matching the public review dates",
+      passed: closureEvidenceReady,
+      command: "node tools/draft_live_review_closure.js --write-local",
+      validatorCommand: "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready",
+      nextAction: "Validate LIVE_REVIEW_CLOSURE.local.json against every canonical reviewed document, then make the four public review dates exactly match its publicConfigPatch while liveMode remains false.",
+    },
     {
       id: "publicLiveReceipt",
       label: "issued public live receipt bound to the current public config, terms, and privacy notice",
       passed: publicLiveReceiptReady,
-      command: "node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force",
+      command: "node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --live-review-closure LIVE_REVIEW_CLOSURE.local.json --public-config public-config.js --output public-live-receipt.js --force",
       validatorCommand: "node tools/export_public_live_receipt.js --check-public-js --require-issued",
-      nextAction: "Validate revenue, external-live, reviewer-capacity, delivery-review, and the current public legal documents, then export the seven-day public-only live receipt while liveMode remains false.",
+      nextAction: "Validate document-bound review closure, revenue, external-live, reviewer-capacity, delivery-review, and the current public legal documents, then export the seven-day public-only live receipt while liveMode remains false.",
     },
   ];
   const publicRouteBlockers = evidenceRows
     .filter((row) => !row.passed)
-    .filter((row) => !REVIEW_CLOSURE_FIELDS.includes(row.id));
+    .filter((row) => !REVIEW_CLOSURE_FIELDS.includes(row.id))
+    .filter((row) => row.id !== REVIEW_CLOSURE_EVIDENCE_BLOCKER);
   const reviewBlockers = evidenceRows
     .filter((row) => !row.passed)
     .filter((row) => REVIEW_CLOSURE_FIELDS.includes(row.id))
     .map((row) => row.id);
-  const closureActions = reviewClosureActions(reviewBlockers);
-  const localEvidenceSummary = summarizeLocalEvidence(localEvidence);
+  const reviewClosureEvidenceBlockers = closureEvidenceReady
+    ? []
+    : [{
+      id: REVIEW_CLOSURE_EVIDENCE_BLOCKER,
+      label: "document-bound human review closure evidence",
+      laneId: "liveReviewClosure",
+      nextAction: evidenceRows.find((row) => row.id === REVIEW_CLOSURE_EVIDENCE_BLOCKER).nextAction,
+    }];
   const revenueBlockers = blockerFromLane(localEvidenceSummary, "revenueSetupEvidence", {
     id: "privatePaymentFiscalEvidence",
     label: "private payment/fiscal evidence",
@@ -432,9 +476,11 @@ function buildStatus(config, logText, localEvidence, publicLiveReceiptReady) {
   ];
   const hardBlockers = [
     ...reviewBlockers,
+    ...reviewClosureEvidenceBlockers.map((blocker) => blocker.id),
     ...revenueBlockers.map((blocker) => blocker.id),
     ...externalLiveBlockers.map((blocker) => blocker.id),
   ];
+  const closureActions = reviewClosureActions(hardBlockers);
   const passes = evolutionPasses(logText);
   const latestPass = summarizeLatestPass(passes[passes.length - 1]);
   const modeState = evolutionMode(
@@ -461,6 +507,7 @@ function buildStatus(config, logText, localEvidence, publicLiveReceiptReady) {
     .map((lane) => `${lane.label}: ${lane.nextAction}`);
   const selectedHandoff = selectHandoff({
     reviewBlockers,
+    reviewClosureEvidenceBlockers,
     revenueBlockers,
     externalLiveBlockers,
     publicRouteBlockers,
@@ -483,6 +530,7 @@ function buildStatus(config, logText, localEvidence, publicLiveReceiptReady) {
     publicLiveReceiptReady,
     selectedHandoff,
     reviewClosureActions: closureActions,
+    reviewClosureEvidenceBlockers,
     revenueBlockers,
     externalLiveBlockers,
     operationalBlockers,
@@ -568,6 +616,7 @@ const status = buildStatus(
     termsDocumentPath,
     privacyDocumentPath,
   ),
+  liveReviewClosurePath,
 );
 
 if (asJson) {

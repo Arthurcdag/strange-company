@@ -16,13 +16,21 @@ EXTERNAL_TEMPLATE = ROOT / "EXTERNAL_LIVE_PACKET.template.json"
 REVENUE_TEMPLATE = ROOT / "REVENUE_SETUP_EVIDENCE_INDEX.template.json"
 REVIEWER_TEMPLATE = ROOT / "REVIEWER_CANDIDATE_TRACKER.template.json"
 DELIVERY_TEMPLATE = ROOT / "DELIVERY_REVIEW_CHECKLIST.template.json"
+CLOSURE_TEMPLATE = ROOT / "LIVE_REVIEW_CLOSURE.template.json"
 ACTIVE_STATUS = "local_packet_validators_passed"
 LEGAL_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_PUBLIC_LEGAL_DOCUMENT_V1"
+REVIEW_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_REVIEW_DOCUMENT_V1"
 
 
 def legal_document_digest(document_path: str, contents: str) -> str:
     normalized = contents.removeprefix("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
     payload = f"{LEGAL_DOCUMENT_DIGEST_DOMAIN}\npath={document_path}\n{normalized}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def review_document_digest(document_path: str, contents: str) -> str:
+    normalized = contents.removeprefix("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
+    payload = f"{REVIEW_DOCUMENT_DIGEST_DOMAIN}\npath={document_path}\n{normalized}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -360,6 +368,81 @@ def ready_delivery_checklist() -> dict[str, object]:
     return payload
 
 
+def ready_live_review_closure(
+    config: dict[str, object],
+    *,
+    document_overrides: dict[str, pathlib.Path] | None = None,
+) -> dict[str, object]:
+    payload = json.loads(CLOSURE_TEMPLATE.read_text(encoding="utf-8"))
+    payload["schemaVersion"] = 2
+    payload["mode"] = "local"
+    overrides = document_overrides or {}
+
+    review_dates = {
+        "terms": config["termsReviewedAt"],
+        "privacy": config["privacyReviewedAt"],
+        "brazilCompliance": config["brazilComplianceReviewedAt"],
+        "aiHandoff": config["aiHandoffReviewedAt"],
+    }
+    required_true_flags = {
+        "terms": (
+            "offerFlowReviewed",
+            "refundCancellationReviewed",
+            "supportFlowReviewed",
+            "humanApprovedForPublicConfig",
+        ),
+        "privacy": (
+            "lgpdContactReviewed",
+            "retentionReviewed",
+            "processorsReviewed",
+            "dataSubjectRightsReviewed",
+            "humanApprovedForPublicConfig",
+        ),
+        "brazilCompliance": (
+            "cnpjOrEntityRouteReviewed",
+            "fiscalReceiptRouteReviewed",
+            "paymentSupportReviewed",
+            "lgpdRouteReviewed",
+            "humanApprovedForPublicConfig",
+        ),
+        "aiHandoff": (
+            "aiPreparedTextReviewed",
+            "acceptedChangedOrRejected",
+            "automatedDecisionStopRuleConfirmed",
+            "humanApprovedForPublicConfig",
+        ),
+    }
+    for gate_name, reviewed_at in review_dates.items():
+        gate = payload["reviewGates"][gate_name]
+        gate["reviewer"] = f"PRIVATE_CLOSURE_REVIEWER_CANARY_{gate_name}"
+        gate["reviewedAt"] = reviewed_at
+        gate["aiOnlyApproval"] = False
+        for flag in required_true_flags[gate_name]:
+            gate[flag] = True
+        gate["documentDigests"] = {
+            canonical_path: review_document_digest(
+                canonical_path,
+                (overrides.get(canonical_path) or ROOT / canonical_path).read_text(
+                    encoding="utf-8"
+                ),
+            )
+            for canonical_path in gate["documentsReviewed"]
+        }
+
+    payload["publicConfigPatch"] = {
+        "jurisdiction": "BR",
+        "aiGeneratedLegalDocsRequireHumanReview": True,
+        "termsReviewedAt": config["termsReviewedAt"],
+        "privacyReviewedAt": config["privacyReviewedAt"],
+        "brazilComplianceReviewedAt": config["brazilComplianceReviewedAt"],
+        "aiHandoffReviewedAt": config["aiHandoffReviewedAt"],
+        "liveMode": False,
+    }
+    payload["attestation"]["operator"] = "PRIVATE_CLOSURE_OPERATOR_CANARY_5T"
+    payload["attestation"]["reviewedAt"] = config["termsReviewedAt"]
+    return payload
+
+
 def ready_files(folder: pathlib.Path) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path]:
     config = ready_public_config(live_mode=False)
     config_path = write_public_config(folder, config)
@@ -367,6 +450,11 @@ def ready_files(folder: pathlib.Path) -> tuple[pathlib.Path, pathlib.Path, pathl
     revenue = write_json(folder, "REVENUE_SETUP_EVIDENCE_INDEX.local.json", ready_revenue_index(config))
     write_json(folder, "REVIEWER_CANDIDATE_TRACKER.local.json", ready_reviewer_tracker())
     write_json(folder, "DELIVERY_REVIEW_CHECKLIST.local.json", ready_delivery_checklist())
+    write_json(
+        folder,
+        "LIVE_REVIEW_CLOSURE.local.json",
+        ready_live_review_closure(config),
+    )
     return config_path, external, revenue
 
 
@@ -388,6 +476,8 @@ def generation_args(
         str(config.parent / "REVIEWER_CANDIDATE_TRACKER.local.json"),
         "--delivery-review-checklist",
         str(config.parent / "DELIVERY_REVIEW_CHECKLIST.local.json"),
+        "--live-review-closure",
+        str(config.parent / "LIVE_REVIEW_CLOSURE.local.json"),
         "--output",
         str(output),
         *extra,
@@ -410,6 +500,7 @@ class PublicLiveReceiptTests(unittest.TestCase):
             "AVISO_DE_PRIVACIDADE.md",
         )
         self.assertFalse(receipt["attestations"]["localPacketValidatorsPassed"])
+        self.assertFalse(receipt["attestations"]["liveReviewClosureValidatorPassed"])
         self.assertFalse(receipt["attestations"]["operationalValidatorsPassed"])
 
         checked = run_exporter("--check-public-js")
@@ -440,6 +531,9 @@ class PublicLiveReceiptTests(unittest.TestCase):
             self.assertTrue(file_receipt["issuedAt"].endswith("Z"))
             self.assertTrue(file_receipt["validUntil"].endswith("Z"))
             self.assertTrue(file_receipt["attestations"]["operationalValidatorsPassed"])
+            self.assertTrue(
+                file_receipt["attestations"]["liveReviewClosureValidatorPassed"]
+            )
             self.assertEqual(file_receipt["core"]["operatorName"], "Strange Works Studio")
             self.assertEqual(file_receipt["core"]["jurisdiction"], "BR")
             self.assertEqual(file_receipt["core"]["complianceMode"], "brazil-human-reviewed")
@@ -469,12 +563,89 @@ class PublicLiveReceiptTests(unittest.TestCase):
                 "PRIVATE_BANK_CANARY_7Q",
                 "PRIVATE_ADDRESS_CANARY_9S",
                 "PRIVATE_PAYMENT_CANARY_6P",
+                "PRIVATE_CLOSURE_REVIEWER_CANARY_terms",
+                "PRIVATE_CLOSURE_REVIEWER_CANARY_privacy",
+                "PRIVATE_CLOSURE_REVIEWER_CANARY_brazilCompliance",
+                "PRIVATE_CLOSURE_REVIEWER_CANARY_aiHandoff",
+                "PRIVATE_CLOSURE_OPERATOR_CANARY_5T",
             ):
                 with self.subTest(private_canary=private_canary):
                     self.assertNotIn(private_canary, public_text)
             self.assertNotIn('"packetHash":', public_text)
             self.assertNotIn('"privatePacketHash":', public_text)
             self.assertNotIn('"sourcePacketHash":', public_text)
+            self.assertNotIn('"reviewGates":', public_text)
+            self.assertNotIn('"documentDigests":', public_text)
+            self.assertNotIn('"publicConfigPatch":', public_text)
+            closure = json.loads(
+                (folder / "LIVE_REVIEW_CLOSURE.local.json").read_text(encoding="utf-8")
+            )
+            for gate in closure["reviewGates"].values():
+                for private_digest in gate["documentDigests"].values():
+                    with self.subTest(private_closure_digest=private_digest):
+                        self.assertNotIn(private_digest, public_text)
+
+            self.assertEqual(
+                set(file_receipt["attestations"]),
+                {
+                    "publicOnly",
+                    "privatePacketDataExcluded",
+                    "privatePacketHashesExcluded",
+                    "localPacketValidatorsPassed",
+                    "liveReviewClosureValidatorPassed",
+                    "reviewerCandidateTrackerReady",
+                    "deliveryReviewChecklistReady",
+                    "operationalValidatorsPassed",
+                    "digestCoversCanonicalPublicCoreExceptLiveMode",
+                    "digestCoversReceiptEnvelopeExceptLiveMode",
+                },
+            )
+
+    def test_export_fails_closed_when_live_review_closure_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            (folder / "LIVE_REVIEW_CLOSURE.local.json").unlink()
+            output = folder / "public-live-receipt.js"
+
+            result = run_exporter(*generation_args(config, external, revenue, output))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("LIVE_REVIEW_CLOSURE is missing", result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_export_fails_closed_when_live_review_closure_digest_is_stale(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            closure_path = folder / "LIVE_REVIEW_CLOSURE.local.json"
+            closure = json.loads(closure_path.read_text(encoding="utf-8"))
+            closure["reviewGates"]["terms"]["documentDigests"]["TERMOS.md"] = "0" * 64
+            write_json(folder, closure_path.name, closure)
+            output = folder / "public-live-receipt.js"
+
+            result = run_exporter(*generation_args(config, external, revenue, output))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("LIVE_REVIEW_CLOSURE validator failed", result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_export_rejects_closure_dates_that_do_not_match_public_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            closure_path = folder / "LIVE_REVIEW_CLOSURE.local.json"
+            closure = json.loads(closure_path.read_text(encoding="utf-8"))
+            closure["reviewGates"]["terms"]["reviewedAt"] = "2026-07-09"
+            closure["publicConfigPatch"]["termsReviewedAt"] = "2026-07-09"
+            write_json(folder, closure_path.name, closure)
+            output = folder / "public-live-receipt.js"
+
+            result = run_exporter(*generation_args(config, external, revenue, output))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("LIVE_REVIEW_CLOSURE validator failed", result.stderr)
+            self.assertFalse(output.exists())
 
     def test_export_refuses_overwrite_without_force(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -519,6 +690,14 @@ class PublicLiveReceiptTests(unittest.TestCase):
             output = folder / "public-live-receipt.js"
             generated = run_exporter(*generation_args(config, external, revenue, output))
             self.assertEqual(generated.returncode, 0, generated.stderr)
+            for local_packet in (
+                external,
+                revenue,
+                folder / "REVIEWER_CANDIDATE_TRACKER.local.json",
+                folder / "DELIVERY_REVIEW_CHECKLIST.local.json",
+                folder / "LIVE_REVIEW_CLOSURE.local.json",
+            ):
+                local_packet.unlink()
 
             closed_config = ready_public_config(live_mode=False)
             closed_config["googleFormUrl"] = ""
@@ -621,6 +800,14 @@ class PublicLiveReceiptTests(unittest.TestCase):
             generated = run_exporter(*generation_args(config, external, revenue, output))
             self.assertEqual(generated.returncode, 0, generated.stderr)
             original_digest = read_receipt(output)["coreSha256"]
+            for local_packet in (
+                external,
+                revenue,
+                folder / "REVIEWER_CANDIDATE_TRACKER.local.json",
+                folder / "DELIVERY_REVIEW_CHECKLIST.local.json",
+                folder / "LIVE_REVIEW_CLOSURE.local.json",
+            ):
+                local_packet.unlink()
 
             flipped = ready_public_config(live_mode=True)
             write_public_config(folder, flipped)
@@ -645,8 +832,21 @@ class PublicLiveReceiptTests(unittest.TestCase):
             privacy = folder / "AVISO_DE_PRIVACIDADE.md"
             terms_text = (ROOT / "TERMOS.md").read_text(encoding="utf-8")
             privacy_text = (ROOT / "AVISO_DE_PRIVACIDADE.md").read_text(encoding="utf-8")
+            terms_text = f"{terms_text.rstrip()}\n\nOverride-only terms marker.\n"
+            privacy_text = f"{privacy_text.rstrip()}\n\nOverride-only privacy marker.\n"
             terms.write_bytes(terms_text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8"))
             privacy.write_bytes(privacy_text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8"))
+            write_json(
+                folder,
+                "LIVE_REVIEW_CLOSURE.local.json",
+                ready_live_review_closure(
+                    ready_public_config(live_mode=False),
+                    document_overrides={
+                        "TERMOS.md": terms,
+                        "AVISO_DE_PRIVACIDADE.md": privacy,
+                    },
+                ),
+            )
             document_args = (
                 "--terms-doc",
                 str(terms),

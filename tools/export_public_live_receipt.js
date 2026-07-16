@@ -57,6 +57,10 @@ const deliveryReviewChecklistPath = firstArgValue(
   ["--delivery-review-checklist", "--delivery-checklist"],
   path.join(root, "DELIVERY_REVIEW_CHECKLIST.local.json")
 );
+const liveReviewClosurePath = firstArgValue(
+  ["--live-review-closure"],
+  path.join(root, "LIVE_REVIEW_CLOSURE.local.json")
+);
 const outputArg = argValue("--output");
 const outputPath = outputArg
   ? path.resolve(process.cwd(), outputArg)
@@ -343,6 +347,7 @@ function buildReceipt(core) {
       privatePacketDataExcluded: true,
       privatePacketHashesExcluded: true,
       localPacketValidatorsPassed: true,
+      liveReviewClosureValidatorPassed: true,
       reviewerCandidateTrackerReady: true,
       deliveryReviewChecklistReady: true,
       operationalValidatorsPassed: true,
@@ -367,6 +372,7 @@ function buildPlaceholder(core) {
       privatePacketDataExcluded: true,
       privatePacketHashesExcluded: true,
       localPacketValidatorsPassed: false,
+      liveReviewClosureValidatorPassed: false,
       reviewerCandidateTrackerReady: false,
       deliveryReviewChecklistReady: false,
       operationalValidatorsPassed: false,
@@ -490,6 +496,7 @@ function validateReceipt(receipt, currentCore) {
       "privatePacketDataExcluded",
       "privatePacketHashesExcluded",
       "localPacketValidatorsPassed",
+      "liveReviewClosureValidatorPassed",
       "reviewerCandidateTrackerReady",
       "deliveryReviewChecklistReady",
       "operationalValidatorsPassed",
@@ -503,6 +510,7 @@ function validateReceipt(receipt, currentCore) {
     "privatePacketDataExcluded",
     "privatePacketHashesExcluded",
     "localPacketValidatorsPassed",
+    "liveReviewClosureValidatorPassed",
     "reviewerCandidateTrackerReady",
     "deliveryReviewChecklistReady",
     "operationalValidatorsPassed",
@@ -532,6 +540,7 @@ function validateReceipt(receipt, currentCore) {
     }
     if (
       receipt.attestations.localPacketValidatorsPassed !== false ||
+      receipt.attestations.liveReviewClosureValidatorPassed !== false ||
       receipt.attestations.reviewerCandidateTrackerReady !== false ||
       receipt.attestations.deliveryReviewChecklistReady !== false ||
       receipt.attestations.operationalValidatorsPassed !== false
@@ -576,6 +585,7 @@ function validateReceipt(receipt, currentCore) {
     }
     if (
       receipt.attestations.localPacketValidatorsPassed !== true ||
+      receipt.attestations.liveReviewClosureValidatorPassed !== true ||
       receipt.attestations.reviewerCandidateTrackerReady !== true ||
       receipt.attestations.deliveryReviewChecklistReady !== true ||
       receipt.attestations.operationalValidatorsPassed !== true
@@ -645,6 +655,20 @@ try {
     fail("Refusing to issue a live receipt after public-config.js liveMode has been enabled; issue it while liveMode is false, then perform the human flip.");
   }
   requireReadyCore(currentCore);
+  runValidator(
+    "LIVE_REVIEW_CLOSURE",
+    "validate_live_review_closure.js",
+    liveReviewClosurePath,
+    [
+      "--require-ready",
+      "--terms-doc",
+      termsDocumentPath,
+      "--privacy-doc",
+      privacyDocumentPath,
+      "--public-config",
+      publicConfigPath,
+    ]
+  );
   runValidator(
     "EXTERNAL_LIVE_PACKET",
     "validate_external_live_packet.js",

@@ -350,3 +350,43 @@ the paid desk, public legal-document drift closes the receipt, operating-capacit
 gates are aligned across the browser, status, and VAU, and the public AMA remains
 available. The bundle is explicit that direct Google Form response collection is
 an external human-controlled route, not something a static receipt can revoke.
+
+## 2026-07-16 - Document-Bound Human Review Closure
+
+Objective: close the review-to-receipt drift gap by binding every human review
+approval to the exact normalized document bytes that were reviewed.
+
+Changed:
+
+- Bumped `LIVE_REVIEW_CLOSURE.template.json` to schema v2 and added canonical,
+  path-bound SHA-256 digests for every terms, privacy, Brazil compliance, and AI
+  handoff document.
+- Updated the closure drafter and validator so drafts snapshot current files and
+  `--require-ready` recomputes trusted canonical files, rejecting missing,
+  malformed, substituted, extra, or stale document digests.
+- Required the authoritative closure validator in receipt issuance, evolution
+  status, the next-action packet, and VAU while keeping check-only and revocation
+  flows independent from private local packets.
+- Added only a public-safe boolean closure-validator attestation to the public
+  receipt; private packet contents and hashes remain excluded.
+- Updated operator runbooks, preflight/survival contracts, and regression tests
+  for missing closure evidence, document drift, line-ending normalization, and
+  fail-closed status/receipt behavior.
+
+Verified with:
+
+- `node --check tools\validate_live_review_closure.js`
+- `node --check tools\export_public_live_receipt.js`
+- `node --check tools\evolution_goal_status.js`
+- `python -m unittest tests.test_live_review_closure tests.test_draft_live_review_closure tests.test_render_live_review_public_config_patch tests.test_local_evidence_status`
+- `python -m unittest tests.test_public_live_receipt tests.test_evolution_goal_status tests.test_evolution_next_packet tests.test_vau_company_evolution tests.test_public_ama`
+- `python -m unittest discover -s tests`
+- `node tools\audit_evolution_log.js`
+- `node tools\preflight_public_launch.js`
+- `node tools\build_public_site.js --check --output .public-site-build.local --force`
+- `node tools\survival_check.js`
+
+Result: a missing or stale human-review closure now keeps `liveMode` closed and
+blocks receipt issuance even when public review dates are populated; edits to any
+required reviewed document require a new digest snapshot and renewed human review
+before readiness can advance.

@@ -57,10 +57,11 @@ When a reviewed delivery loop exists locally, pass it explicitly:
   --depth 1
 ```
 
-When evaluating live-decision readiness, pass all four private readiness and operating-capacity packets plus the public receipt explicitly. VAU calls the authoritative Node validators and fails closed if Node, a packet, the issued receipt, or a validator is unavailable:
+When evaluating live-decision readiness, pass the document-bound human-review closure, all four other private readiness and operating-capacity packets, and the public receipt explicitly. VAU calls the authoritative Node validators and fails closed if Node, a packet, the issued receipt, a required reviewed document, or a validator is unavailable:
 
 ```powershell
 & 'C:\Program Files\LibreOffice\program\python.exe' tools\vau_company_evolution.py `
+  --live-review-closure LIVE_REVIEW_CLOSURE.local.json `
   --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json `
   --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json `
   --revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json `
@@ -79,6 +80,7 @@ Hard blockers remain hard:
 - `privacyReviewedAt`
 - `brazilComplianceReviewedAt`
 - `aiHandoffReviewedAt`
+- document-bound human review closure validated against every required current file with `node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready`
 - private payment/fiscal evidence
 - private external live evidence validated against the current config with `node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js`
 
@@ -109,7 +111,7 @@ The current public config has support and Google Form verification complete, but
 review dates are blank and `liveMode` is false. That means the useful evolution
 path is:
 
-1. complete human/legal/privacy/Brazil/AI handoff review dates,
+1. complete the document-bound human/legal/privacy/Brazil/AI review closure, then publish only its review dates,
 2. prepare private payment/fiscal evidence,
 3. validate the separate external support/Google/Stripe/bank live packet,
 4. finish the 4-reviewer bench,

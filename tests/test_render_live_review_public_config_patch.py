@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import pathlib
 import subprocess
 import tempfile
@@ -15,6 +16,14 @@ README = ROOT / "README.md"
 HUMAN_REVIEW_PACKET = ROOT / "HUMAN_REVIEW_PACKET.md"
 VALIDATE_WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
 BUILD_PUBLIC_SITE = ROOT / "tools" / "build_public_site.js"
+REVIEW_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_REVIEW_DOCUMENT_V1"
+
+
+def review_document_digest(canonical_path: str) -> str:
+    text = (ROOT / canonical_path).read_text(encoding="utf-8")
+    normalized = text.removeprefix("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
+    payload = f"{REVIEW_DOCUMENT_DIGEST_DOMAIN}\npath={canonical_path}\n{normalized}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def run_renderer(*args: str) -> subprocess.CompletedProcess[str]:
@@ -42,6 +51,10 @@ def ready_payload() -> dict[str, object]:
         gate["reviewedAt"] = "2026-06-12"
         gate["humanApprovedForPublicConfig"] = True
         gate["aiOnlyApproval"] = False
+        gate["documentDigests"] = {
+            document: review_document_digest(document)
+            for document in gate["documentsReviewed"]
+        }
         payload["publicConfigPatch"][field] = "2026-06-12"
 
     payload["reviewGates"]["terms"].update(

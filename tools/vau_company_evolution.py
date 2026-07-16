@@ -434,6 +434,42 @@ def _infer_external_live_evidence(evidence_path: Path, public_config: Path) -> t
     return ready, "validator:passed" if ready else ""
 
 
+def _infer_live_review_closure(
+    closure_path: Path,
+    public_config: Path,
+    terms_document: Path,
+    privacy_document: Path,
+) -> tuple[bool, str]:
+    if not _node_validator_passes(
+        "validate_live_review_closure.js",
+        closure_path,
+        "--require-ready",
+        "--terms-doc",
+        str(terms_document),
+        "--privacy-doc",
+        str(privacy_document),
+    ):
+        return False, ""
+
+    try:
+        packet = json.loads(closure_path.read_text(encoding="utf-8-sig"))
+        config_text = public_config.read_text(encoding="utf-8")
+    except (OSError, json.JSONDecodeError):
+        return False, ""
+
+    patch = packet.get("publicConfigPatch") if isinstance(packet, dict) else None
+    if not isinstance(patch, dict):
+        return False, ""
+
+    for config_field in LIVE_REVIEW_FIELDS.values():
+        packet_date = str(patch.get(config_field, "")).strip()
+        config_date = _read_string_config(config_text, config_field).strip()
+        if not packet_date or packet_date != config_date:
+            return False, ""
+
+    return True, "validator:passed; public-dates:matched"
+
+
 def _infer_public_live_receipt(
     receipt_path: Path,
     public_config: Path,
@@ -656,6 +692,7 @@ def build_current_state(
     public_ama_queue: Path = DEFAULT_PUBLIC_AMA_QUEUE,
     public_ama_answers: Path = DEFAULT_PUBLIC_AMA_ANSWERS,
     delivery_review_checklist: Path = DEFAULT_DELIVERY_REVIEW_CHECKLIST,
+    live_review_closure: Path = DEFAULT_LIVE_REVIEW_CLOSURE,
 ) -> dict[str, Any]:
     text = public_config.read_text(encoding="utf-8")
     terms_reviewed_at = _read_string_config(text, "termsReviewedAt")
@@ -670,6 +707,12 @@ def build_current_state(
     external_live_evidence_ready, external_live_evidence = _infer_external_live_evidence(
         external_live_packet,
         public_config,
+    )
+    live_review_closure_ready, live_review_closure_evidence = _infer_live_review_closure(
+        live_review_closure,
+        public_config,
+        terms_document,
+        privacy_document,
     )
     public_live_receipt_ready, public_live_receipt_evidence = _infer_public_live_receipt(
         public_live_receipt,
@@ -702,6 +745,7 @@ def build_current_state(
             "aiHandoffReviewed": bool(ai_handoff_reviewed_at),
             "privatePaymentFiscalEvidenceReady": payment_fiscal_evidence_ready,
             "privateExternalLiveEvidenceReady": external_live_evidence_ready,
+            "liveReviewClosureReady": live_review_closure_ready,
             "publicLiveReceiptReady": public_live_receipt_ready,
             "humanReviewersReady": reviewers_ready,
             "publicAmaQueueActive": (ama_questions + ama_answers_published) > 0,
@@ -716,6 +760,7 @@ def build_current_state(
             "aiHandoffReviewedAt": ai_handoff_reviewed_at,
             "privatePaymentFiscalEvidence": payment_fiscal_evidence,
             "privateExternalLiveEvidence": external_live_evidence,
+            "liveReviewClosure": live_review_closure_evidence,
             "publicLiveReceipt": public_live_receipt_evidence,
             "publicAmaQueue": ama_queue_evidence,
             "deliveryReviewLoop": delivery_review_loop_evidence,
@@ -749,6 +794,8 @@ def hard_blockers(state: dict[str, Any]) -> list[str]:
         blockers.append("brazilComplianceReviewedAt")
     if not gates.get("aiHandoffReviewed"):
         blockers.append("aiHandoffReviewedAt")
+    if not gates.get("liveReviewClosureReady"):
+        blockers.append("humanReviewClosureEvidence")
     if not gates.get("privatePaymentFiscalEvidenceReady"):
         blockers.append("private payment/fiscal evidence")
     if not gates.get("privateExternalLiveEvidenceReady"):
@@ -865,6 +912,31 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
             )
         )
 
+    if "humanReviewClosureEvidence" in hard:
+        events.append(
+            CompanyEvent(
+                name="human_review_closure_evidence_ready",
+                domain="compliance",
+                probability_hint=0.24,
+                strategic_value=2.2,
+                tags=("hard_gate", "manual", "compliance", "document_bound_evidence"),
+                state_delta={
+                    "gates.liveReviewClosureReady": True,
+                    "evidence.liveReviewClosure": "validator:passed; public-dates:matched",
+                },
+                requires_real_evidence=True,
+                reason=(
+                    "Public review dates are not authoritative without a validator-passing closure packet "
+                    "bound to the current canonical reviewed documents."
+                ),
+                next_action=(
+                    "Complete LIVE_REVIEW_CLOSURE.local.json with current documentDigests, run "
+                    "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json "
+                    "--require-ready, and keep liveMode false."
+                ),
+            )
+        )
+
     if "private payment/fiscal evidence" in hard:
         events.append(
             CompanyEvent(
@@ -913,6 +985,7 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
         "public live readiness receipt" in hard
         and get_path(state, "gates.privatePaymentFiscalEvidenceReady", False)
         and get_path(state, "gates.privateExternalLiveEvidenceReady", False)
+        and get_path(state, "gates.liveReviewClosureReady", False)
         and get_path(state, "gates.humanReviewersReady", False)
         and get_path(state, "gates.deliveryReviewLoopReady", False)
         and all(
@@ -937,10 +1010,11 @@ def generate_company_events(future: CompanyFuture) -> list[CompanyEvent]:
                     "evidence.publicLiveReceipt": "public-receipt:issued",
                 },
                 requires_real_evidence=True,
-                reason="The public desk needs a short-lived, config-bound receipt after all four private readiness and operating-capacity validators pass.",
+                reason="The public desk needs a short-lived, config-bound receipt after document-bound closure plus the four revenue, external-live, reviewer, and delivery validators pass.",
                 next_action=(
                     "Run node tools/export_public_live_receipt.js with revenue, external-live, reviewer, and delivery packets "
-                    "while liveMode remains false, review the public-only output, and then rerun VAU."
+                    "--live-review-closure LIVE_REVIEW_CLOSURE.local.json while liveMode remains false, "
+                    "review the public-only output, and then rerun VAU."
                 ),
             )
         )
@@ -1385,6 +1459,7 @@ def parse_args() -> argparse.Namespace:
         description="Run VAU across Strange Company as a whole-company evolution model."
         " Use --revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json and"
         " --external-live-packet EXTERNAL_LIVE_PACKET.local.json and"
+        " --live-review-closure LIVE_REVIEW_CLOSURE.local.json and"
         " --public-live-receipt public-live-receipt.js and"
         " --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json."
     )
@@ -1392,6 +1467,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--reviewer-tracker", default=str(DEFAULT_REVIEWER_TRACKER))
     parser.add_argument("--revenue-evidence-index", default=str(DEFAULT_REVENUE_EVIDENCE_INDEX))
     parser.add_argument("--external-live-packet", default=str(DEFAULT_EXTERNAL_LIVE_PACKET))
+    parser.add_argument("--live-review-closure", default=str(DEFAULT_LIVE_REVIEW_CLOSURE))
     parser.add_argument("--public-live-receipt", default=str(DEFAULT_PUBLIC_LIVE_RECEIPT))
     parser.add_argument("--terms-doc", default=str(DEFAULT_TERMS_DOCUMENT))
     parser.add_argument("--privacy-doc", default=str(DEFAULT_PRIVACY_DOCUMENT))
@@ -1412,6 +1488,7 @@ def main() -> int:
         reviewer_tracker=Path(args.reviewer_tracker),
         revenue_evidence_index=Path(args.revenue_evidence_index),
         external_live_packet=Path(args.external_live_packet),
+        live_review_closure=Path(args.live_review_closure),
         public_live_receipt=Path(args.public_live_receipt),
         terms_document=Path(args.terms_doc),
         privacy_document=Path(args.privacy_doc),

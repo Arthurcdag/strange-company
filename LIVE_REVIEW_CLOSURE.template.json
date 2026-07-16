@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "mode": "template",
   "reviewGates": {
     "terms": {
@@ -9,6 +9,10 @@
         "TERMOS.md",
         "TERMS.md"
       ],
+      "documentDigests": {
+        "TERMOS.md": "",
+        "TERMS.md": ""
+      },
       "offerFlowReviewed": false,
       "refundCancellationReviewed": false,
       "supportFlowReviewed": false,
@@ -22,6 +26,10 @@
         "AVISO_DE_PRIVACIDADE.md",
         "PRIVACY.md"
       ],
+      "documentDigests": {
+        "AVISO_DE_PRIVACIDADE.md": "",
+        "PRIVACY.md": ""
+      },
       "lgpdContactReviewed": false,
       "retentionReviewed": false,
       "processorsReviewed": false,
@@ -37,6 +45,11 @@
         "BRAZIL_COMPLIANCE_AGENTS.md",
         "CONKA8_LAW_INSTRUCTIONS.md"
       ],
+      "documentDigests": {
+        "BRAZIL_COMPLIANCE.md": "",
+        "BRAZIL_COMPLIANCE_AGENTS.md": "",
+        "CONKA8_LAW_INSTRUCTIONS.md": ""
+      },
       "cnpjOrEntityRouteReviewed": false,
       "fiscalReceiptRouteReviewed": false,
       "paymentSupportReviewed": false,
@@ -51,6 +64,10 @@
         "AI_LEGAL_HANDOFF.md",
         "HUMAN_REVIEW_PACKET.md"
       ],
+      "documentDigests": {
+        "AI_LEGAL_HANDOFF.md": "",
+        "HUMAN_REVIEW_PACKET.md": ""
+      },
       "aiPreparedTextReviewed": false,
       "acceptedChangedOrRejected": false,
       "automatedDecisionStopRuleConfirmed": false,

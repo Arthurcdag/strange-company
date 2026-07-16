@@ -9,7 +9,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from tests.test_delivery_review_checklist import ready_payload as ready_delivery_payload
-from tests.test_local_evidence_status import live_review_ready_payload
+from tests.test_local_evidence_status import live_review_ready_payload as base_live_review_ready_payload
 from tests.test_revenue_setup_evidence_index import valid_evidence_payload
 from tests.test_reviewer_candidate_tracker import candidate
 
@@ -83,6 +83,20 @@ def write_temp_config(
 
 def write_json(path: pathlib.Path, payload: dict[str, object]) -> None:
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def live_review_ready_payload(review_date: str = "2026-07-01") -> dict[str, object]:
+    payload = base_live_review_ready_payload()
+    for gate_id, field in (
+        ("terms", "termsReviewedAt"),
+        ("privacy", "privacyReviewedAt"),
+        ("brazilCompliance", "brazilComplianceReviewedAt"),
+        ("aiHandoff", "aiHandoffReviewedAt"),
+    ):
+        payload["reviewGates"][gate_id]["reviewedAt"] = review_date
+        payload["publicConfigPatch"][field] = review_date
+    payload["attestation"]["reviewedAt"] = review_date
+    return payload
 
 
 def valid_external_live_payload(review_date: str = "2026-07-13") -> dict[str, object]:
@@ -161,9 +175,15 @@ def write_ready_local_lanes(
     revenue: bool = True,
     reviewers: bool = False,
     delivery: bool = False,
+    closure: bool = True,
     review_date: str = "2026-06-12",
 ) -> None:
     root = pathlib.Path(workspace)
+    if closure:
+        write_json(
+            root / "LIVE_REVIEW_CLOSURE.local.json",
+            live_review_ready_payload(review_date),
+        )
     if external:
         write_json(
             root / "EXTERNAL_LIVE_PACKET.local.json",
@@ -216,6 +236,8 @@ def issue_public_live_receipt(
             str(root / "REVIEWER_CANDIDATE_TRACKER.local.json"),
             "--delivery-review-checklist",
             str(root / "DELIVERY_REVIEW_CHECKLIST.local.json"),
+            "--live-review-closure",
+            str(root / "LIVE_REVIEW_CLOSURE.local.json"),
             "--public-config",
             str(public_config),
             "--terms-doc",
@@ -249,7 +271,8 @@ class EvolutionGoalStatusTests(unittest.TestCase):
         self.assertIn("termsReviewedAt", data["hardBlockers"])
         self.assertIn("privatePaymentFiscalEvidence", data["hardBlockers"])
         self.assertIn("privateExternalLiveEvidence", data["hardBlockers"])
-        self.assertEqual(data["selectedHandoff"]["blockerId"], "humanReviewClosure")
+        self.assertIn("humanReviewClosureEvidence", data["hardBlockers"])
+        self.assertEqual(data["selectedHandoff"]["blockerId"], "humanReviewClosureEvidence")
         self.assertEqual(data["selectedHandoff"]["laneStatus"], "missing")
         self.assertIn("draft_live_review_closure.js", data["selectedHandoff"]["command"])
         self.assertIn("LIVE_REVIEW_CLOSURE.local.json", data["reviewClosureActions"][0])
@@ -260,7 +283,7 @@ class EvolutionGoalStatusTests(unittest.TestCase):
         self.assertGreaterEqual(data["localEvidence"]["laneCount"], 6)
         self.assertTrue(any(lane["id"] == "liveReviewClosure" for lane in data["localEvidence"]["lanes"]))
         self.assertGreaterEqual(data["evolutionPassCount"], 3)
-        self.assertEqual(data["latestPass"]["title"], "Fail-Closed Live Readiness and Operator Handoff")
+        self.assertEqual(data["latestPass"]["title"], "Document-Bound Human Review Closure")
 
     def test_text_output_names_latest_pass(self) -> None:
         with tempfile.TemporaryDirectory() as workspace:
@@ -288,7 +311,7 @@ class EvolutionGoalStatusTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         data = json.loads(result.stdout)
-        self.assertEqual(data["selectedHandoff"]["blockerId"], "humanReviewClosure")
+        self.assertEqual(data["selectedHandoff"]["blockerId"], "humanReviewClosureEvidence")
         self.assertEqual(data["selectedHandoff"]["laneStatus"], "ready")
         self.assertIn("render_live_review_public_config_patch.js", data["selectedHandoff"]["command"])
         self.assertEqual(files_before, files_after)
@@ -324,8 +347,75 @@ class EvolutionGoalStatusTests(unittest.TestCase):
         data = json.loads(result.stdout)
         self.assertEqual(data["mode"], "burn_down_hard_blockers")
         self.assertEqual(data["hardBlockers"], ["privatePaymentFiscalEvidence"])
+        self.assertNotIn("humanReviewClosureEvidence", data["hardBlockers"])
         self.assertEqual(data["reviewClosureActions"], [])
         self.assertFalse(data["publicLiveReady"])
+
+    def test_populated_public_dates_do_not_bypass_missing_closure_evidence(self) -> None:
+        config = write_temp_config(
+            terms="2026-06-12",
+            privacy="2026-06-12",
+            brazil="2026-06-12",
+            ai_handoff="2026-06-12",
+        )
+        with tempfile.TemporaryDirectory() as workspace:
+            write_ready_local_lanes(workspace, closure=False)
+            result = run_status(
+                "--json",
+                "--public-config",
+                str(config),
+                "--local-evidence-dir",
+                workspace,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        self.assertIn("humanReviewClosureEvidence", data["hardBlockers"])
+        self.assertEqual(data["selectedHandoff"]["blockerId"], "humanReviewClosureEvidence")
+        self.assertEqual(data["selectedHandoff"]["laneStatus"], "missing")
+        self.assertFalse(data["publicLiveReady"])
+
+    def test_invalid_or_date_stale_closure_evidence_stays_hard_blocked(self) -> None:
+        config = write_temp_config(
+            terms="2026-06-12",
+            privacy="2026-06-12",
+            brazil="2026-06-12",
+            ai_handoff="2026-06-12",
+        )
+        with tempfile.TemporaryDirectory() as workspace:
+            root = pathlib.Path(workspace)
+            write_ready_local_lanes(workspace, closure=False)
+            (root / "LIVE_REVIEW_CLOSURE.local.json").write_text("{", encoding="utf-8")
+            invalid_result = run_status(
+                "--json", "--public-config", str(config), "--local-evidence-dir", workspace
+            )
+
+            write_json(
+                root / "LIVE_REVIEW_CLOSURE.local.json",
+                live_review_ready_payload("2026-06-11"),
+            )
+            stale_result = run_status(
+                "--json", "--public-config", str(config), "--local-evidence-dir", workspace
+            )
+
+        self.assertEqual(invalid_result.returncode, 0, invalid_result.stderr)
+        invalid_data = json.loads(invalid_result.stdout)
+        invalid_lane = next(
+            lane for lane in invalid_data["localEvidence"]["lanes"]
+            if lane["id"] == "liveReviewClosure"
+        )
+        self.assertEqual(invalid_lane["status"], "invalid")
+        self.assertIn("humanReviewClosureEvidence", invalid_data["hardBlockers"])
+
+        self.assertEqual(stale_result.returncode, 0, stale_result.stderr)
+        stale_data = json.loads(stale_result.stdout)
+        stale_lane = next(
+            lane for lane in stale_data["localEvidence"]["lanes"]
+            if lane["id"] == "liveReviewClosure"
+        )
+        self.assertTrue(stale_lane["ready"])
+        self.assertIn("humanReviewClosureEvidence", stale_data["hardBlockers"])
+        self.assertEqual(stale_data["selectedHandoff"]["laneId"], "liveReviewClosure")
 
     def test_future_public_review_dates_remain_hard_blockers(self) -> None:
         config = write_temp_config(
@@ -352,7 +442,7 @@ class EvolutionGoalStatusTests(unittest.TestCase):
             "aiHandoffReviewedAt",
         ):
             self.assertIn(field, data["hardBlockers"])
-        self.assertEqual(data["selectedHandoff"]["blockerId"], "humanReviewClosure")
+        self.assertEqual(data["selectedHandoff"]["blockerId"], "humanReviewClosureEvidence")
 
     def test_missing_external_live_packet_blocks_human_live_decision(self) -> None:
         config = write_temp_config(
@@ -522,6 +612,7 @@ class EvolutionGoalStatusTests(unittest.TestCase):
         self.assertFalse(data["publicLiveReady"])
         self.assertEqual(data["selectedHandoff"]["blockerId"], "publicLiveReceipt")
         self.assertIn("export_public_live_receipt.js", data["selectedHandoff"]["command"])
+        self.assertIn("--live-review-closure LIVE_REVIEW_CLOSURE.local.json", data["selectedHandoff"]["command"])
 
     def test_legal_document_drift_reopens_public_receipt_blocker(self) -> None:
         config = write_temp_config(

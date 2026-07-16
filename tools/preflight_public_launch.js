@@ -123,6 +123,7 @@ function checkPublicSurface() {
   assert(publicHtml.includes('href="#ama"'), "public.html must hand closed paid intake to the public-safe AMA.");
   assert(publicHtml.includes('id="publicOrderForm" hidden aria-hidden="true"'), "public order form must start hidden.");
   assert(publicHtml.includes('id="publicOrderFields" hidden disabled'), "public order fields must start disabled.");
+  assert(publicJs.includes("liveReviewClosureValidatorPassed"), "public receipt verification must require the document-bound human-review attestation.");
   assert(publicHtml.includes("public-config.js"), "public.html must load public-config.js.");
   assert(publicHtml.includes("public-ama-answers.js"), "public.html must load public-ama-answers.js.");
   assert(publicHtml.includes("public.js"), "public.html must load public.js.");
@@ -1326,6 +1327,9 @@ function checkLiveReviewClosureContract() {
   const draft = read("tools/draft_live_review_closure.js");
   const renderer = read("tools/render_live_review_public_config_patch.js");
   const validator = read("tools/validate_live_review_closure.js");
+  const receiptExporter = read("tools/export_public_live_receipt.js");
+  const statusTool = read("tools/evolution_goal_status.js");
+  const vauCompany = read("tools/vau_company_evolution.py");
   const gitignore = read(".gitignore");
   const validateWorkflow = read(".github/workflows/validate.yml");
   const pagesWorkflow = read(".github/workflows/pages.yml");
@@ -1339,10 +1343,12 @@ function checkLiveReviewClosureContract() {
     ["README live review renderer", readme, "tools/render_live_review_public_config_patch.js"],
     ["human review live closure local packet", humanReview, "LIVE_REVIEW_CLOSURE.local.json"],
     ["human review live closure ready command", humanReview, "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready"],
+    ["human review config-bound closure command", humanReview, "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js"],
     ["human review live closure render command", humanReview, "node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json"],
     ["evolution log live review entry", evolutionLog, "Live Review Closure Packet"],
-    ["live review template schema", template, '"schemaVersion": 1'],
+    ["live review template schema", template, '"schemaVersion": 2'],
     ["live review template gates", template, '"reviewGates"'],
+    ["live review template document digests", template, '"documentDigests"'],
     ["live review template keeps liveMode false", template, '"liveMode": false'],
     ["live review draft local target", draft, "LIVE_REVIEW_CLOSURE.local.json"],
     ["live review draft stop liveMode", draft, "Do not use this packet to set liveMode true."],
@@ -1350,7 +1356,16 @@ function checkLiveReviewClosureContract() {
     ["live review renderer validates ready packet", renderer, "validate_live_review_closure.js"],
     ["live review renderer keeps liveMode false", renderer, "liveModeRemainsFalse"],
     ["live review validator ready gate", validator, "--require-ready"],
+    ["live review validator digest domain", validator, "STRANGE_COMPANY_REVIEW_DOCUMENT_V1"],
+    ["live review validator public config binding", validator, "--public-config"],
+    ["live review validator canonical digest map", validator, "documentDigests"],
     ["live review validator keeps liveMode false", validator, "liveMode must remain false"],
+    ["public receipt live review argument", receiptExporter, "--live-review-closure"],
+    ["public receipt authoritative review validator", receiptExporter, "validate_live_review_closure.js"],
+    ["public receipt review validator attestation", receiptExporter, "liveReviewClosureValidatorPassed"],
+    ["status document-bound closure blocker", statusTool, "humanReviewClosureEvidence"],
+    ["VAU live review closure argument", vauCompany, "--live-review-closure"],
+    ["VAU authoritative review validator", vauCompany, "validate_live_review_closure.js"],
     ["live review local ignored", gitignore, "LIVE_REVIEW_CLOSURE.local.json"],
     ["live review template unignored", gitignore, "!LIVE_REVIEW_CLOSURE.template.json"],
     ["live review draft syntax workflow", validateWorkflow, "node --check tools/draft_live_review_closure.js"],

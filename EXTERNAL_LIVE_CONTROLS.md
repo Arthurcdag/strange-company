@@ -68,9 +68,10 @@ Only use the resulting public values in `public-config.js`; keep Stripe dashboar
 After the external and revenue packets validate against the same current config, also close the reviewer-capacity and delivery-review gates before exporting the public-only receipt while `liveMode` is still `false`:
 
 ```bash
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
 node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
 node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
-node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --live-review-closure LIVE_REVIEW_CLOSURE.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
 node tools/export_public_live_receipt.js --check-public-js --require-issued
 ```
 
@@ -232,7 +233,12 @@ Minimum review questions:
 - [ ] Are restricted data categories rejected clearly?
 - [ ] Is the incident/support route clear?
 
-If the documents change, commit those edits before setting review dates. Set:
+Before setting review dates, generate `LIVE_REVIEW_CLOSURE.local.json`, have the
+responsible humans review the exact files represented by its schema-v2
+path-bound digests, and run `node tools/validate_live_review_closure.js
+LIVE_REVIEW_CLOSURE.local.json --require-ready`. If any required document
+changes, the digest check must fail until the packet is regenerated and the
+changed material is reviewed again. Then set:
 
 ```js
 termsReviewedAt: "YYYY-MM-DD",
@@ -333,11 +339,12 @@ Keep `supportEmail` set to the verified pilot inbox (`tuiidagnese+strangeworks@g
 Run:
 
 ```bash
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
 node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
 node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
 node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
 node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
-node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --live-review-closure LIVE_REVIEW_CLOSURE.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
 node tools/export_public_live_receipt.js --check-public-js --require-issued
 node tools/preflight_public_launch.js
 node tools/evolution_goal_status.js --json

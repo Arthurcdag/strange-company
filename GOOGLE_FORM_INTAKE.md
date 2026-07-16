@@ -115,7 +115,8 @@ googleFormVerified: false
 ```
 
 For a live release, prepare the verified URL locally while response collection
-is still disabled, complete all four validators and issue the receipt, then
+is still disabled, complete the document-bound review closure plus all four
+other validators and issue the receipt, then
 publish the issued receipt and `liveMode: true` together. Enable Form responses
 only after the live Pages deployment is verified. A static browser receipt
 cannot revoke a Google Form opened through an old or direct link.
