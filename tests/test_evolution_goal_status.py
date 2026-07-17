@@ -295,7 +295,7 @@ class EvolutionGoalStatusTests(unittest.TestCase):
         self.assertGreaterEqual(data["evolutionPassCount"], 3)
         self.assertEqual(
             data["latestPass"]["title"],
-            "Revocation-Dominant Review Closure Binding",
+            "Input-CAS-Protected Receipt Revocation",
         )
 
     def test_text_output_names_latest_pass(self) -> None:
