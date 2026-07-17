@@ -589,6 +589,36 @@ def start_paused_receipt_issuance(
     )
 
 
+def start_paused_receipt_revocation(
+    config: pathlib.Path,
+    output: pathlib.Path,
+    barrier: pathlib.Path,
+    *extra: str,
+) -> subprocess.Popen[str]:
+    environment = os.environ.copy()
+    environment["NODE_ENV"] = "test"
+    environment["STRANGE_COMPANY_TEST_RECEIPT_REVOKE_SNAPSHOT_BARRIER"] = str(
+        barrier
+    )
+    return subprocess.Popen(
+        [
+            "node",
+            str(EXPORTER.relative_to(ROOT)),
+            "--revoke",
+            "--public-config",
+            str(config),
+            "--output",
+            str(output),
+            *extra,
+        ],
+        cwd=ROOT,
+        encoding="utf-8",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=environment,
+    )
+
+
 def wait_for_snapshot_barrier(
     process: subprocess.Popen[str],
     barrier: pathlib.Path,
@@ -1308,6 +1338,138 @@ class PublicLiveReceiptTests(unittest.TestCase):
             self.assertEqual(receipt["schemaVersion"], 4)
             self.assertEqual(receipt["generation"], 3)
             self.assertEqual(receipt["status"], ACTIVE_STATUS)
+
+    def test_inflight_revoke_cannot_overwrite_newer_config_revocation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            output = folder / "public-live-receipt.js"
+            issued = run_exporter(*generation_args(config, external, revenue, output))
+            self.assertEqual(issued.returncode, 0, issued.stderr)
+            self.assertEqual(read_receipt(output)["generation"], 1)
+
+            barrier = folder / "revoke-config-drift"
+            process = start_paused_receipt_revocation(config, output, barrier)
+            try:
+                release_marker = wait_for_snapshot_barrier(process, barrier)
+
+                changed_config = ready_public_config(live_mode=False)
+                changed_config["operatorName"] = "Newer operator after revoke snapshot"
+                write_public_config(folder, changed_config)
+                newer_revoke = run_exporter(
+                    "--revoke",
+                    "--public-config",
+                    str(config),
+                    "--output",
+                    str(output),
+                )
+                self.assertEqual(newer_revoke.returncode, 0, newer_revoke.stderr)
+                newer_receipt_bytes = output.read_bytes()
+                newer_receipt = read_receipt(output)
+                self.assertEqual(newer_receipt["generation"], 2)
+                self.assertEqual(newer_receipt["status"], "not_issued")
+                self.assertEqual(
+                    newer_receipt["core"]["operatorName"],
+                    "Newer operator after revoke snapshot",
+                )
+
+                release_marker.write_text("release\n", encoding="utf-8")
+                stdout, stderr = process.communicate(timeout=30)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.communicate()
+
+            self.assertNotEqual(process.returncode, 0, stdout)
+            self.assertIn(
+                "Revocation input changed during validation (public config)",
+                stderr,
+            )
+            self.assertEqual(output.read_bytes(), newer_receipt_bytes)
+            self.assertEqual(read_receipt(output)["generation"], 2)
+
+    def test_inflight_revoke_cannot_overwrite_newer_document_revocation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = pathlib.Path(tmp)
+            config, external, revenue = ready_files(folder)
+            documents = copy_review_documents(folder)
+            document_root = documents["TERMOS.md"].parent
+            write_json(
+                folder,
+                "LIVE_REVIEW_CLOSURE.local.json",
+                ready_live_review_closure(
+                    ready_public_config(live_mode=False),
+                    document_overrides=documents,
+                ),
+            )
+            output = folder / "public-live-receipt.js"
+            issued = run_exporter(
+                *generation_args(
+                    config,
+                    external,
+                    revenue,
+                    output,
+                    "--document-root",
+                    str(document_root),
+                )
+            )
+            self.assertEqual(issued.returncode, 0, issued.stderr)
+            self.assertEqual(read_receipt(output)["generation"], 1)
+
+            barrier = folder / "revoke-document-drift"
+            process = start_paused_receipt_revocation(
+                config,
+                output,
+                barrier,
+                "--document-root",
+                str(document_root),
+            )
+            try:
+                release_marker = wait_for_snapshot_barrier(process, barrier)
+
+                document = documents["BRAZIL_COMPLIANCE.md"]
+                document.write_bytes(
+                    document.read_bytes() + b"\nNewer reviewed bytes after revoke snapshot.\n"
+                )
+                newer_revoke = run_exporter(
+                    "--revoke",
+                    "--public-config",
+                    str(config),
+                    "--document-root",
+                    str(document_root),
+                    "--output",
+                    str(output),
+                )
+                self.assertEqual(newer_revoke.returncode, 0, newer_revoke.stderr)
+                newer_receipt_bytes = output.read_bytes()
+                newer_receipt = read_receipt(output)
+                self.assertEqual(newer_receipt["generation"], 2)
+                self.assertEqual(newer_receipt["status"], "not_issued")
+                self.assertEqual(
+                    newer_receipt["core"]["reviewDocuments"][
+                        "BRAZIL_COMPLIANCE.md"
+                    ],
+                    public_review_document_digest(
+                        "BRAZIL_COMPLIANCE.md",
+                        document.read_text(encoding="utf-8"),
+                    ),
+                )
+
+                release_marker.write_text("release\n", encoding="utf-8")
+                stdout, stderr = process.communicate(timeout=30)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.communicate()
+
+            self.assertNotEqual(process.returncode, 0, stdout)
+            self.assertIn(
+                "Revocation input changed during validation "
+                "(public review document BRAZIL_COMPLIANCE.md)",
+                stderr,
+            )
+            self.assertEqual(output.read_bytes(), newer_receipt_bytes)
+            self.assertEqual(read_receipt(output)["generation"], 2)
 
     def test_inflight_reissue_cannot_overwrite_newer_revocation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

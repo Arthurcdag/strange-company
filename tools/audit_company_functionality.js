@@ -314,6 +314,8 @@ function auditDocs() {
   assertIncludes("tools/export_public_live_receipt.js", "createIssuanceSnapshot", "public live receipt issuance input snapshot");
   assertIncludes("tools/export_public_live_receipt.js", "assertIssuanceInputsMatchSnapshot", "public live receipt issuance input compare-and-swap");
   assertIncludes("tools/export_public_live_receipt.js", "assertReceiptOutputMatchesBaseline", "public live receipt issuance compare-and-swap");
+  assertIncludes("tools/export_public_live_receipt.js", "createRevocationSnapshot", "public live receipt revocation input snapshot");
+  assertIncludes("tools/export_public_live_receipt.js", "assertRevocationInputsMatchSnapshot", "public live receipt revocation input compare-and-swap");
   assertIncludes("public.js", "HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION", "public browser receipt-generation high-water mark");
   assertIncludes("public.js", "HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY", "public browser same-generation identity pin");
   assertIncludes("tools/export_public_live_receipt.js", "reviewDocuments", "public receipt nine-document review core");

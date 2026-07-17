@@ -381,7 +381,10 @@ node tools\build_public_site.js --check --output .public-site-build.local --forc
 Publish that closed config and placeholder together, verify Pages remains
 closed, and only then rerun status from the closed state before repair or
 reissuance. The revoke path does not require the private packets; a receipt in
-an already open tab is rechecked from the server and fails closed.
+an already open tab is rechecked from the server and fails closed. If revocation
+reports public-config or reviewed-document drift, do not force an overwrite:
+inspect the current closed inputs and rerun revocation from that exact state.
+The concurrent binder or newer receipt bytes remain untouched.
 
 ## First Paid Pilot Procedure
 

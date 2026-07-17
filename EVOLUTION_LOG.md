@@ -631,3 +631,51 @@ These are local process-integrity and race-resistance controls, not a signature,
 global monotonic anchor, legal review, payment proof, privacy approval, fiscal
 approval, or launch authorization. External gates remain open and tracked
 `liveMode` remains false.
+
+## 2026-07-17 - Input-CAS-Protected Receipt Revocation
+
+Objective: prevent a standalone receipt revoker that captured an older public
+core from overwriting a newer closure-binder or revocation result after waiting
+for the shared receipt lock.
+
+Changed:
+
+- Factored one exact public-core input snapshot over `public-config.js` and all
+  nine canonical reviewed documents, and reused it for issuance and revocation.
+- Made revocation build its placeholder only from that snapshot, then compare
+  every source byte again under the receipt mutation lock before advancing the
+  generation or writing any output.
+- Added a test-only revocation snapshot barrier plus deterministic config-drift,
+  reviewed-document-drift, and paused-revoker-versus-binder regressions; each
+  proves the stale revoker aborts and preserves the winning receipt bytes and
+  generation.
+- Wired the revocation compare-and-swap contract through preflight,
+  functionality audit, survival checks, README, external-live controls, and
+  human operator handoffs.
+- Refreshed the tracked fail-closed receipt to generation 5 after the reviewed
+  human handoff changed; its status remains `not_issued`.
+
+Verified with:
+
+- `node --check tools\export_public_live_receipt.js`
+- `node --check tools\preflight_public_launch.js`
+- `node --check tools\audit_company_functionality.js`
+- `node --check tools\survival_check.js`
+- `python -m unittest tests.test_public_live_receipt tests.test_bind_live_review_closure`
+- Focused result: 48 tests passed.
+- `python -m unittest discover -s tests`
+- Full discovery result: 293 tests passed; 1 skipped.
+- `node tools\export_public_live_receipt.js --check-public-js`
+- `node tools\preflight_public_launch.js --deployment`
+- `node tools\audit_company_functionality.js`
+- `node tools\build_public_site.js --check --output .public-site-build.local --force`
+- `node tools\survival_check.js`
+- `node tools\audit_evolution_log.js`
+- `git diff --check`
+
+Result: a revoker paused on an older config or reviewed-document set now fails
+without replacing a newer binder or revocation receipt. This closes a local
+stale-core race while preserving revocation dominance for unchanged inputs; it
+does not create a signature, external monotonic anchor, legal review, payment
+proof, privacy approval, fiscal approval, or launch authorization. The public
+receipt remains fail-closed and tracked `liveMode` remains false.

@@ -453,14 +453,10 @@ function readIssuanceInput(filePath, label, { publicText = false } = {}) {
   }
 }
 
-function createIssuanceSnapshot() {
+function createPublicCoreInputSnapshot() {
   const configInput = readIssuanceInput(publicConfigPath, "public config", {
     publicText: true,
   });
-  const closureInput = readIssuanceInput(
-    liveReviewClosurePath,
-    "LIVE_REVIEW_CLOSURE"
-  );
   const documentInputs = REVIEW_DOCUMENT_SPECS.map((spec) => ({
     ...readIssuanceInput(
       spec.filePath,
@@ -469,6 +465,31 @@ function createIssuanceSnapshot() {
     ),
     publicPath: spec.publicPath,
   }));
+  return {
+    configInput,
+    configSource: configInput.contents.toString("utf8"),
+    documentInputs,
+    documentContents: Object.fromEntries(
+      documentInputs.map((input) => [
+        input.publicPath,
+        input.contents.toString("utf8"),
+      ])
+    ),
+    inputs: [configInput, ...documentInputs],
+  };
+}
+
+function createRevocationSnapshot() {
+  return createPublicCoreInputSnapshot();
+}
+
+function createIssuanceSnapshot() {
+  const publicCoreSnapshot = createPublicCoreInputSnapshot();
+  const { configInput, documentInputs } = publicCoreSnapshot;
+  const closureInput = readIssuanceInput(
+    liveReviewClosurePath,
+    "LIVE_REVIEW_CLOSURE"
+  );
   const externalInput = readIssuanceInput(
     externalPacketPath,
     "EXTERNAL_LIVE_PACKET"
@@ -494,13 +515,6 @@ function createIssuanceSnapshot() {
     reviewerInput,
     deliveryInput,
   ];
-  const configSource = configInput.contents.toString("utf8");
-  const documentContents = Object.fromEntries(
-    documentInputs.map((input) => [
-      input.publicPath,
-      input.contents.toString("utf8"),
-    ])
-  );
   const snapshotDir = fs.mkdtempSync(path.join(os.tmpdir(), "strange-company-live-receipt-"));
   try {
     try {
@@ -526,9 +540,9 @@ function createIssuanceSnapshot() {
     return {
       dir: snapshotDir,
       configPath: snapshotConfigPath,
-      configSource,
+      configSource: publicCoreSnapshot.configSource,
       closurePath: snapshotClosurePath,
-      documentContents,
+      documentContents: publicCoreSnapshot.documentContents,
       externalPath: snapshotExternalPath,
       revenuePath: snapshotRevenuePath,
       reviewerPath: snapshotReviewerPath,
@@ -541,22 +555,30 @@ function createIssuanceSnapshot() {
   }
 }
 
-function assertIssuanceInputsMatchSnapshot(snapshot) {
+function assertInputsMatchSnapshot(snapshot, operation, mutationVerb, retryNoun) {
   for (const input of snapshot.inputs) {
     let current;
     try {
       current = fs.readFileSync(input.filePath);
     } catch (error) {
       fail(
-        `Issuance input changed during validation (${input.label}); refusing to issue a receipt: ${error.message}`
+        `${operation} input changed during validation (${input.label}); refusing to ${mutationVerb} a receipt: ${error.message}`
       );
     }
     if (!current.equals(input.contents)) {
       fail(
-        `Issuance input changed during validation (${input.label}); refusing to issue a receipt. Rerun issuance from the current inputs.`
+        `${operation} input changed during validation (${input.label}); refusing to ${mutationVerb} a receipt. Rerun ${retryNoun} from the current inputs.`
       );
     }
   }
+}
+
+function assertIssuanceInputsMatchSnapshot(snapshot) {
+  assertInputsMatchSnapshot(snapshot, "Issuance", "issue", "issuance");
+}
+
+function assertRevocationInputsMatchSnapshot(snapshot) {
+  assertInputsMatchSnapshot(snapshot, "Revocation", "revoke", "revocation");
 }
 
 function cleanupIssuanceSnapshot(snapshot) {
@@ -565,11 +587,11 @@ function cleanupIssuanceSnapshot(snapshot) {
   }
 }
 
-function waitAtSnapshotBarrierForTest() {
-  const barrierValue = process.env.STRANGE_COMPANY_TEST_RECEIPT_SNAPSHOT_BARRIER;
+function waitAtNamedSnapshotBarrierForTest(environmentName, timeoutLabel) {
+  const barrierValue = process.env[environmentName];
   if (!barrierValue) return;
   if (process.env.NODE_ENV !== "test") {
-    fail("STRANGE_COMPANY_TEST_RECEIPT_SNAPSHOT_BARRIER is allowed only with NODE_ENV=test.");
+    fail(`${environmentName} is allowed only with NODE_ENV=test.`);
   }
   const barrier = path.resolve(barrierValue);
   const readyPath = `${barrier}.ready`;
@@ -579,10 +601,24 @@ function waitAtSnapshotBarrierForTest() {
   const sleeper = new Int32Array(new SharedArrayBuffer(4));
   while (!fs.existsSync(releasePath)) {
     if (Date.now() >= deadline) {
-      fail("test receipt snapshot barrier timed out.");
+      fail(`test receipt ${timeoutLabel} snapshot barrier timed out.`);
     }
     Atomics.wait(sleeper, 0, 0, 10);
   }
+}
+
+function waitAtSnapshotBarrierForTest() {
+  waitAtNamedSnapshotBarrierForTest(
+    "STRANGE_COMPANY_TEST_RECEIPT_SNAPSHOT_BARRIER",
+    "issuance"
+  );
+}
+
+function waitAtRevocationSnapshotBarrierForTest() {
+  waitAtNamedSnapshotBarrierForTest(
+    "STRANGE_COMPANY_TEST_RECEIPT_REVOKE_SNAPSHOT_BARRIER",
+    "revocation"
+  );
 }
 
 function runValidator(label, scriptName, packetPath, validatorArgs) {
@@ -1003,6 +1039,7 @@ function writeReceipt(filePath, receipt, overwrite = force) {
 }
 
 let issuanceSnapshot = null;
+let revocationSnapshot = null;
 try {
   if (revoke && checkPublicJs) {
     fail("--revoke cannot be combined with --check-public-js.");
@@ -1025,11 +1062,20 @@ try {
       );
     }
   } else if (revoke) {
-    const currentCore = buildPublicCore(loadPublicConfig(publicConfigPath));
+    revocationSnapshot = createRevocationSnapshot();
+    waitAtRevocationSnapshotBarrierForTest();
+    const currentCore = buildPublicCore(
+      loadPublicConfigSource(
+        revocationSnapshot.configSource,
+        revocationSnapshot.configInput.filePath
+      ),
+      revocationSnapshot.documentContents
+    );
     if (currentCore.flags.liveMode !== false) {
       fail("Refusing to revoke the public live receipt until public-config.js liveMode is false.");
     }
     const receipt = withReceiptMutationLock(outputPath, () => {
+      assertRevocationInputsMatchSnapshot(revocationSnapshot);
       const nextGeneration = nextReceiptGeneration(outputPath, {
         allowLegacyActiveMigration: true,
       });
@@ -1113,4 +1159,5 @@ try {
   process.exitCode = 1;
 } finally {
   cleanupIssuanceSnapshot(issuanceSnapshot);
+  revocationSnapshot = null;
 }

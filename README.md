@@ -131,7 +131,7 @@ The strong version is not lawless. The strong version is difficult to corrupt.
 - [public-ama-answers.js](public-ama-answers.js): public-safe AMA answer archive loaded by the static page; empty until approved answers are exported.
 - [public.js](public.js): payment-safe public request packet builder.
 - [tools/build_public_site.js](tools/build_public_site.js): cross-platform builder/checker for the GitHub Pages public bundle.
-- [tools/export_public_live_receipt.js](tools/export_public_live_receipt.js): two-phase exporter that validates the document-bound human-review closure plus revenue, external-live, reviewer-capacity, and delivery-review packets, then emits a public-only, config-bound schema-v4 seven-day receipt whose exact `reviewDocuments` map covers all nine reviewed paths while `liveMode` remains false; issuance and `--revoke` both advance the public generation, and revocation replaces any lease with a closed placeholder without private packets.
+- [tools/export_public_live_receipt.js](tools/export_public_live_receipt.js): two-phase exporter that validates the document-bound human-review closure plus revenue, external-live, reviewer-capacity, and delivery-review packets, then emits a public-only, config-bound schema-v4 seven-day receipt whose exact `reviewDocuments` map covers all nine reviewed paths while `liveMode` remains false; issuance and `--revoke` both advance the public generation, while revocation replaces any lease without private packets and aborts if its snapshotted public config or reviewed documents drift before the receipt lock is acquired.
 - [tools/preflight_public_launch.js](tools/preflight_public_launch.js): launch preflight for public/private separation, URL allowlists, live-mode config, and sensitive-data guard coverage.
 - [tools/audit_company_functionality.js](tools/audit_company_functionality.js): repo-level audit for Strange Company, the satellite operator, and the external live-operation gate.
 - [tools/audit_evolution_log.js](tools/audit_evolution_log.js): public-safe audit for `EVOLUTION_LOG.md`, requiring objective, changed artifacts, verification commands, and a result for each evolution pass.
@@ -258,9 +258,12 @@ only its three public config values, then run
 `node tools/export_public_live_receipt.js --revoke --public-config
 public-config.js --output public-live-receipt.js`, run the deployment preflight,
 and publish the closed config plus placeholder together. Schema v4 advances a
-monotonic generation on issue and revoke. Issuance captures the exact receipt
-preimage and rechecks it under the output lock after validation, so an in-flight
-issuer cannot overwrite a newer revocation or competing issue. An open browser rejects a lower generation
+monotonic generation on issue and revoke. Revocation snapshots the exact public
+config and all nine reviewed documents, then compares those bytes again under
+the receipt lock; input drift aborts without overwriting a newer binder result.
+Issuance captures every exact input plus the receipt baseline and rechecks them
+under the same lock, so an in-flight issuer cannot overwrite a newer revocation
+or competing issue. An open browser rejects a lower generation
 or a different receipt identity at the same observed generation. Pages also
 rejects non-main or stale-main deploys. A new client served a complete
 same-origin rollback has no independent trust anchor, and a current-main revert

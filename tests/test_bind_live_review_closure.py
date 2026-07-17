@@ -13,6 +13,7 @@ from pathlib import Path
 from tests.test_public_live_receipt import (
     ready_files,
     start_paused_receipt_issuance,
+    start_paused_receipt_revocation,
     wait_for_snapshot_barrier,
 )
 
@@ -551,6 +552,51 @@ class BindLiveReviewClosureTests(unittest.TestCase):
             final_receipt = parse_receipt(fixture.receipt)
             self.assertEqual(final_receipt["status"], "not_issued")
             self.assertEqual(final_receipt["generation"], 2)
+
+    def test_binder_wins_against_paused_stale_core_revoker(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            fixture = BinderFixture(base / "binder")
+            plan_result, plan = fixture.plan()
+            self.assertEqual(plan_result.returncode, 0, plan_result.stderr)
+
+            barrier = base / "paused-revoker"
+            revoker = start_paused_receipt_revocation(
+                fixture.config,
+                fixture.receipt,
+                barrier,
+                "--document-root",
+                str(fixture.workspace),
+            )
+            try:
+                release_marker = wait_for_snapshot_barrier(revoker, barrier)
+                applied = fixture.apply(str(plan["planId"]))
+                self.assertEqual(applied.returncode, 0, applied.stderr)
+                bound_config_bytes = fixture.config.read_bytes()
+                bound_receipt_bytes = fixture.receipt.read_bytes()
+                bound_receipt = parse_receipt(fixture.receipt)
+                self.assertEqual(bound_receipt["status"], "not_issued")
+                self.assertEqual(bound_receipt["generation"], 2)
+                self.assertEqual(
+                    bound_receipt["core"]["reviewDates"]["termsReviewedAt"],
+                    REVIEW_DATE,
+                )
+
+                release_marker.write_text("release\n", encoding="utf-8")
+                stdout, stderr = revoker.communicate(timeout=30)
+            finally:
+                if revoker.poll() is None:
+                    revoker.kill()
+                    revoker.communicate()
+
+            self.assertNotEqual(revoker.returncode, 0, stdout)
+            self.assertIn(
+                "Revocation input changed during validation (public config)",
+                stderr,
+            )
+            self.assertEqual(fixture.config.read_bytes(), bound_config_bytes)
+            self.assertEqual(fixture.receipt.read_bytes(), bound_receipt_bytes)
+            self.assertEqual(parse_receipt(fixture.receipt)["generation"], 2)
 
     def test_interrupted_receipt_first_commit_is_fail_closed_and_resumable(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

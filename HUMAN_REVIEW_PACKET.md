@@ -20,7 +20,10 @@ The resulting public receipt uses schema v4 and replaces the former two-file
 legal core with an exact `reviewDocuments` map for all nine canonical paths.
 Its monotonic public generation advances on issuance and revocation; local
 mutations are serialized, and an open browser cannot accept an older generation
-or a different receipt identity at the same observed generation.
+or a different receipt identity at the same observed generation. Revocation
+also snapshots the public config and all nine documents before waiting for the
+receipt lock, then rejects any byte drift under that lock so it cannot overwrite
+a newer closure-binding result with an older public core.
 Each runtime digest uses `STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1`, the
 canonical path, and BOM-stripped, LF-normalized UTF-8 text. The map contains
 only public document digests; it never contains private packet hashes.

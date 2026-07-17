@@ -1466,6 +1466,8 @@ function checkLiveReviewClosureContract() {
     ["public receipt issuance input compare-and-swap", receiptExporter, "assertIssuanceInputsMatchSnapshot"],
     ["public receipt issuance output baseline", receiptExporter, "captureReceiptOutputBaseline"],
     ["public receipt issuance compare-and-swap", receiptExporter, "assertReceiptOutputMatchesBaseline"],
+    ["public receipt revocation input snapshot", receiptExporter, "createRevocationSnapshot"],
+    ["public receipt revocation input compare-and-swap", receiptExporter, "assertRevocationInputsMatchSnapshot"],
     ["public receipt placeholder generation", publicReceipt, '"generation"'],
     ["public receipt nine-document core", receiptExporter, "reviewDocuments"],
     ["public browser nine-document core", publicJs, "reviewDocuments"],
