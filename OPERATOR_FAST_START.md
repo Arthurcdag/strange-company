@@ -20,17 +20,23 @@ For exact Google Form questions, Sheet headers, support inbox checks, Stripe evi
    - keep `aiGeneratedLegalDocsRequireHumanReview: true`,
    - set `supportInboxVerified: true` after sending and receiving a test email,
    - set `googleFormVerified: true` after a test response lands in the Sheet,
-   - set `termsReviewedAt` and `privacyReviewedAt`,
-   - set `brazilComplianceReviewedAt` and `aiHandoffReviewedAt`,
-   - set `liveMode: true` only after the stop rule is clear,
+   - leave the four review-date fields to the closure binder below,
+   - keep `liveMode: false` through validation, receipt export, preflight, and status review,
    - adjust service names and prices if the offer changed.
-5. Run `node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live`.
-6. Run `node tools/preflight_public_launch.js`.
-7. Run `node tools/audit_company_functionality.js --require-live`.
-8. Open `public.html` locally and confirm the readiness banner says `Live intake configured`.
-9. Submit a safe test packet.
-10. Confirm the email draft uses the real inbox.
-11. Open the Google Form from the public packet output and paste the packet.
+5. Run `node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready`, then `node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json`. Keep the plan and PLAN_ID local because they commit to private closure evidence. Review the exact four-date delta and execute only the unchanged plan's exact `applyArguments`. Finally run the config-bound closure validator and `node tools/export_public_live_receipt.js --check-public-js`; stop if any reviewed document, input, date, plan ID, or fail-closed placeholder is stale.
+6. Run `node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js`.
+7. Run `node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js`.
+8. Run `node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready`.
+9. Run `node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready`.
+10. Run `node tools/export_public_live_receipt.js --live-review-closure LIVE_REVIEW_CLOSURE.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force`.
+11. Run `node tools/export_public_live_receipt.js --check-public-js --require-issued`.
+12. Run `node tools/preflight_public_launch.js`.
+13. Run `node tools/evolution_goal_status.js --json` and stop if any hard, public-route, or operational blocker remains.
+14. After a separate human decision, change only `liveMode` to `true`, then run `node tools/preflight_public_launch.js --deployment` before publication.
+15. Build and serve the public bundle over HTTP: run `node tools/build_public_site.js --check --output .public-site-build.local --force`, then `python -m http.server 8000 --directory .public-site-build.local` and open `http://localhost:8000/`. Alternatively, verify the deployed Pages URL. Confirm the readiness banner says `Live intake configured`; a direct `file://` open cannot complete the receipt and reviewed-document fetch checks.
+16. Submit a safe test packet.
+17. Confirm the email draft uses the real inbox.
+18. Open the Google Form from the public packet output and paste the packet.
 
 ## Live Smoke
 
@@ -47,3 +53,12 @@ For exact Google Form questions, Sheet headers, support inbox checks, Stripe evi
 ## Stop Rule
 
 Do not use the public page for real customers if the support inbox, LGPD contact path, Google Form, ledger Sheet, terms review, privacy review, Brazilian entity/CNPJ route, tax/NFS-e route, payment provider, or business bank/payment account is missing.
+
+For a stop or receipt expiry, disable external Form responses first. Capture
+the complete sequence, run `node tools/render_public_live_shutdown_patch.js`,
+apply only its three fail-closed config values, then run
+`node tools/export_public_live_receipt.js --revoke --public-config
+public-config.js --output public-live-receipt.js`, run the deployment preflight,
+build the public bundle, and publish the closed config plus placeholder
+together. Verify Pages is closed and only then rerun status from the closed
+state; do not pause for a mid-recovery status recommendation.

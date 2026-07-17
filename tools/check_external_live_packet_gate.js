@@ -5,34 +5,38 @@ const { spawnSync } = require("child_process");
 
 const root = path.resolve(__dirname, "..");
 const packetPath = path.join(os.tmpdir(), `strange-live-packet-gate-${process.pid}-${Date.now()}.json`);
+const configPath = path.join(os.tmpdir(), `strange-live-packet-gate-${process.pid}-${Date.now()}.js`);
 
 function testPacketMissingBrazilAndAiReviews() {
+  const now = Date.now();
+  const reviewDate = new Date(now).toISOString().slice(0, 10);
   return {
     schemaVersion: 1,
-    mode: "gate-regression-test",
+    mode: "local",
     support: {
       supportEmail: "ops@example.com",
       owner: "Human operator",
       monitoringCadence: "daily",
-      testReceivedAt: "2026-05-22T00:00:00Z",
-      testRepliedAt: "2026-05-22T00:05:00Z",
+      testReceivedAt: new Date(now - 10 * 60 * 1000).toISOString(),
+      testRepliedAt: new Date(now - 5 * 60 * 1000).toISOString(),
       fallbackContact: "backup@example.com",
       verified: true
     },
     google: {
       sheetUrl: "https://docs.google.com/spreadsheets/d/test/edit",
       formUrl: "https://docs.google.com/forms/d/e/test/viewform",
-      testResponseTimestamp: "2026-05-22T00:10:00Z",
+      testResponseTimestamp: new Date(now - 2 * 60 * 1000).toISOString(),
       requestsHeaderVerified: true,
       invoicesHeaderVerified: true,
       leadsHeaderVerified: true,
       formLinkedToSheet: true,
+      acceptingResponses: false,
       verified: true
     },
     legalReview: {
-      termsReviewedAt: "2026-05-22",
-      privacyReviewedAt: "2026-05-22",
-      supportReviewedAt: "2026-05-22",
+      termsReviewedAt: reviewDate,
+      privacyReviewedAt: reviewDate,
+      supportReviewedAt: reviewDate,
       brazilComplianceReviewedAt: "",
       aiHandoffReviewedAt: "",
       reviewer: "Human reviewer",
@@ -65,15 +69,15 @@ function testPacketMissingBrazilAndAiReviews() {
       googleFormUrl: "https://docs.google.com/forms/d/e/test/viewform",
       supportInboxVerified: true,
       googleFormVerified: true,
-      termsReviewedAt: "2026-05-22",
-      privacyReviewedAt: "2026-05-22",
+      termsReviewedAt: reviewDate,
+      privacyReviewedAt: reviewDate,
       brazilComplianceReviewedAt: "",
       aiHandoffReviewedAt: "",
       liveMode: true
     },
     attestation: {
       operator: "Human operator",
-      reviewedAt: "2026-05-22",
+      reviewedAt: reviewDate,
       noSecretsInRepo: true,
       strangeCompanyRemainsSealed: true,
       satelliteIsRevenueOperator: true
@@ -91,11 +95,20 @@ function fail(message, output = "") {
 }
 
 try {
-  fs.writeFileSync(packetPath, `${JSON.stringify(testPacketMissingBrazilAndAiReviews(), null, 2)}\n`, "utf8");
+  const packet = testPacketMissingBrazilAndAiReviews();
+  const currentConfig = { ...packet.publicConfig, liveMode: false };
+  fs.writeFileSync(packetPath, `${JSON.stringify(packet, null, 2)}\n`, "utf8");
+  fs.writeFileSync(
+    configPath,
+    `window.PUBLIC_ORDER_CONFIG = ${JSON.stringify(currentConfig, null, 2)};\n`,
+    "utf8"
+  );
   const result = spawnSync(process.execPath, [
     path.join(root, "tools", "validate_external_live_packet.js"),
     packetPath,
-    "--require-live"
+    "--require-live",
+    "--public-config",
+    configPath
   ], {
     cwd: root,
     encoding: "utf8"
@@ -114,11 +127,22 @@ try {
   if (missing.length) {
     fail(`validator did not report expected failure(s): ${missing.join("; ")}`, output);
   }
+  for (const unexpected of [
+    "packet mode must be local",
+    "must be no more than 30 days old",
+    "requires --public-config",
+  ]) {
+    if (output.includes(unexpected)) {
+      fail(`regression fixture is not otherwise ready: ${unexpected}`, output);
+    }
+  }
   console.log("External live packet gate regression passed.");
 } finally {
-  try {
-    fs.unlinkSync(packetPath);
-  } catch {
-    // Temporary file cleanup best effort.
+  for (const tempPath of [packetPath, configPath]) {
+    try {
+      fs.unlinkSync(tempPath);
+    } catch {
+      // Temporary file cleanup best effort.
+    }
   }
 }

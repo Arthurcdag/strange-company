@@ -4,7 +4,8 @@ This is the developer/operator handoff for creating the outside routes that must
 
 The developer can prepare the repo and verify URLs. The operator or account owner must create and approve the support inbox, Google Form, Stripe account, bank route, terms review, and privacy review. Do not store private keys, bank numbers, tax documents, customer secrets, or payment credentials in this repo.
 
-Use `HUMAN_REVIEW_PACKET.md` as the manual close sheet before editing `public-config.js`.
+Use `HUMAN_REVIEW_PACKET.md` as the manual close sheet before binding reviewed
+dates into `public-config.js`.
 
 ## Output Values
 
@@ -56,13 +57,26 @@ Run the gate regression that proves an otherwise-complete live packet still fail
 node tools/check_external_live_packet_gate.js
 ```
 
-Validate the completed local packet before changing `public-config.js`:
+Bind the four reviewed dates with `node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json`, inspect its non-mutating plan, then apply the unchanged plan with `--apply --expect-plan-id <PLAN_ID>`. This transaction keeps `liveMode: false` and advances the receipt to a matching fail-closed placeholder. Copy the other reviewed public-safe values into `public-config.js` only through their documented evidence steps. The revenue packet must match that pre-live snapshot exactly. The external-live packet must match every public field except its local `publicConfig.liveMode`, which is `true` because `--require-live` validates the intended post-decision target; the binding deliberately ignores only this one phase field. The tracked config and receipt remain `false` until the separate human flip. Then validate both packets:
 
 ```bash
-node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
 ```
 
 Only use the resulting public values in `public-config.js`; keep Stripe dashboard URLs, Sheet URLs, bank last4, and operator names in the private Operations evidence lane.
+
+After the external and revenue packets validate against the same current config, also close the reviewer-capacity and delivery-review gates before exporting the public-only receipt while `liveMode` is still `false`:
+
+```bash
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
+node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
+node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+node tools/export_public_live_receipt.js --live-review-closure LIVE_REVIEW_CLOSURE.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --check-public-js --require-issued
+```
+
+The receipt contains only the already-public config snapshot, process attestations, a monotonic generation, an exact schema-v4 `reviewDocuments` map of canonical-path SHA-256 hashes for all nine reviewed files, and integrity digests for both the public core and the full envelope. It contains neither private packet data nor hashes of private packets. An output-scoped exclusive lock serializes local issue/revoke mutations. Before revocation advances the generation, it rechecks the exact snapshotted public config and all nine documents under that lock; concurrent binder or document drift aborts without replacing the newer receipt. The browser refetches and recomputes every reviewed document with the shared `STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1` path-bound domain; any missing file, extra or substituted map key, lower already-observed generation, different identity at the same generation, envelope edit, reviewed-copy drift, config change other than the final `liveMode` flip, or expiry after seven days closes the paid desk. This is a time-limited process receipt, not external certification, a signature, or proof that a particular operator ran the validators.
 
 ## Launch Gate Evidence Panel
 
@@ -95,6 +109,12 @@ Minimum checks:
 - [ ] A reply can be sent from the support address.
 - [ ] The support address is the same address that will appear in `public-config.js`.
 - [ ] No personal-only mailbox is treated as the permanent customer support system.
+
+Record the received, replied, and Google Form test times as real ISO-8601 UTC
+timestamps ending in `Z`. Strict live validation rejects future times, a support
+reply earlier than its received message, and connectivity tests older than 30
+days. Rerun the tests instead of reissuing a receipt from stale connectivity
+evidence.
 
 Evidence to record privately:
 
@@ -187,18 +207,33 @@ Response setup:
 - [ ] Submit one safe test response.
 - [ ] Confirm the response lands in the Sheet.
 - [ ] Copy the public Form URL that starts with `https://docs.google.com/forms/`.
-- [ ] Paste only that Form URL into `public-config.js`.
+- [ ] Turn off external Form response collection after the safe test.
+- [ ] Record `google.acceptingResponses: false` in the ignored external-live packet.
+- [ ] Paste only that Form URL into the local release config; do not publish a
+  pre-live snapshot that exposes the URL while the desk is closed.
 
 Do not depend on Google Forms `entry.*` IDs in the public site. The public page should open the form and provide a copyable packet; it should not auto-submit customer data.
+The receipt gates only the static site. It cannot disable an external Form reached
+through a direct or previously shared URL, so the human operator owns that toggle.
+On any post-flip gate failure, disable Form responses first, run
+`node tools/render_public_live_shutdown_patch.js`, apply its three fail-closed
+public values, revoke the receipt, and deploy the closed config and placeholder
+together before rebuilding readiness.
 
-## 4. Terms And Privacy Review Dates
+## 4. Nine-Document Human Review Binding
 
-Review these files against the real offer and intake path:
+Review these exact canonical files against the real offer, intake path, Brazil
+compliance posture, and AI/human handoff:
 
+- `TERMOS.md`
 - `TERMS.md`
+- `AVISO_DE_PRIVACIDADE.md`
 - `PRIVACY.md`
-- `SUPPORT.md`
-- `RUN_LIVE_PILOT.md`
+- `BRAZIL_COMPLIANCE.md`
+- `BRAZIL_COMPLIANCE_AGENTS.md`
+- `CONKA8_LAW_INSTRUCTIONS.md`
+- `AI_LEGAL_HANDOFF.md`
+- `HUMAN_REVIEW_PACKET.md`
 
 Minimum review questions:
 
@@ -209,14 +244,28 @@ Minimum review questions:
 - [ ] Are restricted data categories rejected clearly?
 - [ ] Is the incident/support route clear?
 
-If the documents change, commit those edits before setting review dates. Set:
+Before setting review dates, generate `LIVE_REVIEW_CLOSURE.local.json`, have the
+responsible humans review the exact files represented by its schema-v2
+path-bound digests, and run `node tools/validate_live_review_closure.js
+LIVE_REVIEW_CLOSURE.local.json --require-ready`. Then run the closure binder in
+plan mode, inspect its local-only plan, and apply only that exact plan with
+`--apply --expect-plan-id <PLAN_ID>`. Never copy the dates into the config by
+hand. Rerun the validator with `--public-config public-config.js`. If any required document
+changes, the digest check must fail until the packet is regenerated and the
+changed material is reviewed again. After closure validation, receipt issuance
+independently recomputes all nine public-domain digests from the canonical
+document bytes and stores them in the schema-v4 `reviewDocuments` core; it does
+not copy digest values out of the private closure packet. The deployed browser
+must be able to fetch all nine paths. The binder owns these four fields and
+keeps `liveMode: false`:
 
 ```js
 termsReviewedAt: "YYYY-MM-DD",
 privacyReviewedAt: "YYYY-MM-DD",
 ```
 
-Only use the real review date.
+Only use real review dates in the local closure packet. Do not publish or commit
+the binder plan or PLAN_ID because it commits to private closure evidence.
 
 ## 5. Stripe Route
 
@@ -269,9 +318,12 @@ stripe_payout_test_status:
 reconciliation_owner:
 ```
 
-## 7. Public Config Patch
+## 7. Public Config Binding
 
-Only after all checks above are real:
+Only after all checks above are real may the public-safe config reach the
+following shape. The four review dates shown below are illustrative; bind their
+real values through `bind_live_review_closure.js`, never by manually applying
+this block:
 
 ```js
 window.PUBLIC_ORDER_CONFIG = {
@@ -287,7 +339,7 @@ window.PUBLIC_ORDER_CONFIG = {
   privacyReviewedAt: "YYYY-MM-DD",
   brazilComplianceReviewedAt: "YYYY-MM-DD",
   aiHandoffReviewedAt: "YYYY-MM-DD",
-  liveMode: true,
+  liveMode: false,
   services: [
     {
       id: "proof-sprint",
@@ -310,11 +362,26 @@ Keep `supportEmail` set to the verified pilot inbox (`tuiidagnese+strangeworks@g
 Run:
 
 ```bash
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --apply --expect-plan-id <PLAN_ID>
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
+node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
+node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+node tools/export_public_live_receipt.js --live-review-closure LIVE_REVIEW_CLOSURE.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --check-public-js --require-issued
 node tools/preflight_public_launch.js
-node tools/audit_company_functionality.js --require-live
+node tools/evolution_goal_status.js --json
 ```
 
-Both must pass before publishing the live config.
+Every command must pass while `liveMode` remains false and the ready config
+stays unpublished. Review the issued receipt and confirm status has no hard,
+public-route, or operational blockers; only then may a human make the separate
+`liveMode: true` change. Run `node tools/preflight_public_launch.js --deployment`,
+publish the issued receipt and live config together, verify Pages, and only then
+enable external Form responses.
 
 ## 8. Live Smoke Test
 

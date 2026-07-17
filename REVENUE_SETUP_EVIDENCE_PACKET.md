@@ -128,9 +128,18 @@ ledger_owner:
 
 Use ISO dates: `YYYY-MM-DD`. Review dates must be the real human review dates.
 
-## Public Config Patch Values
+## Public Config Binding Reference
 
-Only after every gate above closes, patch the public-safe fields. These must match `EXTERNAL_LIVE_PACKET.local.json` and `REVENUE_SETUP_EVIDENCE_INDEX.local.json`:
+Only after every gate above closes may the public-safe fields reach the shape
+below. Update the support/Form fields through their documented evidence steps.
+The four reviewed-at fields are binder-owned: record real dates in
+`LIVE_REVIEW_CLOSURE.local.json`, validate the exact reviewed documents, inspect
+the local-only binder plan, and execute only its exact `applyArguments`. Never
+copy the dates into `public-config.js` manually. These values must match both
+local packets, except for the intentional phase field: `public-config.js`, the
+revenue packet, and the receipt stay at `liveMode: false`, while the external-live
+packet uses local `publicConfig.liveMode: true` as the post-decision target
+required by `--require-live`. The binding ignores only that one field:
 
 ```js
 supportEmail: "reviewed support email",
@@ -141,10 +150,10 @@ termsReviewedAt: "YYYY-MM-DD",
 privacyReviewedAt: "YYYY-MM-DD",
 brazilComplianceReviewedAt: "YYYY-MM-DD",
 aiHandoffReviewedAt: "YYYY-MM-DD",
-liveMode: true
+liveMode: false
 ```
 
-Do not put Sheet URLs, Stripe dashboard URLs, bank metadata, tax IDs, CPF, CNPJ artifacts, private reviewer notes, or credentials in `public-config.js`.
+Do not put Sheet URLs, Stripe dashboard URLs, bank metadata, tax IDs, CPF, CNPJ artifacts, private reviewer notes, or credentials in `public-config.js`. Keep `liveMode` false until the bound validators, receipt export/check, preflight, and status review all pass; the human flip is a separate decision.
 
 ## Evidence Index Map
 
@@ -165,22 +174,43 @@ Each section of `REVENUE_SETUP_EVIDENCE_INDEX.local.json` records only non-secre
 
 ## Final Validation
 
-Run before requesting any customer payment:
+If `REVENUE_SETUP_EVIDENCE_INDEX.local.json` is absent, create it once with
+`node tools/draft_revenue_setup_evidence_index.js --write-local`, then fill it
+with real private evidence. Do not rerun the non-overwriting drafter over an
+existing packet.
+
+Run before requesting any customer payment. The binder plan and PLAN_ID stay
+local because they commit to private closure evidence:
 
 ```bash
 node --check public-config.js
 node --check public.js
 node --check script.js
-node tools/preflight_public_launch.js
-node tools/audit_company_functionality.js
-node tools/audit_company_functionality.js --require-live
-node tools/survival_check.js
 node tools/check_external_live_packet_gate.js
-node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json
+# Execute the exact applyArguments emitted by the unchanged binder plan.
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-payment
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-tax
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
+node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
+node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+node tools/export_public_live_receipt.js --live-review-closure LIVE_REVIEW_CLOSURE.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --check-public-js --require-issued
+node tools/preflight_public_launch.js
+node tools/evolution_goal_status.js --json
+node tools/survival_check.js
 python -B -m unittest discover -s tests
 ```
 
-If any command fails, keep `liveMode: false`, record the blocker in the manual close sheet, and fix the outside evidence before retrying.
+Run the bound validators and receipt export only after the binder has committed
+the reviewed public dates with `liveMode: false`. If any command fails, keep
+`liveMode: false`, record the blocker in the manual close sheet, and fix the
+outside evidence before retrying. If all pass, the human `liveMode` flip remains
+a separate decision followed by `node tools/preflight_public_launch.js
+--deployment` before publication.
 
 ## Stop Rules
 

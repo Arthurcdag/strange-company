@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "mode": "template",
+  "requiredReadyReviewerCount": 4,
+  "requiredReadyRoles": [
+    "terms_consumer_law",
+    "privacy_lgpd",
+    "tax_nfse_accounting",
+    "payment_reconciliation"
+  ],
+  "allowedRoles": [
+    "terms_consumer_law",
+    "privacy_lgpd",
+    "tax_nfse_accounting",
+    "payment_reconciliation",
+    "delivery_quality"
+  ],
+  "contactStatuses": [
+    "not_contacted",
+    "contacted",
+    "responded",
+    "paid_test_ready",
+    "declined",
+    "unavailable"
+  ],
+  "candidateRecords": [],
+  "attestation": {
+    "operator": "",
+    "reviewedAt": "",
+    "noSecretsInRepo": true,
+    "privateCandidateNotesStayOutOfRepo": true,
+    "aiDidNotApproveReviewer": true,
+    "strangeCompanyRemainsSealed": true,
+    "satelliteIsReviewerContractingLane": true
+  }
+}

@@ -73,6 +73,8 @@ class RevenueSetupPacketTests(unittest.TestCase):
             "REVENUE_SETUP_EVIDENCE_PACKET.md",
             "REVENUE_SETUP_OUTREACH_PACKET.md",
             "REVENUE_SETUP_EVIDENCE_INDEX.template.json",
+            "tools/draft_revenue_setup_evidence_index.js",
+            "tools/validate_revenue_setup_evidence_index.js",
         ):
             with self.subTest(reference=reference):
                 self.assertIn(reference, text)
@@ -84,6 +86,8 @@ class RevenueSetupPacketTests(unittest.TestCase):
             "HUMAN_REVENUE_INSTRUCTIONS.md",
             "REVENUE_SETUP_OUTREACH_PACKET.md",
             "REVENUE_SETUP_EVIDENCE_INDEX.template.json",
+            "tools/draft_revenue_setup_evidence_index.js",
+            "tools/validate_revenue_setup_evidence_index.js",
         ):
             with self.subTest(reference=reference):
                 self.assertIn(reference, text)
@@ -112,6 +116,8 @@ class RevenueSetupPacketTests(unittest.TestCase):
             "REVENUE_SETUP_EVIDENCE_PACKET.md",
             "REVENUE_SETUP_OUTREACH_PACKET.md",
             "REVENUE_SETUP_EVIDENCE_INDEX.template.json",
+            "tools/draft_revenue_setup_evidence_index.js",
+            "tools/validate_revenue_setup_evidence_index.js",
         ):
             with self.subTest(reference=reference):
                 self.assertIn(reference, text)

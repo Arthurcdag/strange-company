@@ -30,8 +30,9 @@ Complete every line in the **Operational launch** checklist before sending the f
 - [ ] **LGPD contact path ready.** Privacy/data-subject requests route to a responsible human.
 - [ ] **Google Sheet ledger live.** Tabs: `Requests`, `Invoices`, `Customers`, `Delivery`, `Incidents`, `Leads`. Required columns on operational tabs: `created_at`, `source`, `invoice_id`, `customer`, `contact`, `service`, `amount`, `status`, `stripe_invoice_url`, `delivery_due`, `notes`.
 - [ ] **Intake route configured.** Use a Google Form bound to the Sheet for the first public route. Use an Apps Script web app only for internal/sandbox append tests until reviewed.
-- [ ] **Public config updated.** `public-config.js` contains the real support inbox, Google Form URL, review dates, verified flags, `jurisdiction: "BR"`, and `liveMode: true`.
-- [ ] **Public launch preflight passes.** Run `node tools/preflight_public_launch.js` before merging config changes or sending traffic.
+- [ ] **Pre-live public config updated.** `public-config.js` contains the real support inbox, Google Form URL, verified flags, `jurisdiction: "BR"`, and `liveMode: false`; the four review dates were applied with `bind_live_review_closure.js`. The receipt advances first and each file replacement is atomic, so an interruption remains fail-closed and resumable rather than forming a two-file atomic transaction. Keep that snapshot unpublished through validation, receipt issuance, normal preflight, and status review.
+- [ ] **Public receipt issued and pre-live checks pass.** Issue `public-live-receipt.js` with the bound five-packet exporter command in [OPERATOR_FAST_START.md](OPERATOR_FAST_START.md), then run `node tools/export_public_live_receipt.js --check-public-js --require-issued` and `node tools/preflight_public_launch.js` while `liveMode` is still `false`.
+- [ ] **Separate human live flip and deployment preflight pass.** After the issued receipt and all blockers are reviewed, change only `liveMode` to `true` and run `node tools/preflight_public_launch.js --deployment` before merging or sending traffic.
 - [ ] **Brazil functionality audit passes.** Run `node tools/audit_company_functionality.js --require-live` before publishing live intake.
 - [ ] **Terms reviewed.** Date stamped in the Operations integration config.
 - [ ] **Privacy notice reviewed.** Date stamped in the Operations integration config.
@@ -40,6 +41,14 @@ Complete every line in the **Operational launch** checklist before sending the f
 - [ ] **Safe test order completed.** Confirms request, payment/fiscal evidence, delivery, and receipt chain before scaling.
 
 The Operations tab will hold the launch in **Launch incomplete** or **Integration incomplete** until the above is done.
+
+If a gate fails after the human live flip, disable external Form responses
+first. Capture and finish this sequence without rerunning status midway: run
+`node tools/render_public_live_shutdown_patch.js`, apply only its blank Form
+URL, false Form verification, and false live-mode values, revoke the receipt,
+run deployment preflight and the public bundle check, publish the closed config
+plus placeholder together, verify Pages remains closed, and only then rerun
+status from the closed state before repairing or reissuing evidence.
 
 ## Daily Operating Loop
 
@@ -111,7 +120,10 @@ Anything off-script - failed payment, fiscal-document problem, refund/cancellati
 
 - Reconcile the Sheet `Invoices` tab against the payment provider and NFS-e/receipt records.
 - Confirm bank deposits match payment-provider payouts.
-- Re-read terms and privacy. If either changed, bump the `termsReviewedAt` / `privacyReviewedAt` dates in Operations.
+- Re-read terms and privacy. If either changed, regenerate and complete the
+  local closure packet for the exact new document digests, obtain human review,
+  then use a new binder plan/apply; never bump reviewed-at dates directly in
+  Operations or `public-config.js`.
 - Spot-check that no order row contains payment credentials, card data, secrets, sensitive personal data, or regulated source documents.
 - Review LGPD requests and incidents.
 

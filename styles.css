@@ -3900,12 +3900,18 @@ input[type="range"] {
   font: inherit;
 }
 
+.public-ama-surface,
 .public-order-surface {
   display: grid;
   grid-template-columns: minmax(280px, 0.9fr) minmax(360px, 1.1fr);
   gap: 24px;
   align-items: start;
   padding: 28px 0;
+}
+
+.public-ama-surface {
+  padding-top: 34px;
+  border-bottom: 1px solid var(--line);
 }
 
 .public-readiness {
@@ -3955,6 +3961,7 @@ input[type="range"] {
   gap: 6px;
 }
 
+.public-ama-copy h1,
 .public-order-copy h1 {
   margin: 0;
   max-width: 720px;
@@ -3962,6 +3969,7 @@ input[type="range"] {
   line-height: 0.95;
 }
 
+.public-ama-copy .lead,
 .public-order-copy .lead {
   max-width: 640px;
 }
@@ -3987,8 +3995,11 @@ input[type="range"] {
   color: var(--green);
 }
 
+.public-ama-form,
 .public-order-form,
+.public-order-closed,
 .public-output,
+.public-ama-answers,
 .public-band article,
 .public-status-grid article {
   border: 1px solid var(--line);
@@ -3997,17 +4008,59 @@ input[type="range"] {
   box-shadow: var(--shadow);
 }
 
+.public-ama-form,
 .public-order-form {
   display: grid;
   gap: 14px;
   padding: 20px;
 }
 
+.public-order-form[hidden],
+.public-order-fields[hidden],
+.public-order-closed[hidden] {
+  display: none;
+}
+
+.public-order-fields {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.public-order-closed {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 20px;
+  border-left: 4px solid var(--amber);
+}
+
+.public-order-closed h2,
+.public-order-closed p {
+  margin: 0;
+}
+
+.public-order-closed p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.public-order-closed .order-output-actions {
+  margin-top: 0;
+}
+
+.public-ama-form .field,
 .public-order-form .field {
   display: grid;
   gap: 6px;
 }
 
+.public-ama-form input,
+.public-ama-form select,
+.public-ama-form textarea,
 .public-order-form input,
 .public-order-form select,
 .public-order-form textarea {
@@ -4041,6 +4094,56 @@ input[type="range"] {
   white-space: pre-wrap;
 }
 
+.public-ama-answers {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  margin: 8px 0 24px;
+}
+
+.public-section-heading h2 {
+  margin: 4px 0 0;
+  font-size: 22px;
+}
+
+.public-ama-answer-list {
+  display: grid;
+  gap: 12px;
+}
+
+.public-ama-answer {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.public-ama-answer h3,
+.public-ama-answer p {
+  margin: 0;
+}
+
+.public-ama-answer h3 {
+  font-size: 18px;
+}
+
+.public-ama-answer p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.public-ama-answer small {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.public-ama-answer.empty {
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.54);
+}
+
 .public-band {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4066,6 +4169,7 @@ input[type="range"] {
 @media (max-width: 860px) {
   .public-topbar,
   .public-readiness,
+  .public-ama-surface,
   .public-order-surface,
   .public-band {
     grid-template-columns: 1fr;
@@ -4086,6 +4190,7 @@ input[type="range"] {
 
 @media (max-width: 620px) {
   .public-status-grid,
+  .public-ama-form .field-row,
   .public-order-form .field-row {
     grid-template-columns: 1fr;
   }

@@ -35,6 +35,85 @@ const PUBLIC_ORDER_CONFIG = {
     ? window.PUBLIC_ORDER_CONFIG.services
     : DEFAULT_PUBLIC_ORDER_CONFIG.services
 };
+const PUBLIC_LIVE_RECEIPT = window.PUBLIC_LIVE_RECEIPT || {};
+let CURRENT_PUBLIC_LIVE_RECEIPT = PUBLIC_LIVE_RECEIPT;
+const PUBLIC_LIVE_RECEIPT_KEYS = Object.freeze([
+  "schemaVersion",
+  "generation",
+  "mode",
+  "status",
+  "issuedAt",
+  "validUntil",
+  "core",
+  "coreSha256",
+  "attestations",
+  "envelopeSha256"
+]);
+const PUBLIC_REVIEW_DOCUMENT_DIGEST_DOMAIN = "STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1";
+const PUBLIC_REVIEW_DOCUMENT_PATHS = Object.freeze([
+  "TERMOS.md",
+  "TERMS.md",
+  "AVISO_DE_PRIVACIDADE.md",
+  "PRIVACY.md",
+  "BRAZIL_COMPLIANCE.md",
+  "BRAZIL_COMPLIANCE_AGENTS.md",
+  "CONKA8_LAW_INSTRUCTIONS.md",
+  "AI_LEGAL_HANDOFF.md",
+  "HUMAN_REVIEW_PACKET.md"
+]);
+
+function publicLiveReceiptGeneration(receipt) {
+  if (!(
+    receipt
+    && hasExactKeys(receipt, PUBLIC_LIVE_RECEIPT_KEYS)
+    && receipt.schemaVersion === 4
+    && receipt.mode === "public"
+    && ["local_packet_validators_passed", "not_issued"].includes(receipt.status)
+    && Number.isSafeInteger(receipt.generation)
+    && receipt.generation > 0
+  )) {
+    return 0;
+  }
+  return receipt.generation;
+}
+
+// This high-water mark prevents rollback inside one open document. A new client
+// served a complete older same-origin artifact still needs deployment freshness
+// controls because this public static page has no independent trust anchor.
+let HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION = publicLiveReceiptGeneration(PUBLIC_LIVE_RECEIPT);
+let HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY = HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION > 0
+  ? `${PUBLIC_LIVE_RECEIPT.status}:${String(PUBLIC_LIVE_RECEIPT.envelopeSha256 || "")}`
+  : "";
+
+function publicLiveReceiptGenerationIdentity(receipt) {
+  return `${String(receipt.status || "")}:${String(receipt.envelopeSha256 || "")}`;
+}
+
+function publicLiveReceiptMatchesGenerationHead(receipt) {
+  const generation = publicLiveReceiptGeneration(receipt);
+  if (generation === 0 || generation < HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION) {
+    return false;
+  }
+  return !(
+    generation === HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION
+    && HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY
+    && publicLiveReceiptGenerationIdentity(receipt) !== HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY
+  );
+}
+
+function observePublicLiveReceiptGeneration(receipt) {
+  const generation = publicLiveReceiptGeneration(receipt);
+  if (!publicLiveReceiptMatchesGenerationHead(receipt)) {
+    return false;
+  }
+  if (generation > HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION) {
+    HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION = generation;
+    HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY = publicLiveReceiptGenerationIdentity(receipt);
+  } else if (generation > 0 && !HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY) {
+    HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY = publicLiveReceiptGenerationIdentity(receipt);
+  }
+  return generation > 0;
+}
 
 const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -68,12 +147,17 @@ function requestId() {
   return `REQ-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Date.now().toString(36).toUpperCase()}`;
 }
 
+function amaId() {
+  return `AMA-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Date.now().toString(36).toUpperCase()}`;
+}
+
 function findSensitiveData(text) {
   const value = String(text || "");
   const checks = [
     ["protected health information", /\b(PHI|patient|diagnosis|medical record|MRN|health record|treatment|prescription)\b/i],
     ["payment card data", /\b(?:\d[ -]*?){13,19}\b/],
     ["social security number", /\b\d{3}-\d{2}-\d{4}\b/],
+    ["Brazil personal or company tax ID", /\b(?:\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})\b/],
     ["password or secret", /\b(password|passcode|secret|private key|api[_ -]?key|access token|bearer token)\b/i],
     ["private key material", /-----BEGIN [A-Z ]*PRIVATE KEY-----/i]
   ];
@@ -84,23 +168,402 @@ function selectedService(serviceId) {
   return PUBLIC_ORDER_CONFIG.services.find((service) => service.id === serviceId) || PUBLIC_ORDER_CONFIG.services[0];
 }
 
-function publicReadinessModel() {
+function canonicalPublicText(value) {
+  return String(value || "").trim();
+}
+
+function canonicalPublicConfigCore(config, reviewDocuments) {
+  const services = Array.isArray(config.services) ? config.services : [];
+  return {
+    operatorName: canonicalPublicText(config.operatorName),
+    jurisdiction: canonicalPublicText(config.jurisdiction),
+    complianceMode: canonicalPublicText(config.complianceMode),
+    aiGeneratedLegalDocsRequireHumanReview: config.aiGeneratedLegalDocsRequireHumanReview === true,
+    support: {
+      email: canonicalPublicText(config.supportEmail),
+      verified: config.supportInboxVerified === true
+    },
+    form: {
+      url: canonicalPublicText(config.googleFormUrl),
+      verified: config.googleFormVerified === true
+    },
+    flags: {
+      supportInboxVerified: config.supportInboxVerified === true,
+      googleFormVerified: config.googleFormVerified === true,
+      liveMode: false
+    },
+    reviewDates: {
+      termsReviewedAt: canonicalPublicText(config.termsReviewedAt),
+      privacyReviewedAt: canonicalPublicText(config.privacyReviewedAt),
+      brazilComplianceReviewedAt: canonicalPublicText(config.brazilComplianceReviewedAt),
+      aiHandoffReviewedAt: canonicalPublicText(config.aiHandoffReviewedAt)
+    },
+    reviewDocuments,
+    services: services.map((service) => ({
+      id: canonicalPublicText(service.id),
+      title: canonicalPublicText(service.title),
+      detail: canonicalPublicText(service.detail),
+      price: Number(service.price || 0)
+    }))
+  };
+}
+
+function stableSerialize(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableSerialize).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+async function sha256Hex(value) {
+  if (!globalThis.crypto || !globalThis.crypto.subtle || typeof TextEncoder === "undefined") {
+    return "";
+  }
+  const bytes = new TextEncoder().encode(value);
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function normalizePublicReviewDocumentText(value) {
+  return String(value).replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+}
+
+async function fetchPublicAssetText(assetPath) {
+  const requestOptions = { cache: "no-store", credentials: "same-origin" };
+  const canAbort = typeof AbortController === "function";
+  const controller = canAbort ? new AbortController() : null;
+  let timeoutId = null;
+  if (controller && typeof window.setTimeout === "function") {
+    requestOptions.signal = controller.signal;
+    timeoutId = window.setTimeout(() => controller.abort(), 5000);
+  }
+  try {
+    const response = await fetch(assetPath, requestOptions);
+    if (!response || response.ok !== true) {
+      throw new Error(`Could not verify public asset ${assetPath}.`);
+    }
+    const contents = await response.text();
+    if (typeof contents !== "string" || contents.length > 1000000) {
+      throw new Error(`Public asset ${assetPath} has an invalid size.`);
+    }
+    return contents;
+  } finally {
+    if (timeoutId !== null && typeof window.clearTimeout === "function") {
+      window.clearTimeout(timeoutId);
+    }
+  }
+}
+
+async function publicReviewDocumentCore() {
+  const entries = await Promise.all(PUBLIC_REVIEW_DOCUMENT_PATHS.map(async (documentPath) => {
+    const contents = normalizePublicReviewDocumentText(await fetchPublicAssetText(documentPath));
+    const sha256 = await sha256Hex(
+      `${PUBLIC_REVIEW_DOCUMENT_DIGEST_DOMAIN}\npath=${documentPath}\n${contents}`
+    );
+    if (!/^[a-f0-9]{64}$/.test(sha256)) {
+      throw new Error(`Could not hash public review document ${documentPath}.`);
+    }
+    return [documentPath, sha256];
+  }));
+  return Object.fromEntries(entries);
+}
+
+function parsePublicLiveReceiptScript(contents) {
+  const prefix = "window.PUBLIC_LIVE_RECEIPT = Object.freeze(";
+  const source = String(contents).trim();
+  if (!source.startsWith(prefix) || !source.endsWith(");")) {
+    throw new Error("Public live receipt wrapper is invalid.");
+  }
+  return JSON.parse(source.slice(prefix.length, -2));
+}
+
+async function fetchCurrentPublicLiveReceipt() {
+  return parsePublicLiveReceiptScript(await fetchPublicAssetText("public-live-receipt.js"));
+}
+
+function receiptEnvelopePayload(receipt, receiptCore) {
+  return {
+    schemaVersion: receipt.schemaVersion,
+    generation: receipt.generation,
+    mode: receipt.mode,
+    status: receipt.status,
+    issuedAt: receipt.issuedAt,
+    validUntil: receipt.validUntil,
+    core: receiptCore,
+    coreSha256: receipt.coreSha256,
+    attestations: receipt.attestations
+  };
+}
+
+function hasExactKeys(value, expected) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  return stableSerialize(Object.keys(value).sort()) === stableSerialize([...expected].sort());
+}
+
+function digestablePublicCore(core) {
+  const copy = JSON.parse(JSON.stringify(core));
+  if (copy && copy.flags && typeof copy.flags === "object") {
+    delete copy.flags.liveMode;
+  }
+  return copy;
+}
+
+function publicLiveReceiptFresh(receipt = CURRENT_PUBLIC_LIVE_RECEIPT, now = Date.now()) {
+  const issuedAt = String(receipt && receipt.issuedAt || "");
+  const validUntil = String(receipt && receipt.validUntil || "");
+  const issuedDate = new Date(issuedAt);
+  const validUntilDate = new Date(validUntil);
+  return Boolean(
+    issuedAt
+    && validUntil
+    && !Number.isNaN(issuedDate.valueOf())
+    && !Number.isNaN(validUntilDate.valueOf())
+    && issuedDate.toISOString() === issuedAt
+    && validUntilDate.toISOString() === validUntil
+    && issuedDate.valueOf() <= now + (5 * 60 * 1000)
+    && validUntilDate.valueOf() > now
+    && validUntilDate.valueOf() - issuedDate.valueOf() > 0
+    && validUntilDate.valueOf() - issuedDate.valueOf() <= (7 * 24 * 60 * 60 * 1000)
+  );
+}
+
+async function publicLiveReceiptEnvelopeReady(config, receipt, now = Date.now()) {
+  try {
+    const attestations = receipt && receipt.attestations ? receipt.attestations : {};
+    const receiptCore = receipt && receipt.core && typeof receipt.core === "object"
+      ? receipt.core
+      : null;
+    if (!(
+      receipt
+      && hasExactKeys(receipt, PUBLIC_LIVE_RECEIPT_KEYS)
+      && hasExactKeys(attestations, ["publicOnly", "privatePacketDataExcluded", "privatePacketHashesExcluded", "localPacketValidatorsPassed", "liveReviewClosureValidatorPassed", "reviewerCandidateTrackerReady", "deliveryReviewChecklistReady", "operationalValidatorsPassed", "digestCoversCanonicalPublicCoreExceptLiveMode", "digestCoversReceiptEnvelopeExceptLiveMode"])
+      && receipt.schemaVersion === 4
+      && Number.isSafeInteger(receipt.generation)
+      && receipt.generation > 0
+      && publicLiveReceiptMatchesGenerationHead(receipt)
+      && receipt.mode === "public"
+      && receipt.status === "local_packet_validators_passed"
+      && publicLiveReceiptFresh(receipt, now)
+      && /^[a-f0-9]{64}$/.test(String(receipt.coreSha256 || ""))
+      && /^[a-f0-9]{64}$/.test(String(receipt.envelopeSha256 || ""))
+      && attestations.publicOnly === true
+      && attestations.privatePacketDataExcluded === true
+      && attestations.privatePacketHashesExcluded === true
+      && attestations.localPacketValidatorsPassed === true
+      && attestations.liveReviewClosureValidatorPassed === true
+      && attestations.reviewerCandidateTrackerReady === true
+      && attestations.deliveryReviewChecklistReady === true
+      && attestations.operationalValidatorsPassed === true
+      && attestations.digestCoversCanonicalPublicCoreExceptLiveMode === true
+      && attestations.digestCoversReceiptEnvelopeExceptLiveMode === true
+      && receiptCore
+      && receiptCore.flags
+      && receiptCore.flags.liveMode === false
+      && hasExactKeys(receiptCore.reviewDocuments, PUBLIC_REVIEW_DOCUMENT_PATHS)
+      && PUBLIC_REVIEW_DOCUMENT_PATHS.every(
+        (documentPath) => /^[a-f0-9]{64}$/.test(String(receiptCore.reviewDocuments[documentPath] || ""))
+      )
+    )) {
+      return false;
+    }
+    if (
+      stableSerialize(digestablePublicCore(receiptCore))
+      !== stableSerialize(digestablePublicCore(canonicalPublicConfigCore(config, receiptCore.reviewDocuments)))
+    ) {
+      return false;
+    }
+    const expectedCoreDigest = await sha256Hex(
+      `STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2\n${stableSerialize(digestablePublicCore(receiptCore))}`
+    );
+    if (expectedCoreDigest !== receipt.coreSha256) {
+      return false;
+    }
+    const expectedEnvelopeDigest = await sha256Hex(
+      `STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V4\n${stableSerialize(receiptEnvelopePayload(receipt, digestablePublicCore(receiptCore)))}`
+    );
+    return expectedEnvelopeDigest === receipt.envelopeSha256;
+  } catch {
+    return false;
+  }
+}
+
+async function publicReviewDocumentsReady(receipt) {
+  try {
+    const receiptDocuments = receipt && receipt.core ? receipt.core.reviewDocuments : null;
+    if (!hasExactKeys(receiptDocuments, PUBLIC_REVIEW_DOCUMENT_PATHS)) {
+      return false;
+    }
+    const currentDocuments = await publicReviewDocumentCore();
+    return stableSerialize(receiptDocuments) === stableSerialize(currentDocuments);
+  } catch {
+    return false;
+  }
+}
+
+async function publicLiveReceiptReady(config = PUBLIC_ORDER_CONFIG, receipt = CURRENT_PUBLIC_LIVE_RECEIPT, now = Date.now()) {
+  if (!await publicLiveReceiptEnvelopeReady(config, receipt, now)) {
+    return false;
+  }
+  return publicReviewDocumentsReady(receipt);
+}
+
+const PUBLIC_REVIEW_DOCUMENT_VERIFICATION_TTL_MS = 15 * 60 * 1000;
+let PUBLIC_LIVE_RECEIPT_VERIFIED = false;
+let PUBLIC_REVIEW_DOCUMENTS_VERIFIED_AT = 0;
+let PUBLIC_REVIEW_DOCUMENTS_VERIFIED_ENVELOPE_SHA256 = "";
+let PUBLIC_LIVE_RECEIPT_REFRESH_IN_FLIGHT = null;
+let PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_FORCED = false;
+let PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_REVALIDATES_DOCUMENTS = false;
+let PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED = false;
+let LATEST_PUBLIC_LIVE_RECEIPT_REFRESH = Promise.resolve(false);
+
+function clearPublicReviewDocumentVerificationCache() {
+  PUBLIC_REVIEW_DOCUMENTS_VERIFIED_AT = 0;
+  PUBLIC_REVIEW_DOCUMENTS_VERIFIED_ENVELOPE_SHA256 = "";
+}
+
+function publicReviewDocumentVerificationCached(receipt, now = Date.now()) {
+  return Boolean(
+    PUBLIC_REVIEW_DOCUMENTS_VERIFIED_AT
+    && PUBLIC_REVIEW_DOCUMENTS_VERIFIED_ENVELOPE_SHA256
+    && PUBLIC_REVIEW_DOCUMENTS_VERIFIED_ENVELOPE_SHA256 === String(receipt.envelopeSha256 || "")
+    && now - PUBLIC_REVIEW_DOCUMENTS_VERIFIED_AT >= 0
+    && now - PUBLIC_REVIEW_DOCUMENTS_VERIFIED_AT < PUBLIC_REVIEW_DOCUMENT_VERIFICATION_TTL_MS
+  );
+}
+
+function applyPublicLiveReceiptState(receipt, verified) {
+  CURRENT_PUBLIC_LIVE_RECEIPT = receipt;
+  PUBLIC_LIVE_RECEIPT_VERIFIED = verified === true;
+  renderReadiness();
+  setPublicOrderAvailability();
+  schedulePublicReceiptExpiry();
+}
+
+async function performPublicLiveReceiptRefresh(forceDocumentCheck) {
+  let latestReceipt = {};
+  try {
+    latestReceipt = await fetchCurrentPublicLiveReceipt();
+    const latestGeneration = publicLiveReceiptGeneration(latestReceipt);
+    if (latestReceipt.status === "not_issued" && latestGeneration > 0) {
+      observePublicLiveReceiptGeneration(latestReceipt);
+      PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED = false;
+      clearPublicReviewDocumentVerificationCache();
+      applyPublicLiveReceiptState(latestReceipt, false);
+      return false;
+    }
+    if (!await publicLiveReceiptEnvelopeReady(PUBLIC_ORDER_CONFIG, latestReceipt)) {
+      PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED = false;
+      clearPublicReviewDocumentVerificationCache();
+      applyPublicLiveReceiptState(latestReceipt, false);
+      return false;
+    }
+    observePublicLiveReceiptGeneration(latestReceipt);
+
+    if (PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED) {
+      PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED = false;
+      PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_FORCED = true;
+      forceDocumentCheck = true;
+    }
+    const cacheReady = publicReviewDocumentVerificationCached(latestReceipt);
+    if (!forceDocumentCheck && cacheReady) {
+      applyPublicLiveReceiptState(latestReceipt, true);
+      return true;
+    }
+
+    PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_REVALIDATES_DOCUMENTS = true;
+    applyPublicLiveReceiptState(latestReceipt, false);
+    if (!await publicReviewDocumentsReady(latestReceipt)) {
+      clearPublicReviewDocumentVerificationCache();
+      return false;
+    }
+    PUBLIC_REVIEW_DOCUMENTS_VERIFIED_AT = Date.now();
+    PUBLIC_REVIEW_DOCUMENTS_VERIFIED_ENVELOPE_SHA256 = latestReceipt.envelopeSha256;
+    applyPublicLiveReceiptState(latestReceipt, true);
+    return true;
+  } catch {
+    PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED = false;
+    clearPublicReviewDocumentVerificationCache();
+    applyPublicLiveReceiptState(latestReceipt, false);
+    return false;
+  }
+}
+
+function refreshPublicLiveReceiptVerification({ forceDocumentCheck = false } = {}) {
+  if (
+    forceDocumentCheck
+    && !(
+      PUBLIC_LIVE_RECEIPT_REFRESH_IN_FLIGHT
+      && (
+        PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_FORCED
+        || PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_REVALIDATES_DOCUMENTS
+      )
+    )
+  ) {
+    PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED = true;
+    applyPublicLiveReceiptState(CURRENT_PUBLIC_LIVE_RECEIPT, false);
+  }
+  if (PUBLIC_LIVE_RECEIPT_REFRESH_IN_FLIGHT) {
+    return PUBLIC_LIVE_RECEIPT_REFRESH_IN_FLIGHT;
+  }
+
+  const refresh = (async () => {
+    do {
+      const forceCurrentPass = PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED;
+      PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED = false;
+      PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_FORCED = forceCurrentPass;
+      try {
+        await performPublicLiveReceiptRefresh(forceCurrentPass);
+      } finally {
+        PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_FORCED = false;
+        PUBLIC_LIVE_RECEIPT_REFRESH_CURRENT_PASS_REVALIDATES_DOCUMENTS = false;
+      }
+    } while (PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED);
+    return PUBLIC_LIVE_RECEIPT_VERIFIED;
+  })();
+  PUBLIC_LIVE_RECEIPT_REFRESH_IN_FLIGHT = refresh;
+  LATEST_PUBLIC_LIVE_RECEIPT_REFRESH = refresh;
+  void refresh.finally(() => {
+    if (PUBLIC_LIVE_RECEIPT_REFRESH_IN_FLIGHT === refresh) {
+      PUBLIC_LIVE_RECEIPT_REFRESH_IN_FLIGHT = null;
+    }
+  });
+  return refresh;
+}
+
+async function waitForLatestPublicLiveReceiptRefresh() {
+  let pendingRefresh;
+  do {
+    pendingRefresh = LATEST_PUBLIC_LIVE_RECEIPT_REFRESH;
+    await pendingRefresh;
+  } while (pendingRefresh !== LATEST_PUBLIC_LIVE_RECEIPT_REFRESH);
+  return PUBLIC_LIVE_RECEIPT_VERIFIED;
+}
+
+function publicReadinessModel(receiptIntegrityReady = PUBLIC_LIVE_RECEIPT_VERIFIED, now = Date.now()) {
   const formUrl = safeGoogleFormUrl(PUBLIC_ORDER_CONFIG.googleFormUrl);
-  const supportReady = Boolean(PUBLIC_ORDER_CONFIG.supportEmail && PUBLIC_ORDER_CONFIG.supportInboxVerified);
+  const supportReady = Boolean(canonicalPublicText(PUBLIC_ORDER_CONFIG.supportEmail) && PUBLIC_ORDER_CONFIG.supportInboxVerified);
   const formReady = Boolean(formUrl && PUBLIC_ORDER_CONFIG.googleFormVerified);
-  const termsReady = Boolean(PUBLIC_ORDER_CONFIG.termsReviewedAt);
-  const privacyReady = Boolean(PUBLIC_ORDER_CONFIG.privacyReviewedAt);
-  const brazilReady = PUBLIC_ORDER_CONFIG.jurisdiction === "BR"
+  const termsReady = Boolean(canonicalPublicText(PUBLIC_ORDER_CONFIG.termsReviewedAt));
+  const privacyReady = Boolean(canonicalPublicText(PUBLIC_ORDER_CONFIG.privacyReviewedAt));
+  const brazilReady = canonicalPublicText(PUBLIC_ORDER_CONFIG.jurisdiction) === "BR"
     && PUBLIC_ORDER_CONFIG.aiGeneratedLegalDocsRequireHumanReview === true
-    && Boolean(PUBLIC_ORDER_CONFIG.brazilComplianceReviewedAt)
-    && Boolean(PUBLIC_ORDER_CONFIG.aiHandoffReviewedAt);
-  const liveReady = Boolean(PUBLIC_ORDER_CONFIG.liveMode && supportReady && formReady && termsReady && privacyReady && brazilReady);
+    && Boolean(canonicalPublicText(PUBLIC_ORDER_CONFIG.brazilComplianceReviewedAt))
+    && Boolean(canonicalPublicText(PUBLIC_ORDER_CONFIG.aiHandoffReviewedAt));
+  const receiptReady = receiptIntegrityReady === true && publicLiveReceiptFresh(CURRENT_PUBLIC_LIVE_RECEIPT, now);
+  const liveReady = Boolean(PUBLIC_ORDER_CONFIG.liveMode === true && receiptReady && supportReady && formReady && termsReady && privacyReady && brazilReady);
   const blockers = [];
   if (!supportReady) blockers.push("support inbox");
   if (!formReady) blockers.push("Google intake");
   if (!termsReady) blockers.push("terms review");
   if (!privacyReady) blockers.push("privacy review");
   if (!brazilReady) blockers.push("Brazil compliance and AI human review");
+  if (!receiptReady) blockers.push("strict public live receipt");
   if (!PUBLIC_ORDER_CONFIG.liveMode) blockers.push("live-mode flag");
   return {
     formUrl,
@@ -109,6 +572,7 @@ function publicReadinessModel() {
     termsReady,
     privacyReady,
     brazilReady,
+    receiptReady,
     liveReady,
     blockers
   };
@@ -136,8 +600,66 @@ function renderReadiness() {
       <span class="state ${model.brazilReady ? "green" : "amber"}">Brazil</span>
       <span class="state ${model.termsReady ? "green" : "amber"}">Terms</span>
       <span class="state ${model.privacyReady ? "green" : "amber"}">Privacy</span>
+      <span class="state ${model.receiptReady ? "green" : "amber"}">Live receipt</span>
     </div>
   `;
+}
+
+function setPublicOrderAvailability() {
+  const readiness = publicReadinessModel();
+  const form = document.querySelector("#publicOrderForm");
+  const fields = document.querySelector("#publicOrderFields");
+  const closed = document.querySelector("#publicOrderClosed");
+  if (!form || !fields || !closed) {
+    return;
+  }
+
+  const liveReady = readiness.liveReady === true;
+  form.hidden = !liveReady;
+  form.setAttribute("aria-hidden", String(!liveReady));
+  fields.hidden = !liveReady;
+  fields.disabled = !liveReady;
+  closed.hidden = liveReady;
+  closed.setAttribute("aria-hidden", String(liveReady));
+}
+
+let PUBLIC_RECEIPT_EXPIRY_TIMEOUT = null;
+let PUBLIC_RECEIPT_REVALIDATION_INTERVAL = null;
+let PUBLIC_RECEIPT_VISIBILITY_LISTENER_ATTACHED = false;
+
+function schedulePublicReceiptExpiry() {
+  if (PUBLIC_RECEIPT_EXPIRY_TIMEOUT !== null && typeof window.clearTimeout === "function") {
+    window.clearTimeout(PUBLIC_RECEIPT_EXPIRY_TIMEOUT);
+    PUBLIC_RECEIPT_EXPIRY_TIMEOUT = null;
+  }
+  const expiresAt = new Date(String(CURRENT_PUBLIC_LIVE_RECEIPT.validUntil || "")).valueOf();
+  if (!PUBLIC_LIVE_RECEIPT_VERIFIED || !Number.isFinite(expiresAt)) {
+    return;
+  }
+  const delay = Math.max(0, expiresAt - Date.now());
+  PUBLIC_RECEIPT_EXPIRY_TIMEOUT = window.setTimeout(() => {
+    PUBLIC_RECEIPT_EXPIRY_TIMEOUT = null;
+    PUBLIC_LIVE_RECEIPT_VERIFIED = false;
+    clearPublicReviewDocumentVerificationCache();
+    renderReadiness();
+    setPublicOrderAvailability();
+  }, delay + 1);
+}
+
+function schedulePublicReceiptRevalidation() {
+  if (PUBLIC_RECEIPT_REVALIDATION_INTERVAL === null) {
+    PUBLIC_RECEIPT_REVALIDATION_INTERVAL = window.setInterval(() => {
+      void refreshPublicLiveReceiptVerification();
+    }, 60 * 1000);
+  }
+  if (!PUBLIC_RECEIPT_VISIBILITY_LISTENER_ATTACHED) {
+    PUBLIC_RECEIPT_VISIBILITY_LISTENER_ATTACHED = true;
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        void refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
+      }
+    });
+  }
 }
 
 function requestPacket(order) {
@@ -162,9 +684,35 @@ function requestPacket(order) {
   ].join("\n");
 }
 
+function amaQuestionPacket(question) {
+  return [
+    `AMA Question ID: ${question.id}`,
+    `Operator: ${PUBLIC_ORDER_CONFIG.operatorName}`,
+    `Jurisdiction: Brazil`,
+    `Name: ${question.name}`,
+    `Contact: ${question.contact}`,
+    `Topic: ${question.topic}`,
+    `Source: Public AMA Desk`,
+    "",
+    "Question:",
+    question.question,
+    "",
+    "Controls:",
+    "Public-safe AMA question only.",
+    "No order, invoice, payment request, customer support ticket, or launch approval is created.",
+    "No protected health information, credentials, private keys, CPF, CNPJ documents, payment data, private evidence, or regulated source documents are accepted.",
+    "AI-generated legal, tax, privacy, accounting, payment, refund, and compliance answers require human review before operational use."
+  ].join("\n");
+}
+
 function mailtoUrl(order) {
   const subject = `Invoice request ${order.id} / ${order.customer}`;
   return `mailto:${encodeURIComponent(PUBLIC_ORDER_CONFIG.supportEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(requestPacket(order))}`;
+}
+
+function amaMailtoUrl(question) {
+  const subject = `AMA question ${question.id} / ${question.topic}`;
+  return `mailto:${encodeURIComponent(PUBLIC_ORDER_CONFIG.supportEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(amaQuestionPacket(question))}`;
 }
 
 function renderBlocked(message) {
@@ -174,6 +722,133 @@ function renderBlocked(message) {
     <span class="metric-label">Request blocked</span>
     <strong>${escapeHtml(message)}</strong>
   `;
+}
+
+function renderAmaBlocked(message) {
+  const output = document.querySelector("#publicAmaOutput");
+  output.classList.add("active");
+  output.innerHTML = `
+    <span class="metric-label">AMA blocked</span>
+    <strong>${escapeHtml(message)}</strong>
+  `;
+}
+
+function renderAmaPacket(question) {
+  const output = document.querySelector("#publicAmaOutput");
+  const packet = amaQuestionPacket(question);
+  const readiness = publicReadinessModel();
+  output.classList.add("active");
+  output.innerHTML = `
+    <span class="metric-label">AMA packet created</span>
+    <strong>${escapeHtml(question.id)} / ${escapeHtml(question.topic)}</strong>
+    <p>${readiness.supportReady ? "Open the email draft or copy the packet for the public AMA queue." : "Copy this packet and send it only after the support route is verified."}</p>
+    <div class="order-output-actions">
+      ${readiness.supportReady ? `<a href="${amaMailtoUrl(question)}">Open AMA email</a>` : ""}
+      <button type="button" id="copyAmaPacket">Copy AMA packet</button>
+    </div>
+    <pre>${escapeHtml(packet)}</pre>
+  `;
+  const copyButton = document.querySelector("#copyAmaPacket");
+  if (copyButton) {
+    copyButton.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(packet);
+        copyButton.textContent = "Copied";
+      } catch {
+        copyButton.textContent = "Copy unavailable";
+      }
+    });
+  }
+}
+
+function publicAmaAnswersModel() {
+  const packet = window.PUBLIC_AMA_ANSWERS || {};
+  const answers = Array.isArray(packet.answers) ? packet.answers : [];
+  return answers
+    .filter((answer) => (
+      answer
+      && answer.questionId
+      && answer.publicSafeQuestion
+      && answer.publicAnswer
+      && answer.answerReviewedAt
+    ))
+    .slice(0, 12);
+}
+
+function renderPublicAmaAnswers() {
+  const target = document.querySelector("#publicAmaAnswerList");
+  if (!target) {
+    return;
+  }
+  const answers = publicAmaAnswersModel();
+  if (!answers.length) {
+    target.innerHTML = `
+      <article class="public-ama-answer empty">
+        <span class="metric-label">No answers published</span>
+        <p>Approved answers will appear here after the local AMA queue is exported to the public archive.</p>
+      </article>
+    `;
+    return;
+  }
+  target.innerHTML = answers.map((answer) => `
+    <article class="public-ama-answer">
+      <div>
+        <span class="metric-label">${escapeHtml(answer.topic || "public-ama")} / ${escapeHtml(answer.questionId)}</span>
+        <h3>${escapeHtml(answer.publicSafeQuestion)}</h3>
+      </div>
+      <p>${escapeHtml(answer.publicAnswer)}</p>
+      <small>Reviewed ${escapeHtml(answer.answerReviewedAt)}${answer.publishedAt ? ` / published ${escapeHtml(answer.publishedAt)}` : ""}</small>
+    </article>
+  `).join("");
+}
+
+function setupAmaForm() {
+  const form = document.querySelector("#publicAmaForm");
+  if (!form) {
+    return;
+  }
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const readiness = publicReadinessModel();
+    if (!readiness.supportReady) {
+      renderAmaBlocked("AMA is closed until the public support inbox is verified.");
+      return;
+    }
+    const formData = new FormData(form);
+    const name = String(formData.get("name") || "").trim().slice(0, 120);
+    const contact = String(formData.get("contact") || "").trim().slice(0, 160);
+    const topic = String(formData.get("topic") || "other").trim().slice(0, 80);
+    const question = String(formData.get("question") || "").trim().slice(0, 1200);
+    const clean = Boolean(formData.get("clean"));
+    const boundary = Boolean(formData.get("boundary"));
+
+    if (!name || !contact || !question) {
+      renderAmaBlocked("Name, contact email, and question are required.");
+      return;
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact)) {
+      renderAmaBlocked("Use a valid contact email.");
+      return;
+    }
+    if (!clean || !boundary) {
+      renderAmaBlocked("Confirm the AMA data boundary before creating the packet.");
+      return;
+    }
+    const sensitiveFindings = findSensitiveData([name, contact, topic, question].join("\n"));
+    if (sensitiveFindings.length) {
+      renderAmaBlocked(`Remove ${sensitiveFindings.join(", ")} before submitting.`);
+      return;
+    }
+
+    renderAmaPacket({
+      id: amaId(),
+      name,
+      contact,
+      topic,
+      question
+    });
+    form.reset();
+  });
 }
 
 function renderPacket(order) {
@@ -217,8 +892,9 @@ function setupForm() {
   });
   amountInput.value = selectedService(serviceSelect.value).price;
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    await refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
     const readiness = publicReadinessModel();
     if (!readiness.liveReady) {
       renderBlocked(`Public intake is closed until these gates are reviewed: ${readiness.blockers.join(", ")}.`);
@@ -266,8 +942,10 @@ function setupForm() {
 
 document.addEventListener("DOMContentLoaded", () => {
   renderReadiness();
+  setPublicOrderAvailability();
+  renderPublicAmaAnswers();
+  setupAmaForm();
   setupForm();
-  if (window.lucide) {
-    window.lucide.createIcons();
-  }
+  schedulePublicReceiptRevalidation();
+  void refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });
 });

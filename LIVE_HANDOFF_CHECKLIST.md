@@ -27,6 +27,8 @@ Use [ONLINE_ASAP.md](ONLINE_ASAP.md) for the fastest safe launch sequence.
 
 - [ ] Clone or pull the latest `main` from `https://github.com/Arthurcdag/strange-company`.
 - [ ] Confirm `main` includes commit `f3f4da5` or newer.
+- [ ] Confirm a GitHub ruleset protects `main`, requires pull requests and `static-checks`, and prevents direct or force pushes without the documented emergency path.
+- [ ] Confirm the `github-pages` environment requires a non-self approving reviewer and does not allow an administrator bypass for ordinary releases.
 - [ ] Run JavaScript syntax checks:
 
 ```bash
@@ -90,27 +92,43 @@ Edit `public-config.js` only after sections 2 and 3 are complete.
 - [ ] Set `googleFormVerified: true`.
 - [ ] Confirm `jurisdiction: "BR"`.
 - [ ] Keep `aiGeneratedLegalDocsRequireHumanReview: true`.
-- [ ] Set `termsReviewedAt` to `YYYY-MM-DD`.
-- [ ] Set `privacyReviewedAt` to `YYYY-MM-DD`.
-- [ ] Set `brazilComplianceReviewedAt` to `YYYY-MM-DD`.
-- [ ] Set `aiHandoffReviewedAt` to `YYYY-MM-DD`.
+- [ ] Validate `LIVE_REVIEW_CLOSURE.local.json`, render the binder plan, inspect its exact four-date delta, and apply only the unchanged plan ID; do not edit the four review dates separately.
+- [ ] Keep the binder plan and PLAN_ID local because they commit to private
+  closure evidence; execute only the exact `applyArguments` it reports.
 - [ ] Confirm service names, descriptions, and prices are the approved public offer.
-- [ ] Set `liveMode: true` last.
+- [ ] Keep `liveMode: false` through evidence validation, receipt export, preflight, and status review.
+- [ ] Keep external Google Form response collection disabled and record
+  `google.acceptingResponses: false` in the local external-live packet.
+- [ ] Keep the pre-flip config and responder URL local; do not publish it before
+  the issued receipt and final live flag are in the same release.
 
 Then run:
 
 ```bash
-node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --apply --expect-plan-id <PLAN_ID>
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
+node tools/export_public_live_receipt.js --check-public-js
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
+node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
+node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+node tools/export_public_live_receipt.js --live-review-closure LIVE_REVIEW_CLOSURE.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --check-public-js --require-issued
 node tools/preflight_public_launch.js
-node tools/audit_company_functionality.js --require-live
+node tools/evolution_goal_status.js --json
 ```
 
-Both commands must pass before publishing the config change.
+Every command must pass and status must show no hard, public-route, or operational
+blockers. A human may then make the separate `liveMode: true` change and rerun
+`node tools/preflight_public_launch.js --deployment`. Publish the issued receipt
+and live config together, verify Pages, and only then enable external Form responses.
 
 ## 5. Publish
 
 - [ ] Commit only the intended config and documentation changes.
-- [ ] Push to `main` or open a PR and merge it after checks pass.
+- [ ] Open a PR, obtain the required non-self approval, and merge only after protected checks pass; do not push the live release directly to `main`.
 - [ ] Wait for the `Deploy static site to Pages` workflow to complete successfully.
 - [ ] Open `https://arthurcdag.github.io/strange-company/`.
 - [ ] Confirm the public readiness banner shows live intake configured.
@@ -124,7 +142,18 @@ Both commands must pass before publishing the config change.
 
 ## 6. Stop Rule
 
-Immediately revert `liveMode` to `false` or stop sending traffic if any of these fail:
+Immediately disable external Form responses and stop sending traffic if any of
+these fail. Then render and apply the exact fail-closed public patch and revoke
+the static lease:
+
+```bash
+node tools/render_public_live_shutdown_patch.js
+node tools/export_public_live_receipt.js --revoke --public-config public-config.js --output public-live-receipt.js
+node tools/preflight_public_launch.js --deployment
+```
+
+Publish the closed config and placeholder in the same rollback. This path does
+not require revalidating private packets.
 
 - [ ] Support inbox is unavailable.
 - [ ] Google Form or Sheet ledger is unavailable.

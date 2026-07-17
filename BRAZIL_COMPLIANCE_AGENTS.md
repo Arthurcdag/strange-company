@@ -19,7 +19,7 @@ The private Operations console renders the agents from Setup Evidence. Each agen
 | LGPD/privacy agent | `lgpd-contact`, `privacy-review` | Data inventory, processor list, rights-request packet | LGPD contact path and privacy notice review |
 | Consumer/terms agent | `terms-review` | Terms redline for scope, refund, cancellation, and support | Customer-facing legal terms review |
 | Intake/ledger agent | `google-sheet`, `google-form` | Form boundaries, Sheet tab checks, TSV import tests | Live Form, live Sheet, no-sensitive-data test submission |
-| AI human-review agent | `terms-review`, `privacy-review`, `lgpd-contact` | No-submit handoff for AI-drafted legal/tax/privacy/compliance material | Human sign-off dates in `public-config.js` and reviewed docs |
+| AI human-review agent | `terms-review`, `privacy-review`, `lgpd-contact` | No-submit handoff for AI-drafted legal/tax/privacy/compliance material | Human sign-off dates in the local closure packet, exact reviewed docs, and binder validation |
 
 ## Operating Loop
 
@@ -28,7 +28,7 @@ The private Operations console renders the agents from Setup Evidence. Each agen
 3. Use each compliance agent's **Copy packet** action to create the exact handoff for the human closer.
 4. Send the packet to the responsible human or complete the manual task yourself when qualified.
 5. Record the result back in Setup Evidence.
-6. Only after external review is complete, set the relevant dates in `public-config.js`: `termsReviewedAt`, `privacyReviewedAt`, `brazilComplianceReviewedAt`, and `aiHandoffReviewedAt`.
+6. Only after external review is complete, record the four real dates in `LIVE_REVIEW_CLOSURE.local.json`, validate the exact reviewed-document digests, inspect `bind_live_review_closure.js` in plan mode, and apply only that unchanged plan. Never set `termsReviewedAt`, `privacyReviewedAt`, `brazilComplianceReviewedAt`, or `aiHandoffReviewedAt` manually.
 
 ## Stop Rules
 

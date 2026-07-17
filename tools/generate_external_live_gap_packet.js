@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const vm = require("vm");
+const { parsePublicOrderConfig } = require("./strict_public_data");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
@@ -11,9 +11,7 @@ function read(relativePath) {
 }
 
 function loadPublicConfig() {
-  const sandbox = { window: {} };
-  vm.runInNewContext(read("public-config.js"), sandbox, { filename: "public-config.js" });
-  return sandbox.window.PUBLIC_ORDER_CONFIG || {};
+  return parsePublicOrderConfig(read("public-config.js"), "public-config.js");
 }
 
 function isIsoDate(value) {
@@ -35,6 +33,7 @@ function isGoogleFormUrl(value) {
 }
 
 function coreLiveEvidenceRows(config) {
+  const reviewBindingFix = "Record all four real dates in LIVE_REVIEW_CLOSURE.local.json, validate its exact document digests, then use bind_live_review_closure.js plan/apply; never edit the public config dates directly.";
   return [
     {
       id: "support-inbox",
@@ -62,28 +61,28 @@ function coreLiveEvidenceRows(config) {
       title: "Terms reviewed by human",
       field: "termsReviewedAt",
       passed: isIsoDate(config.termsReviewedAt),
-      fix: "Record the actual human review date as YYYY-MM-DD."
+      fix: reviewBindingFix
     },
     {
       id: "privacy-review",
       title: "Privacy reviewed by human",
       field: "privacyReviewedAt",
       passed: isIsoDate(config.privacyReviewedAt),
-      fix: "Record the actual privacy review date as YYYY-MM-DD."
+      fix: reviewBindingFix
     },
     {
       id: "brazil-compliance-review",
       title: "Brazil compliance review closed",
       field: "brazilComplianceReviewedAt",
       passed: isIsoDate(config.brazilComplianceReviewedAt),
-      fix: "Close CNPJ/fiscal/LGPD/payment support review with a responsible human."
+      fix: reviewBindingFix
     },
     {
       id: "ai-handoff-review",
       title: "AI legal handoff reviewed",
       field: "aiHandoffReviewedAt",
       passed: isIsoDate(config.aiHandoffReviewedAt),
-      fix: "Confirm which AI-prepared text remains draft-only and which human-owned changes are accepted."
+      fix: reviewBindingFix
     },
     {
       id: "brazil-config",
@@ -136,15 +135,25 @@ function snapshot(config) {
   };
 }
 
+const closureProcedure = {
+  preparationCondition: "only_if_LIVE_REVIEW_CLOSURE_is_absent",
+  preparationCommand: "node tools/draft_live_review_closure.js --write-local",
+  planCommand: "node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json",
+  applyInstruction: "Keep the private plan local and execute its exact applyArguments; do not substitute a copied PLAN_ID command.",
+};
+
 const validationCommands = [
   "node tools/check_external_live_packet_gate.js",
-  "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live",
+  "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready",
+  "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js",
+  "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js",
   "node tools/preflight_public_launch.js",
   "node tools/audit_company_functionality.js --require-live"
 ];
 
 const stopRules = [
   "Do not set liveMode true until support, Google Form, terms, privacy, Brazil compliance, and AI handoff evidence are real.",
+  "Do not publish or commit the binder plan or PLAN_ID; it commits to private closure evidence.",
   "Do not commit EXTERNAL_LIVE_PACKET.local.json, Sheet URLs, Stripe dashboard URLs, bank metadata, private keys, or customer secrets.",
   "Do not treat this packet as legal, tax, privacy, fiscal, payment, or support approval."
 ];
@@ -183,6 +192,13 @@ function liveEvidencePacket(config, model) {
     "[Missing Evidence]",
     missing,
     "",
+    "[Closure Preparation]",
+    `Only if the closure file is absent: ${closureProcedure.preparationCommand}`,
+    "",
+    "[Closure Binding]",
+    `Plan (non-mutating): ${closureProcedure.planCommand}`,
+    `Apply: ${closureProcedure.applyInstruction}`,
+    "",
     "[Validation Commands]",
     validationCommands.join("\n"),
     "",
@@ -205,6 +221,7 @@ if (asJson) {
       field: row.field,
       fix: row.fix
     })),
+    closureProcedure,
     rows: model.rows.map((row) => ({
       id: row.id,
       title: row.title,

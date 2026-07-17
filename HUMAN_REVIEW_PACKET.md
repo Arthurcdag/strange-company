@@ -8,10 +8,40 @@ Use this packet with:
 
 ```bash
 node tools/generate_external_live_gap_packet.js
+node tools/draft_live_review_closure.js --write-local
 node tools/draft_external_live_packet.js --write-local
 ```
 
 Keep `EXTERNAL_LIVE_PACKET.local.json` local and uncommitted.
+Keep `LIVE_REVIEW_CLOSURE.local.json` local and uncommitted. Its schema-v2
+document digests bind each approval to the exact normalized bytes reviewed;
+regenerate and repeat human review whenever a required document changes.
+The resulting public receipt uses schema v4 and replaces the former two-file
+legal core with an exact `reviewDocuments` map for all nine canonical paths.
+Its monotonic public generation advances on issuance and revocation; local
+mutations are serialized, and an open browser cannot accept an older generation
+or a different receipt identity at the same observed generation. Revocation
+also snapshots the public config and all nine documents before waiting for the
+receipt lock, then rejects any byte drift under that lock so it cannot overwrite
+a newer closure-binding result with an older public core.
+Each runtime digest uses `STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1`, the
+canonical path, and BOM-stripped, LF-normalized UTF-8 text. The map contains
+only public document digests; it never contains private packet hashes.
+
+## Nine-Document Runtime Ledger
+
+Every file below must be present in the deployed bundle, match the human-review
+closure, and match the browser-recomputed schema-v4 receipt digest:
+
+- `TERMOS.md`
+- `TERMS.md`
+- `AVISO_DE_PRIVACIDADE.md`
+- `PRIVACY.md`
+- `BRAZIL_COMPLIANCE.md`
+- `BRAZIL_COMPLIANCE_AGENTS.md`
+- `CONKA8_LAW_INSTRUCTIONS.md`
+- `AI_LEGAL_HANDOFF.md`
+- `HUMAN_REVIEW_PACKET.md`
 
 ## Current Gate Shape
 
@@ -33,6 +63,15 @@ At the time this packet was created, the repo already had:
 
 The remaining live blockers are outside-repo evidence: human terms review, human privacy review, Brazil compliance review, AI handoff review, Stripe route, bank route, and final attestation.
 
+Local evidence status, evolution goal status, and the next-action packet report
+one of four phases: `missing`, `invalid`, `document_ready_unbound`, or
+`config_bound_ready`. A packet with valid document digests but dates not yet
+bound into the current public config is only `document_ready_unbound`; run the
+transactional binder in plan mode, inspect its local-only plan, and apply only
+that exact plan. The binder keeps `liveMode: false`, binds all four dates, and
+advances the receipt to a matching fail-closed placeholder. VAU remains blocked
+and closure-first until all four dates and that binding pass together.
+
 ## AI Can Prepare
 
 AI may prepare:
@@ -42,7 +81,7 @@ AI may prepare:
 - Google Form field list and Apps Script instructions,
 - Stripe and bank evidence labels,
 - `EXTERNAL_LIVE_PACKET.local.json` draft structure,
-- public config patch with placeholders,
+- a non-mutating closure-binding plan for operator inspection,
 - validation commands and stop rules.
 
 AI must not:
@@ -55,7 +94,8 @@ AI must not:
 
 ## Manual Close Sheet
 
-Fill this sheet outside the repo before editing `public-config.js`.
+Fill this sheet outside the repo before binding reviewed dates into
+`public-config.js`.
 
 ```text
 operator_name:
@@ -122,17 +162,69 @@ satellite_is_revenue_operator:
 | Google Form test row | operator | Closed 2026-05-24: safe test response reached the private Sheet | `googleFormVerified` |
 | Terms review | operator/lawyer | `TERMOS.md`, `TERMS.md`, offer, refund/cancellation, support, and invoice flow reviewed | `termsReviewedAt` |
 | Privacy review | operator/lawyer | `AVISO_DE_PRIVACIDADE.md`, `PRIVACY.md`, LGPD contact, retention, processors, and rights path reviewed | `privacyReviewedAt` |
-| Brazil compliance review | operator/accountant/lawyer | CNPJ/entity route, NFS-e or fiscal receipt route, payment support, tax/accounting note, LGPD route | `brazilComplianceReviewedAt` |
-| AI handoff review | operator/lawyer | AI-prepared legal/compliance text accepted, changed, or rejected by a human | `aiHandoffReviewedAt` |
+| Brazil compliance review | operator/accountant/lawyer | `BRAZIL_COMPLIANCE.md`, `BRAZIL_COMPLIANCE_AGENTS.md`, `CONKA8_LAW_INSTRUCTIONS.md`, CNPJ/entity route, NFS-e or fiscal receipt route, payment support, tax/accounting note, and LGPD route reviewed | `brazilComplianceReviewedAt` |
+| AI handoff review | operator/lawyer | `AI_LEGAL_HANDOFF.md` and `HUMAN_REVIEW_PACKET.md`; AI-prepared legal/compliance text accepted, changed, or rejected by a human | `aiHandoffReviewedAt` |
 | Stripe route | operator/accountant | Hosted Invoices enabled, test invoice created, payout route and reconciliation owner confirmed | local packet only |
 | Bank route | operator/accountant | Business bank/account route and responsible party recorded | local packet only |
 | Final attestation | responsible operator | No secrets in repo, Strange Company remains sealed, satellite is revenue operator | local packet only |
 
-Use ISO dates: `YYYY-MM-DD`. Review dates must be the real human review dates.
+## Repeatable Delivery Checklist
 
-## Public Config Patch Values
+Use this section every time the project advances one review gate:
 
-Only after the manual close sheet is complete, patch public-safe values:
+1. Run `node tools/generate_external_live_gap_packet.js`.
+2. Copy the produced field names into the manual close sheet.
+3. For the four public review-date fields only, generate or update `LIVE_REVIEW_CLOSURE.local.json`, confirm that each human reviewed the exact files represented by its path-bound digests, and run:
+   - `node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready`
+   - optional preview only: `node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json`; do not apply this preview manually.
+   - `node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json`
+   - inspect the local-only plan ID and exact four-date delta; the plan must say that `liveMode` remains false and that the target receipt is a fail-closed placeholder. Do not publish or commit the plan or PLAN_ID because it commits to private closure evidence.
+   - apply that unchanged plan with `node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --apply --expect-plan-id <PLAN_ID>`; never copy the dates or refresh the receipt as separate manual operations.
+   - run `node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js` and `node tools/export_public_live_receipt.js --check-public-js`; stop unless the dates, all nine document digests, and the new placeholder remain bound.
+   - run `node tools/check_live_review_closure_conformance.js` and stop if the status surfaces disagree on phase or VAU disagrees on closure readiness, blocking, or first hard-gate priority.
+4. Validate final live readiness only after payment, bank, support, Google, and attestation evidence also exists:
+   - `node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js`
+   - `node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js`
+     (expecting `--require-live` only when all blockers are closed)
+   - `node tools/check_external_live_packet_gate.js`
+5. Close the private operational-readiness lanes:
+   - update `REVIEWER_CANDIDATE_TRACKER.local.json` for new contacts,
+   - run `node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-one` after first contact,
+   - run `node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready` once roles are filled,
+   - complete `DELIVERY_REVIEW_CHECKLIST.local.json` and run `node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready`.
+6. Export the public-only receipt while `liveMode` remains `false`, then run the pre-live checks:
+   - `node tools/export_public_live_receipt.js --live-review-closure LIVE_REVIEW_CLOSURE.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force`
+   - `node tools/export_public_live_receipt.js --check-public-js --require-issued`
+   - `node tools/preflight_public_launch.js`
+   - `node tools/evolution_goal_status.js --json`
+   - `node tools/check_live_review_closure_conformance.js`
+7. Only when all checked items are complete, external Form responses remain
+   disabled, status has no hard, public-route, or operational blockers, and a
+   human approves the decision, make the separate `liveMode: true` change; run
+   `node tools/preflight_public_launch.js --deployment`, publish the issued
+   receipt and live config together, verify Pages, and only then enable responses.
+
+If any item fails, keep `liveMode: false`, record the failure, and repeat the same checklist.
+
+If a gate fails after `liveMode` is already true, disable external Form
+responses first. Run `node tools/render_public_live_shutdown_patch.js`, apply
+only its blank `googleFormUrl`, false `googleFormVerified`, and false `liveMode`
+values, revoke the receipt, run the deployment preflight, and publish the closed
+config plus placeholder together before repairing or reissuing evidence.
+
+Use ISO dates: `YYYY-MM-DD`. Review dates must be the real human review dates and
+cannot be in the future. Support received/replied and Google Form test times must
+be ISO-8601 UTC timestamps ending in `Z`, correctly ordered, and no older than 30
+days when strict live validation runs.
+
+## Public Config Values
+
+Only after the manual close sheet is complete may public-safe values be bound.
+The four review dates are binder-owned: place the real dates in
+`LIVE_REVIEW_CLOSURE.local.json`, validate the packet, inspect
+`node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json`, and
+apply only its unchanged local plan. Do not copy these values into the config
+by hand.
 
 ```js
 googleFormUrl: "https://docs.google.com/forms/...",
@@ -141,7 +233,7 @@ termsReviewedAt: "YYYY-MM-DD",
 privacyReviewedAt: "YYYY-MM-DD",
 brazilComplianceReviewedAt: "YYYY-MM-DD",
 aiHandoffReviewedAt: "YYYY-MM-DD",
-liveMode: true,
+liveMode: false,
 ```
 
 Do not put Sheet URLs, Stripe dashboard URLs, bank metadata, tax IDs, private reviewer notes, or credentials in `public-config.js`.
@@ -166,19 +258,25 @@ Run this sequence before publishing:
 
 ```bash
 node tools/check_external_live_packet_gate.js
-node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
+node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
+node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+node tools/export_public_live_receipt.js --live-review-closure LIVE_REVIEW_CLOSURE.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --check-public-js --require-issued
 node tools/preflight_public_launch.js
-node tools/audit_company_functionality.js --require-live
+node tools/evolution_goal_status.js --json
 node tools/survival_check.js
 ```
 
-If any command fails, keep `liveMode: false`.
+If any command fails, keep `liveMode: false`. If all pass and status has no hard, public-route, or operational blockers, review the receipt before the separate human `liveMode` decision.
 
 ## Stop Rules
 
 Stop and keep live intake closed if:
 
-- terms or privacy changed after review and were not re-reviewed,
+- any of the nine required review documents changed after review and the schema-v2 closure digest plus schema-v4 public receipt were not regenerated and re-reviewed,
 - CNPJ/entity, NFS-e, fiscal receipt, payment, or LGPD route is uncertain,
 - Stripe or bank evidence is missing,
 - AI-generated legal/compliance text is being treated as final human approval,

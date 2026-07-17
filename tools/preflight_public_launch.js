@@ -1,10 +1,22 @@
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
-const vm = require("vm");
+const { parsePublicOrderConfig } = require("./strict_public_data");
 
 const root = path.resolve(__dirname, "..");
 const failures = [];
+const deploymentMode = process.argv.includes("--deployment");
+const PUBLIC_REVIEW_DOCUMENT_PATHS = Object.freeze([
+  "TERMOS.md",
+  "TERMS.md",
+  "AVISO_DE_PRIVACIDADE.md",
+  "PRIVACY.md",
+  "BRAZIL_COMPLIANCE.md",
+  "BRAZIL_COMPLIANCE_AGENTS.md",
+  "CONKA8_LAW_INSTRUCTIONS.md",
+  "AI_LEGAL_HANDOFF.md",
+  "HUMAN_REVIEW_PACKET.md",
+]);
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
@@ -21,10 +33,13 @@ function assert(condition, message) {
 }
 
 function compileJavaScript(relativePath) {
-  try {
-    new vm.Script(read(relativePath), { filename: relativePath });
-  } catch (error) {
-    fail(`${relativePath} does not parse: ${error.message}`);
+  const result = spawnSync(process.execPath, ["--check", relativePath], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) {
+    const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
+    fail(`${relativePath} does not parse${output ? `:\n${output}` : "."}`);
   }
 }
 
@@ -37,11 +52,38 @@ function checkExternalLivePacketGate() {
   assert(result.status === 0, `external live packet gate regression failed:\n${output}`);
 }
 
+function checkLiveReviewClosureConformance() {
+  const result = spawnSync(process.execPath, ["tools/check_live_review_closure_conformance.js"], {
+    cwd: root,
+    encoding: "utf8"
+  });
+  const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
+  assert(result.status === 0, `live review closure conformance failed:\n${output}`);
+}
+
+function checkPublicLiveReceipt() {
+  const receiptArgs = [
+    "tools/export_public_live_receipt.js",
+    "--check-public-js",
+    "--public-config",
+    "public-config.js",
+    "--public-js",
+    "public-live-receipt.js",
+  ];
+  if (deploymentMode && loadPublicConfig().liveMode === true) {
+    receiptArgs.push("--require-issued");
+  }
+  const result = spawnSync(process.execPath, receiptArgs, {
+    cwd: root,
+    encoding: "utf8"
+  });
+  const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
+  assert(result.status === 0, `public live receipt regression failed:\n${output}`);
+}
+
 function loadPublicConfig() {
-  const sandbox = { window: {} };
   try {
-    vm.runInNewContext(read("public-config.js"), sandbox, { filename: "public-config.js" });
-    return sandbox.window.PUBLIC_ORDER_CONFIG || {};
+    return parsePublicOrderConfig(read("public-config.js"), "public-config.js");
   } catch (error) {
     fail(`public-config.js could not be loaded: ${error.message}`);
     return {};
@@ -75,16 +117,41 @@ function checkPublicSurface() {
   const publicHtml = read("public.html");
   const publicJs = read("public.js");
   const publicConfig = read("public-config.js");
+  const publicAnswers = read("public-ama-answers.js");
+  const pagesWorkflow = read(".github/workflows/pages.yml");
+  const validateWorkflow = read(".github/workflows/validate.yml");
   const publicFiles = [
     ["public.html", publicHtml],
     ["public.js", publicJs],
+    ["public-ama-answers.js", publicAnswers],
     ["public-config.js", publicConfig]
   ];
 
   assert(publicHtml.includes('class="public-site"'), "public.html must render the public surface.");
+  assert(
+    publicHtml.includes('http-equiv="Content-Security-Policy"')
+      && publicHtml.includes("script-src 'self'")
+      && publicHtml.includes("connect-src 'self'")
+      && publicHtml.includes("form-action 'none'"),
+    "public.html must keep a self-contained fail-closed Content Security Policy."
+  );
+  assert(!/<script\b[^>]*\bsrc=["']https?:\/\//i.test(publicHtml), "public.html must not execute third-party runtime scripts.");
+  assert(publicHtml.includes('id="publicAmaForm"'), "public.html must render the public AMA form.");
+  assert(publicHtml.includes('id="publicAmaAnswers"'), "public.html must render the public AMA answer archive.");
+  assert(publicHtml.includes('href="PUBLIC_AMA.md"'), "public.html must link the public AMA rules.");
+  assert(publicHtml.includes('src="public-live-receipt.js"'), "public.html must load the public live receipt before public.js.");
+  assert(publicHtml.includes('id="publicOrderClosed"'), "public.html must render the fail-closed paid-intake notice.");
+  assert(publicHtml.includes('href="#ama"'), "public.html must hand closed paid intake to the public-safe AMA.");
+  assert(publicHtml.includes('id="publicOrderForm" hidden aria-hidden="true"'), "public order form must start hidden.");
+  assert(publicHtml.includes('id="publicOrderFields" hidden disabled'), "public order fields must start disabled.");
+  assert(publicJs.includes("liveReviewClosureValidatorPassed"), "public receipt verification must require the document-bound human-review attestation.");
   assert(publicHtml.includes("public-config.js"), "public.html must load public-config.js.");
+  assert(publicHtml.includes("public-ama-answers.js"), "public.html must load public-ama-answers.js.");
   assert(publicHtml.includes("public.js"), "public.html must load public.js.");
   assert(!publicHtml.includes("script.js"), "public.html must not load the private command center script.");
+  assert(pagesWorkflow.includes("node tools/build_public_site.js --check --output _site --force"), "pages workflow must use the public site build checker.");
+  assert(pagesWorkflow.includes("python -m unittest discover -s tests"), "Pages deployment must run the full test suite before upload/deploy.");
+  assert(validateWorkflow.includes("node tools/build_public_site.js --check --output .public-site-build.local --force"), "validate workflow must check the public site bundle.");
 
   const forbiddenPublicPatterns = [
     ["localStorage", /\blocalStorage\b/],
@@ -106,7 +173,10 @@ function checkPublicSurface() {
     ["ledger bridge form id", /operationsLedgerBridgeForm/],
     ["daily run storage key", /strange-company-daily-pilot-run/],
     ["plugin workflow UI", /\b(Alpaca|Binance|Zotero|Life Science Research|GitHub signal)\b/],
-    ["automatic network submit", /\bfetch\s*\(/],
+    ["beacon network submit", /\bsendBeacon\s*\(/],
+    ["XHR network submit", /\bXMLHttpRequest\b/],
+    ["WebSocket network channel", /\bWebSocket\s*\(/],
+    ["EventSource network channel", /\bEventSource\s*\(/],
     ["private Setup evidence panel", /\bSetup evidence\b/i],
     ["private Customer acquisition panel", /\bCustomer acquisition\b/i],
     ["setup evidence form id", /setupEvidencePanel/],
@@ -124,6 +194,34 @@ function checkPublicSurface() {
     }
   }
 
+  const fetchCalls = publicJs.match(/\bfetch\s*\(/g) || [];
+  const assetHelperReferences = publicJs.match(/\bfetchPublicAssetText\s*\(/g) || [];
+  assert(fetchCalls.length === 1, "public.js may contain only the fixed same-origin public-asset GET.");
+  assert(
+    publicJs.includes("const response = await fetch(assetPath, requestOptions);"),
+    "public.js fetch must stay inside the public-asset verification helper."
+  );
+  assert(
+    publicJs.includes('const requestOptions = { cache: "no-store", credentials: "same-origin" };'),
+    "public.js public-asset fetch must be same-origin and bypass the browser cache."
+  );
+  assert(assetHelperReferences.length === 3, "public.js public-asset helper must have only its declaration and two fixed call sites.");
+  assert(
+    publicJs.includes("const PUBLIC_REVIEW_DOCUMENT_PATHS = Object.freeze([")
+      && PUBLIC_REVIEW_DOCUMENT_PATHS.every((documentPath) => publicJs.includes(JSON.stringify(documentPath)))
+      && publicJs.includes("Promise.all(PUBLIC_REVIEW_DOCUMENT_PATHS.map"),
+    "public.js nine-document fetch allowlist must stay fixed and concurrently revalidated."
+  );
+  assert(
+    publicJs.includes('fetchPublicAssetText("public-live-receipt.js")'),
+    "public.js receipt revalidation fetch must stay fixed."
+  );
+  assert(!/\bmethod\s*:/.test(publicJs), "public.js public-asset fetch must remain a GET.");
+  assert(!/\bbody\s*:/.test(publicJs), "public.js must not attach a request body to network calls.");
+  for (const [file, contents] of publicFiles.filter(([file]) => file !== "public.js")) {
+    assert(!/\bfetch\s*\(/.test(contents), `${file} must not perform network fetches.`);
+  }
+
   const requiredGuardTerms = [
     "findSensitiveData",
     "protected health information",
@@ -131,9 +229,35 @@ function checkPublicSurface() {
     "social security number",
     "password or secret",
     "private key material",
+    "Brazil personal or company tax ID",
     "renderBlocked",
+    "renderAmaBlocked",
+    "amaQuestionPacket",
+    "publicAmaAnswersModel",
+    "renderPublicAmaAnswers",
+    "setupAmaForm",
+    "if (!readiness.supportReady)",
+    "Public AMA Desk",
+    "No order, invoice, payment request, customer support ticket, or launch approval is created.",
     "Public intake is closed",
     "if (!readiness.liveReady)",
+    "function setPublicOrderAvailability()",
+    "readiness.liveReady === true",
+    "function publicLiveReceiptReady(",
+    "function fetchPublicAssetText(",
+    "function parsePublicLiveReceiptScript(",
+    "await refreshPublicLiveReceiptVerification({ forceDocumentCheck: true });",
+    "PUBLIC_LIVE_RECEIPT_REFRESH_IN_FLIGHT",
+    "PUBLIC_LIVE_RECEIPT_FORCE_REVALIDATION_REQUESTED",
+    "PUBLIC_REVIEW_DOCUMENT_VERIFICATION_TTL_MS",
+    'receipt.status === "local_packet_validators_passed"',
+    'globalThis.crypto.subtle.digest("SHA-256", bytes)',
+    "attestations.operationalValidatorsPassed === true",
+    "receipt.envelopeSha256",
+    "validUntilDate.valueOf() > now",
+    "function schedulePublicReceiptExpiry()",
+    "form.hidden = !liveReady",
+    "fields.disabled = !liveReady",
     "readiness.liveReady ? `<a href=\"${mailtoUrl(order)}\">Open email draft</a>` : \"\""
   ];
   for (const term of requiredGuardTerms) {
@@ -448,7 +572,9 @@ function checkPaidPilotProfitReadinessContract() {
   );
   assert(satelliteDoc.includes("Profit Readiness"), "SATELLITE_COMPANY.md must document Profit Readiness.");
   assert(runbook.includes("Paid Pilot Profit Readiness"), "OPERATIONS_RUNBOOK.md must document Paid Pilot Profit Readiness.");
-  assert(publicConfig.liveMode === false, "public-config.js must keep liveMode false by default.");
+  if (!deploymentMode) {
+    assert(publicConfig.liveMode === false, "public-config.js must keep liveMode false by default; use --deployment only for the separately reviewed live flip.");
+  }
 
   for (const [file, contents] of [
     ["public.html", publicHtml],
@@ -566,7 +692,7 @@ function checkOperationalV15Contract() {
     assert(!/copyGrowthReview/.test(contents), `${file} exposes growth review copy action.`);
     assert(!/outreachLogForm/.test(contents), `${file} exposes outreach log form id.`);
     assert(!/SETUP_EVIDENCE_SLOTS/.test(contents), `${file} exposes setup evidence slot internals.`);
-    assert(!/BRAZIL_COMPLIANCE_AGENTS/.test(contents), `${file} exposes Brazil compliance agent internals.`);
+    assert(!/\bBRAZIL_COMPLIANCE_AGENTS\b(?!\.md)/.test(contents), `${file} exposes Brazil compliance agent internals.`);
     assert(!/ACQUISITION_LEAD_SOURCES/.test(contents), `${file} exposes acquisition lead source internals.`);
   }
 }
@@ -836,6 +962,586 @@ function checkBrazilComplianceContract() {
   }
 }
 
+function checkReviewerCandidateContract() {
+  const readme = read("README.md");
+  const aiHandoff = read("AI_LEGAL_HANDOFF.md");
+  const humanRevenue = read("HUMAN_REVENUE_INSTRUCTIONS.md");
+  const packet = read("REVIEWER_CANDIDATE_PACKET.md");
+  const tracker = read("REVIEWER_CANDIDATE_TRACKER.template.json");
+  const validator = read("tools/validate_reviewer_candidate_tracker.js");
+  const vauCompany = read("tools/vau_company_evolution.py");
+  const gitignore = read(".gitignore");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+
+  const required = [
+    ["README reviewer packet link", readme, "REVIEWER_CANDIDATE_PACKET.md"],
+    ["README reviewer tracker link", readme, "REVIEWER_CANDIDATE_TRACKER.template.json"],
+    ["README reviewer draft generator link", readme, "tools/draft_reviewer_candidate_tracker.js"],
+    ["README reviewer validator link", readme, "tools/validate_reviewer_candidate_tracker.js"],
+    ["AI handoff reviewer packet link", aiHandoff, "REVIEWER_CANDIDATE_PACKET.md"],
+    ["AI handoff reviewer require-one command", aiHandoff, "node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-one"],
+    ["human revenue reviewer tracker link", humanRevenue, "REVIEWER_CANDIDATE_TRACKER.template.json"],
+    ["human revenue reviewer draft generator link", humanRevenue, "tools/draft_reviewer_candidate_tracker.js"],
+    ["reviewer packet first-candidate workflow", packet, "First Candidate Workflow"],
+    ["reviewer packet ready-pool workflow", packet, "Ready Pool Workflow"],
+    ["reviewer packet first-candidate command", packet, "node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-one"],
+    ["reviewer packet ready-pool command", packet, "node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready"],
+    ["reviewer tracker schema", tracker, '"schemaVersion": 1'],
+    ["reviewer tracker candidate records", tracker, '"candidateRecords": []'],
+    ["reviewer tracker terms role", tracker, '"terms_consumer_law"'],
+    ["reviewer tracker privacy role", tracker, '"privacy_lgpd"'],
+    ["reviewer tracker tax role", tracker, '"tax_nfse_accounting"'],
+    ["reviewer tracker payment role", tracker, '"payment_reconciliation"'],
+    ["reviewer tracker no-secrets attestation", tracker, '"noSecretsInRepo": true'],
+    ["reviewer tracker sealed attestation", tracker, '"strangeCompanyRemainsSealed": true'],
+    ["reviewer validator failure header", validator, "Reviewer candidate tracker validation failed"],
+    ["reviewer validator one-candidate gate", validator, "--require-one"],
+    ["reviewer validator ready-pool gate", validator, "--require-ready"],
+    ["VAU reviewer tracker next action", vauCompany, "REVIEWER_CANDIDATE_TRACKER.local.json"],
+    ["VAU reviewer tracker validator command", vauCompany, "tools/validate_reviewer_candidate_tracker.js"],
+    ["reviewer local tracker ignored", gitignore, "REVIEWER_CANDIDATE_TRACKER.local.json"],
+    ["reviewer template unignored", gitignore, "!REVIEWER_CANDIDATE_TRACKER.template.json"],
+    ["reviewer validator CI syntax check", validateWorkflow, "node --check tools/validate_reviewer_candidate_tracker.js"],
+    ["reviewer draft generator CI syntax check", validateWorkflow, "node --check tools/draft_reviewer_candidate_tracker.js"],
+    ["reviewer validator CI template check", validateWorkflow, "node tools/validate_reviewer_candidate_tracker.js --template-ok"]
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
+function checkPublicAmaQueueContract() {
+  const readme = read("README.md");
+  const publicAma = read("PUBLIC_AMA.md");
+  const publicationPacket = read("PUBLIC_AMA_PUBLICATION_PACKET.md");
+  const template = read("PUBLIC_AMA_QUEUE.template.json");
+  const answersTemplate = read("PUBLIC_AMA_ANSWERS.template.json");
+  const publicAnswers = read("public-ama-answers.js");
+  const draft = read("tools/draft_public_ama_queue.js");
+  const exporter = read("tools/export_public_ama_answers.js");
+  const validator = read("tools/validate_public_ama_queue.js");
+  const gitignore = read(".gitignore");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+  const pages = read(".github/workflows/pages.yml");
+  const builder = read("tools/build_public_site.js");
+  const vauCompany = read("tools/vau_company_evolution.py");
+
+  const required = [
+    ["README public AMA doc link", readme, "PUBLIC_AMA.md"],
+    ["README public AMA publication packet link", readme, "PUBLIC_AMA_PUBLICATION_PACKET.md"],
+    ["README public AMA queue template link", readme, "PUBLIC_AMA_QUEUE.template.json"],
+    ["README public AMA answer template link", readme, "PUBLIC_AMA_ANSWERS.template.json"],
+    ["README public AMA draft tool link", readme, "tools/draft_public_ama_queue.js"],
+    ["README public AMA answer export tool link", readme, "tools/export_public_ama_answers.js"],
+    ["README public AMA validator link", readme, "tools/validate_public_ama_queue.js"],
+    ["public AMA queue command", publicAma, "node tools/draft_public_ama_queue.js --write-local"],
+    ["public AMA one-question command", publicAma, "node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-one"],
+    ["public AMA answer-ready command", publicAma, "node tools/validate_public_ama_queue.js PUBLIC_AMA_QUEUE.local.json --require-answer-ready"],
+    ["public AMA answer export command", publicAma, "node tools/export_public_ama_answers.js --input PUBLIC_AMA_QUEUE.local.json --output public-ama-answers.js --require-published --force"],
+    ["public AMA answer archive check command", publicAma, "node tools/export_public_ama_answers.js --check-public-js"],
+    ["public AMA publication packet link", publicAma, "PUBLIC_AMA_PUBLICATION_PACKET.md"],
+    ["public AMA VAU command", publicAma, "python tools/vau_company_evolution.py --public-ama-queue PUBLIC_AMA_QUEUE.local.json --public-ama-answers public-ama-answers.js --depth 1"],
+    ["public AMA publication packet close sheet", publicationPacket, "Manual Close Sheet"],
+    ["public AMA publication packet export command", publicationPacket, "node tools/export_public_ama_answers.js --input PUBLIC_AMA_QUEUE.local.json --output public-ama-answers.js --require-published --force"],
+    ["public AMA publication packet build check", publicationPacket, "node tools/build_public_site.js --check --output .public-site-build.local --force"],
+    ["public AMA publication packet private data stop", publicationPacket, "No direct email, CPF, CNPJ document, payment data, credential"],
+    ["public AMA private-data warning", publicAma, "must not include direct email addresses"],
+    ["public AMA queue template schema", template, '"schemaVersion": 1'],
+    ["public AMA queue template records", template, '"questionRecords": []'],
+    ["public AMA queue public-safe decision", template, '"public_safe"'],
+    ["public AMA answers template schema", answersTemplate, '"schemaVersion": 1'],
+    ["public AMA answers template empty archive", answersTemplate, '"answers": []'],
+    ["public AMA answers template public-only attestation", answersTemplate, '"noPrivateContactData": true'],
+    ["public AMA answers archive global", publicAnswers, "window.PUBLIC_AMA_ANSWERS"],
+    ["public AMA answers archive empty", publicAnswers, '"answers": []'],
+    ["public site build tool", builder, "Public site build check passed"],
+    ["public site build forbidden local queue", builder, "PUBLIC_AMA_QUEUE"],
+    ["public site build forbidden MEI guard", builder, "^MEI_"],
+    ["public AMA draft generator", draft, "PUBLIC_AMA_QUEUE.local.json"],
+    ["public AMA answer exporter", exporter, "PUBLIC_AMA_ANSWERS.template.json"],
+    ["public AMA answer exporter approval gate", exporter, "humanApprovedForPublication"],
+    ["public AMA answer exporter publication gate", exporter, "--require-published"],
+    ["public AMA answer exporter public archive check", exporter, "--check-public-js"],
+    ["public AMA answer exporter public-only attestation", exporter, "noPrivateContactData"],
+    ["public AMA validator failure header", validator, "Public AMA queue validation failed"],
+    ["public AMA validator one-question gate", validator, "--require-one"],
+    ["public AMA validator answer-ready gate", validator, "--require-answer-ready"],
+    ["public AMA local queue ignored", gitignore, "PUBLIC_AMA_QUEUE.local.json"],
+    ["public AMA template unignored", gitignore, "!PUBLIC_AMA_QUEUE.template.json"],
+    ["public AMA local answers ignored", gitignore, "PUBLIC_AMA_ANSWERS.local.json"],
+    ["public AMA answers template unignored", gitignore, "!PUBLIC_AMA_ANSWERS.template.json"],
+    ["public AMA validator syntax check", validateWorkflow, "node --check tools/validate_public_ama_queue.js"],
+    ["public AMA draft syntax check", validateWorkflow, "node --check tools/draft_public_ama_queue.js"],
+    ["public AMA answer export syntax check", validateWorkflow, "node --check tools/export_public_ama_answers.js"],
+    ["public site build syntax check", validateWorkflow, "node --check tools/build_public_site.js"],
+    ["public AMA answer export CI template check", validateWorkflow, "node tools/export_public_ama_answers.js --template-ok"],
+    ["public AMA answer archive CI check", validateWorkflow, "node tools/export_public_ama_answers.js --check-public-js"],
+    ["public site build CI check", validateWorkflow, "node tools/build_public_site.js --check --output .public-site-build.local --force"],
+    ["public AMA validator CI template check", validateWorkflow, "node tools/validate_public_ama_queue.js --template-ok"],
+    ["public site pages workflow builder", pages, "node tools/build_public_site.js --check --output _site --force"],
+    ["public AMA pages template copy", builder, "PUBLIC_AMA_QUEUE.template.json"],
+    ["public AMA answers pages copy", builder, "public-ama-answers.js"],
+    ["public AMA answers template pages copy", builder, "PUBLIC_AMA_ANSWERS.template.json"],
+    ["public AMA pages draft copy", builder, "tools/draft_public_ama_queue.js"],
+    ["public AMA pages exporter copy", builder, "tools/export_public_ama_answers.js"],
+    ["public AMA pages validator copy", builder, "tools/validate_public_ama_queue.js"],
+    ["public AMA VAU default path", vauCompany, "PUBLIC_AMA_QUEUE.local.json"],
+    ["public AMA VAU answer archive path", vauCompany, "public-ama-answers.js"],
+    ["public AMA VAU queue argument", vauCompany, "--public-ama-queue"],
+    ["public AMA VAU answer archive argument", vauCompany, "--public-ama-answers"],
+    ["VAU external live packet argument", vauCompany, "--external-live-packet"],
+    ["VAU external live evidence gate", vauCompany, "privateExternalLiveEvidenceReady"],
+    ["VAU authoritative external live validator", vauCompany, "validate_external_live_packet.js"]
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
+function checkRevenueSetupEvidenceIndexContract() {
+  const readme = read("README.md");
+  const aiHandoff = read("AI_LEGAL_HANDOFF.md");
+  const humanRevenue = read("HUMAN_REVENUE_INSTRUCTIONS.md");
+  const packet = read("REVENUE_SETUP_EVIDENCE_PACKET.md");
+  const template = read("REVENUE_SETUP_EVIDENCE_INDEX.template.json");
+  const draft = read("tools/draft_revenue_setup_evidence_index.js");
+  const validator = read("tools/validate_revenue_setup_evidence_index.js");
+  const gitignore = read(".gitignore");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+  const vauCompany = read("tools/vau_company_evolution.py");
+  const builder = read("tools/build_public_site.js");
+
+  const required = [
+    ["README revenue setup packet link", readme, "REVENUE_SETUP_EVIDENCE_PACKET.md"],
+    ["README revenue setup index template", readme, "REVENUE_SETUP_EVIDENCE_INDEX.template.json"],
+    ["README revenue draft generator link", readme, "tools/draft_revenue_setup_evidence_index.js"],
+    ["README revenue validator link", readme, "tools/validate_revenue_setup_evidence_index.js"],
+    ["AI handoff revenue packet reference", aiHandoff, "REVENUE_SETUP_EVIDENCE_PACKET.md"],
+    ["human revenue draft command", humanRevenue, "node tools/draft_revenue_setup_evidence_index.js --write-local"],
+    ["human revenue payment gate command", humanRevenue, "node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-payment"],
+    ["human revenue config-bound all-gates command", humanRevenue, "node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js"],
+    ["human revenue packet includes draft command", packet, "tools/draft_revenue_setup_evidence_index.js"],
+    ["human revenue packet includes validate command", packet, "tools/validate_revenue_setup_evidence_index.js"],
+    ["revenue setup index template schema", template, '"schemaVersion": 1'],
+    ["revenue validator failure header", validator, "Revenue setup evidence index validation failed"],
+    ["revenue validator entity gate", validator, "--require-entity"],
+    ["revenue validator tax gate", validator, "--require-tax"],
+    ["revenue validator payment gate", validator, "--require-payment"],
+    ["revenue validator support gate", validator, "--require-support"],
+    ["revenue validator privacy gate", validator, "--require-privacy"],
+    ["revenue validator terms gate", validator, "--require-terms"],
+    ["revenue validator ledger gate", validator, "--require-ledger"],
+    ["revenue validator all gate", validator, "--require-all"],
+    ["revenue validator template check", validator, "--template-ok"],
+    ["revenue index local ignored", gitignore, "REVENUE_SETUP_EVIDENCE_INDEX.local.json"],
+    ["revenue index template unignored", gitignore, "!REVENUE_SETUP_EVIDENCE_INDEX.template.json"],
+    ["revenue validator syntax check", validateWorkflow, "node --check tools/validate_revenue_setup_evidence_index.js"],
+    ["revenue draft syntax check", validateWorkflow, "node --check tools/draft_revenue_setup_evidence_index.js"],
+    ["revenue validator CI template check", validateWorkflow, "node tools/validate_revenue_setup_evidence_index.js --template-ok"],
+    ["revenue pages template copy", builder, "REVENUE_SETUP_EVIDENCE_INDEX.template.json"],
+    ["revenue pages draft copy", builder, "tools/draft_revenue_setup_evidence_index.js"],
+    ["revenue pages validator copy", builder, "tools/validate_revenue_setup_evidence_index.js"],
+    ["VAU revenue evidence path", vauCompany, "--revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json"],
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
+function checkDeliveryReviewChecklistContract() {
+  const readme = read("README.md");
+  const runbook = read("OPERATIONS_RUNBOOK.md");
+  const deliveryLoop = read("DELIVERY_REVIEW_LOOP.md");
+  const template = read("DELIVERY_REVIEW_CHECKLIST.template.json");
+  const draft = read("tools/draft_delivery_review_checklist.js");
+  const validator = read("tools/validate_delivery_review_checklist.js");
+  const gitignore = read(".gitignore");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+  const pagesWorkflow = read(".github/workflows/pages.yml");
+  const builder = read("tools/build_public_site.js");
+  const vauCompany = read("tools/vau_company_evolution.py");
+
+  const required = [
+    ["README delivery loop doc link", readme, "DELIVERY_REVIEW_LOOP.md"],
+    ["README delivery checklist template", readme, "DELIVERY_REVIEW_CHECKLIST.template.json"],
+    ["README delivery draft tool", readme, "tools/draft_delivery_review_checklist.js"],
+    ["README delivery validator", readme, "tools/validate_delivery_review_checklist.js"],
+    ["runbook delivery checklist section", runbook, "Delivery Review Checklist"],
+    ["runbook delivery validator command", runbook, "node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready"],
+    ["delivery loop local checklist command", deliveryLoop, "node tools/draft_delivery_review_checklist.js --write-local"],
+    ["delivery loop ready validator command", deliveryLoop, "node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready"],
+    ["delivery loop VAU command", deliveryLoop, "--delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json"],
+    ["delivery template schema", template, '"schemaVersion": 1'],
+    ["delivery template loop section", template, '"deliveryLoop"'],
+    ["delivery template evidence section", template, '"evidence"'],
+    ["delivery template attestation", template, '"noCustomerPrivateDataInRepo": true'],
+    ["delivery draft local target", draft, "DELIVERY_REVIEW_CHECKLIST.local.json"],
+    ["delivery draft no secrets instruction", draft, "Do not store customer-private documents"],
+    ["delivery validator failure header", validator, "Delivery review checklist validation failed"],
+    ["delivery validator ready gate", validator, "--require-ready"],
+    ["delivery validator artifact URL gate", validator, "deliveryArtifactUrl must be an https:// URL"],
+    ["delivery local checklist ignored", gitignore, "DELIVERY_REVIEW_CHECKLIST.local.json"],
+    ["delivery template unignored", gitignore, "!DELIVERY_REVIEW_CHECKLIST.template.json"],
+    ["delivery draft syntax check", validateWorkflow, "node --check tools/draft_delivery_review_checklist.js"],
+    ["delivery validator syntax check", validateWorkflow, "node --check tools/validate_delivery_review_checklist.js"],
+    ["delivery validator CI template check", validateWorkflow, "node tools/validate_delivery_review_checklist.js --template-ok"],
+    ["delivery pages template check", pagesWorkflow, "node tools/validate_delivery_review_checklist.js --template-ok"],
+    ["delivery pages template copy", builder, "DELIVERY_REVIEW_CHECKLIST.template.json"],
+    ["delivery pages validator copy", builder, "tools/validate_delivery_review_checklist.js"],
+    ["delivery local file forbidden from bundle", builder, "DELIVERY_REVIEW_CHECKLIST\\.local\\.json"],
+    ["VAU delivery checklist default", vauCompany, "DEFAULT_DELIVERY_REVIEW_CHECKLIST"],
+    ["VAU delivery checklist argument", vauCompany, "--delivery-review-checklist"],
+    ["VAU delivery loop evidence", vauCompany, "deliveryReviewLoopReady"],
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
+function checkEvolutionLogAuditContract() {
+  const readme = read("README.md");
+  const evolutionLog = read("EVOLUTION_LOG.md");
+  const audit = read("tools/audit_evolution_log.js");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+  const pagesWorkflow = read(".github/workflows/pages.yml");
+  const builder = read("tools/build_public_site.js");
+  const survival = read("tools/survival_check.js");
+
+  const required = [
+    ["README evolution log link", readme, "EVOLUTION_LOG.md"],
+    ["README evolution audit tool", readme, "tools/audit_evolution_log.js"],
+    ["evolution log public-safe boundary", evolutionLog, "public-safe repo evolution passes"],
+    ["evolution log continuous goal entry", evolutionLog, "Continuous VAU Goal"],
+    ["evolution log delivery entry", evolutionLog, "Delivery Review Loop"],
+    ["evolution log audit entry", evolutionLog, "Evolution Pass Audit"],
+    ["audit failure header", audit, "Evolution log audit failed"],
+    ["audit required objective", audit, "Objective"],
+    ["audit required changed artifacts", audit, "Changed"],
+    ["audit required verified commands", audit, "Verified with"],
+    ["audit required result", audit, "Result"],
+    ["audit private data guard", audit, "forbidden approval or private-data claim"],
+    ["audit syntax workflow", validateWorkflow, "node --check tools/audit_evolution_log.js"],
+    ["audit execution workflow", validateWorkflow, "node tools/audit_evolution_log.js"],
+    ["audit pages workflow", pagesWorkflow, "node tools/audit_evolution_log.js"],
+    ["audit public bundle copy", builder, "tools/audit_evolution_log.js"],
+    ["audit public bundle log copy", builder, "EVOLUTION_LOG.md"],
+    ["audit survival check", survival, "Evolution Pass Audit"],
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
+function checkEvolutionGoalStatusContract() {
+  const readme = read("README.md");
+  const evolutionLog = read("EVOLUTION_LOG.md");
+  const statusTool = read("tools/evolution_goal_status.js");
+  const shutdownRenderer = read("tools/render_public_live_shutdown_patch.js");
+  const vauCompany = read("tools/vau_company_evolution.py");
+  const humanRevenue = read("HUMAN_REVENUE_INSTRUCTIONS.md");
+  const operatorFastStart = read("OPERATOR_FAST_START.md");
+  const operationsStart = read("OPERATIONS_START_PACKET.md");
+  const livePilot = read("RUN_LIVE_PILOT.md");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+  const pagesWorkflow = read(".github/workflows/pages.yml");
+  const builder = read("tools/build_public_site.js");
+  const survival = read("tools/survival_check.js");
+
+  const required = [
+    ["README evolution status tool", readme, "tools/evolution_goal_status.js"],
+    ["README evolution status command", readme, "node tools/evolution_goal_status.js --json"],
+    ["README live shutdown renderer", readme, "tools/render_public_live_shutdown_patch.js"],
+    ["evolution log status entry", evolutionLog, "Evolution Status Report"],
+    ["evolution log live recovery entry", evolutionLog, "Fail-Closed Live Recovery and Deployment Freshness"],
+    ["status system name", statusTool, "STRANGE_COMPANY_EVOLUTION_STATUS"],
+    ["status active goal", statusTool, 'goalStatus: "active"'],
+    ["status hard blocker mode", statusTool, "burn_down_hard_blockers"],
+    ["status revenue blocker", statusTool, "privatePaymentFiscalEvidence"],
+    ["status external live blocker", statusTool, "privateExternalLiveEvidence"],
+    ["status selected handoff", statusTool, "selectedHandoff"],
+    ["status live recovery mode", statusTool, "recover_fail_closed"],
+    ["status live recovery handoff", statusTool, "liveModeRecoveryRequired"],
+    ["status live recovery actions", statusTool, "liveRecoveryActions"],
+    ["status public runtime readiness", statusTool, "publicRuntimeReady"],
+    ["status reissuance readiness", statusTool, "reissuanceReady"],
+    ["status live shutdown renderer", statusTool, "render_public_live_shutdown_patch.js"],
+    ["status review closure actions", statusTool, "reviewClosureActions"],
+    ["status review closure local packet", statusTool, "LIVE_REVIEW_CLOSURE.local.json"],
+    ["status review closure binder", statusTool, "bind_live_review_closure.js"],
+    ["status phase-specific closure validator", statusTool, "phaseValidatorCommands"],
+    ["status review closure phase", statusTool, "liveReviewClosurePhase"],
+    ["status config-bound closure validator", statusTool, "--require-ready --public-config public-config.js"],
+    ["status local evidence command", statusTool, "tools/local_evidence_status.js"],
+    ["status local evidence summary", statusTool, "localEvidence"],
+    ["status local evidence dir override", statusTool, "--local-evidence-dir"],
+    ["status latest pass parsing", statusTool, "latestPass"],
+    ["status syntax workflow", validateWorkflow, "node --check tools/evolution_goal_status.js"],
+    ["status execution workflow", validateWorkflow, "node tools/evolution_goal_status.js --json"],
+    ["status pages workflow", pagesWorkflow, "node tools/evolution_goal_status.js --json"],
+    ["status public bundle copy", builder, "tools/evolution_goal_status.js"],
+    ["shutdown renderer system", shutdownRenderer, "STRANGE_COMPANY_PUBLIC_LIVE_SHUTDOWN_PATCH"],
+    ["shutdown renderer is output only", shutdownRenderer, "mutatesFiles: false"],
+    ["shutdown renderer clears form URL", shutdownRenderer, 'googleFormUrl: ""'],
+    ["shutdown renderer clears form verification", shutdownRenderer, "googleFormVerified: false"],
+    ["shutdown renderer closes live mode", shutdownRenderer, "liveMode: false"],
+    ["shutdown renderer revocation command", shutdownRenderer, "--revoke --public-config public-config.js"],
+    ["shutdown renderer deployment preflight", shutdownRenderer, "preflight_public_launch.js --deployment"],
+    ["shutdown renderer syntax workflow", validateWorkflow, "node --check tools/render_public_live_shutdown_patch.js"],
+    ["shutdown renderer execution workflow", validateWorkflow, "node tools/render_public_live_shutdown_patch.js --json"],
+    ["shutdown renderer Pages execution", pagesWorkflow, "node tools/render_public_live_shutdown_patch.js --json"],
+    ["shutdown renderer public bundle copy", builder, "tools/render_public_live_shutdown_patch.js"],
+    ["VAU live recovery event", vauCompany, "live_mode_recovery_required"],
+    ["human revenue live shutdown", humanRevenue, "node tools\\render_public_live_shutdown_patch.js"],
+    ["operator fast-start live shutdown", operatorFastStart, "node tools/render_public_live_shutdown_patch.js"],
+    ["operations start live shutdown", operationsStart, "node tools/render_public_live_shutdown_patch.js"],
+    ["live pilot live shutdown", livePilot, "node tools/render_public_live_shutdown_patch.js"],
+    ["status survival check", survival, "STRANGE_COMPANY_EVOLUTION_STATUS"],
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
+function checkEvolutionNextPacketContract() {
+  const readme = read("README.md");
+  const evolutionLog = read("EVOLUTION_LOG.md");
+  const generator = read("tools/generate_evolution_next_packet.js");
+  const gitignore = read(".gitignore");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+  const pagesWorkflow = read(".github/workflows/pages.yml");
+  const builder = read("tools/build_public_site.js");
+  const survival = read("tools/survival_check.js");
+
+  const required = [
+    ["README next packet tool", readme, "tools/generate_evolution_next_packet.js"],
+    ["README next packet command", readme, "node tools/generate_evolution_next_packet.js"],
+    ["evolution log next packet entry", evolutionLog, "Evolution Next Action Packet"],
+    ["next packet local target", generator, "EVOLUTION_NEXT_ACTION.local.md"],
+    ["next packet status source", generator, "tools/evolution_goal_status.js"],
+    ["next packet review closure section", generator, "Review Closure Workflow"],
+    ["next packet live recovery section", generator, "Live Recovery Workflow"],
+    ["next packet live recovery source", generator, "liveRecoveryActions"],
+    ["next packet selected handoff section", generator, "Do This Next"],
+    ["next packet external live blocker section", generator, "External Live Blockers"],
+    ["next packet review closure source", generator, "reviewClosureActions"],
+    ["next packet local evidence section", generator, "Local Evidence Matrix"],
+    ["next packet local evidence validation command", generator, "node tools/local_evidence_status.js --json"],
+    ["next packet closure phase", generator, "Live review closure phase"],
+    ["next packet closure conformance command", generator, "node tools/check_live_review_closure_conformance.js"],
+    ["next packet stop liveMode", generator, "Do not set `liveMode: true`"],
+    ["next packet no private data", generator, "Do not put CPF, CNPJ, bank data"],
+    ["next packet local ignored", gitignore, "EVOLUTION_NEXT_ACTION.local.md"],
+    ["next packet syntax workflow", validateWorkflow, "node --check tools/generate_evolution_next_packet.js"],
+    ["next packet execution workflow", validateWorkflow, "node tools/generate_evolution_next_packet.js"],
+    ["next packet pages workflow", pagesWorkflow, "node tools/generate_evolution_next_packet.js"],
+    ["next packet public bundle copy", builder, "tools/generate_evolution_next_packet.js"],
+    ["next packet local file forbidden from bundle", builder, "EVOLUTION_NEXT_ACTION\\.local\\.md"],
+    ["next packet survival check", survival, "Evolution Next Action Packet"],
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
+function checkLocalEvidenceStatusContract() {
+  const readme = read("README.md");
+  const evolutionLog = read("EVOLUTION_LOG.md");
+  const statusTool = read("tools/local_evidence_status.js");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+  const pagesWorkflow = read(".github/workflows/pages.yml");
+  const builder = read("tools/build_public_site.js");
+  const survival = read("tools/survival_check.js");
+
+  const required = [
+    ["README local evidence status tool", readme, "tools/local_evidence_status.js"],
+    ["README local evidence status command", readme, "node tools/local_evidence_status.js --json"],
+    ["evolution log local evidence entry", evolutionLog, "Local Evidence Status Matrix"],
+    ["local evidence status system name", statusTool, "STRANGE_COMPANY_LOCAL_EVIDENCE_STATUS"],
+    ["local evidence status local dir override", statusTool, "--local-dir"],
+    ["local evidence status live review lane", statusTool, "LIVE_REVIEW_CLOSURE.local.json"],
+    ["local evidence status missing closure phase", statusTool, "missing"],
+    ["local evidence status invalid closure phase", statusTool, "invalid"],
+    ["local evidence status unbound closure phase", statusTool, "document_ready_unbound"],
+    ["local evidence status bound closure phase", statusTool, "config_bound_ready"],
+    ["local evidence status config binding", statusTool, "--public-config"],
+    ["local evidence status revenue lane", statusTool, "REVENUE_SETUP_EVIDENCE_INDEX.local.json"],
+    ["local evidence status validator stderr guard", statusTool, "without printing ignored packet contents or validator stderr"],
+    ["local evidence status syntax workflow", validateWorkflow, "node --check tools/local_evidence_status.js"],
+    ["local evidence status execution workflow", validateWorkflow, "node tools/local_evidence_status.js --json"],
+    ["local evidence status pages workflow", pagesWorkflow, "node tools/local_evidence_status.js --json"],
+    ["local evidence status public bundle copy", builder, "tools/local_evidence_status.js"],
+    ["local evidence status survival check", survival, "STRANGE_COMPANY_LOCAL_EVIDENCE_STATUS"],
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+}
+
+function checkLiveReviewClosureContract() {
+  const readme = read("README.md");
+  const humanReview = read("HUMAN_REVIEW_PACKET.md");
+  const evolutionLog = read("EVOLUTION_LOG.md");
+  const template = read("LIVE_REVIEW_CLOSURE.template.json");
+  const draft = read("tools/draft_live_review_closure.js");
+  const renderer = read("tools/render_live_review_public_config_patch.js");
+  const binder = read("tools/bind_live_review_closure.js");
+  const strictDataParser = read("tools/strict_public_data.js");
+  const validator = read("tools/validate_live_review_closure.js");
+  const conformance = read("tools/check_live_review_closure_conformance.js");
+  const receiptExporter = read("tools/export_public_live_receipt.js");
+  const publicJs = read("public.js");
+  const publicReceipt = read("public-live-receipt.js");
+  const statusTool = read("tools/evolution_goal_status.js");
+  const vauCompany = read("tools/vau_company_evolution.py");
+  const gitignore = read(".gitignore");
+  const validateWorkflow = read(".github/workflows/validate.yml");
+  const pagesWorkflow = read(".github/workflows/pages.yml");
+  const builder = read("tools/build_public_site.js");
+  const survival = read("tools/survival_check.js");
+
+  const required = [
+    ["README live review template", readme, "LIVE_REVIEW_CLOSURE.template.json"],
+    ["README live review draft tool", readme, "tools/draft_live_review_closure.js"],
+    ["README live review validator", readme, "tools/validate_live_review_closure.js"],
+    ["README live review renderer", readme, "tools/render_live_review_public_config_patch.js"],
+    ["README live review binder", readme, "tools/bind_live_review_closure.js"],
+    ["README live review conformance checker", readme, "tools/check_live_review_closure_conformance.js"],
+    ["human review live closure local packet", humanReview, "LIVE_REVIEW_CLOSURE.local.json"],
+    ["human review live closure ready command", humanReview, "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready"],
+    ["human review config-bound closure command", humanReview, "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js"],
+    ["human review live closure render command", humanReview, "node tools/render_live_review_public_config_patch.js LIVE_REVIEW_CLOSURE.local.json"],
+    ["human review live closure binder plan", humanReview, "node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json"],
+    ["human review live closure binder apply", humanReview, "--apply --expect-plan-id <PLAN_ID>"],
+    ["human review live shutdown command", humanReview, "node tools/render_public_live_shutdown_patch.js"],
+    ["evolution log live review entry", evolutionLog, "Live Review Closure Packet"],
+    ["live review template schema", template, '"schemaVersion": 2'],
+    ["live review template gates", template, '"reviewGates"'],
+    ["live review template document digests", template, '"documentDigests"'],
+    ["live review template keeps liveMode false", template, '"liveMode": false'],
+    ["live review draft local target", draft, "LIVE_REVIEW_CLOSURE.local.json"],
+    ["live review draft stop liveMode", draft, "Do not use this packet to set liveMode true."],
+    ["live review renderer system name", renderer, "LIVE_REVIEW_PUBLIC_CONFIG_PATCH"],
+    ["live review renderer validates ready packet", renderer, "validate_live_review_closure.js"],
+    ["live review renderer keeps liveMode false", renderer, "liveModeRemainsFalse"],
+    ["live review binder system", binder, "STRANGE_COMPANY_LIVE_REVIEW_BIND_PLAN"],
+    ["live review binder plan domain", binder, "STRANGE_COMPANY_LIVE_REVIEW_BIND_PLAN_V1"],
+    ["live review binder stale-plan guard", binder, "--expect-plan-id"],
+    ["live review binder exact fields", binder, "REVIEW_FIELDS"],
+    ["live review binder fail-closed receipt", binder, "not_issued"],
+    ["live review binder atomic replacement", binder, "atomicReplace"],
+    ["strict public config parser", strictDataParser, "parsePublicOrderConfig"],
+    ["strict frozen public archive parser", strictDataParser, "parseFrozenWindowJson"],
+    ["strict parser duplicate-key rejection", strictDataParser, "duplicate object key"],
+    ["strict parser unsafe-key rejection", strictDataParser, "unsafe object key"],
+    ["live review validator ready gate", validator, "--require-ready"],
+    ["live review validator digest domain", validator, "STRANGE_COMPANY_REVIEW_DOCUMENT_V1"],
+    ["live review validator public config binding", validator, "--public-config"],
+    ["live review validator canonical digest map", validator, "documentDigests"],
+    ["live review validator keeps liveMode false", validator, "liveMode must remain false"],
+    ["live review conformance system", conformance, "STRANGE_COMPANY_LIVE_REVIEW_CLOSURE_CONFORMANCE"],
+    ["live review conformance missing phase", conformance, 'phase: "missing"'],
+    ["live review conformance invalid phase", conformance, 'phase: "invalid"'],
+    ["live review conformance unbound phase", conformance, 'phase: "document_ready_unbound"'],
+    ["live review conformance bound phase", conformance, 'phase: "config_bound_ready"'],
+    ["live review conformance local status", conformance, "tools/local_evidence_status.js"],
+    ["live review conformance evolution status", conformance, "tools/evolution_goal_status.js"],
+    ["live review conformance next packet", conformance, "tools/generate_evolution_next_packet.js"],
+    ["live review conformance VAU", conformance, "tools/vau_company_evolution.py"],
+    ["public receipt live review argument", receiptExporter, "--live-review-closure"],
+    ["public receipt authoritative review validator", receiptExporter, "validate_live_review_closure.js"],
+    ["public receipt review validator attestation", receiptExporter, "liveReviewClosureValidatorPassed"],
+    ["public receipt schema v4 exporter", receiptExporter, "schemaVersion: 4"],
+    ["public receipt schema v4 placeholder", publicReceipt, '"schemaVersion": 4'],
+    ["public receipt monotonic generation", receiptExporter, "nextReceiptGeneration"],
+    ["public receipt mutation lock", receiptExporter, "withReceiptMutationLock"],
+    ["public receipt issuance input snapshot", receiptExporter, "createIssuanceSnapshot"],
+    ["public receipt issuance input compare-and-swap", receiptExporter, "assertIssuanceInputsMatchSnapshot"],
+    ["public receipt issuance output baseline", receiptExporter, "captureReceiptOutputBaseline"],
+    ["public receipt issuance compare-and-swap", receiptExporter, "assertReceiptOutputMatchesBaseline"],
+    ["public receipt revocation input snapshot", receiptExporter, "createRevocationSnapshot"],
+    ["public receipt revocation input compare-and-swap", receiptExporter, "assertRevocationInputsMatchSnapshot"],
+    ["public receipt placeholder generation", publicReceipt, '"generation"'],
+    ["public receipt nine-document core", receiptExporter, "reviewDocuments"],
+    ["public browser nine-document core", publicJs, "reviewDocuments"],
+    ["public receipt review-document digest domain", receiptExporter, "STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1"],
+    ["public browser review-document digest domain", publicJs, "STRANGE_COMPANY_PUBLIC_REVIEW_DOCUMENT_V1"],
+    ["public receipt core digest domain v2", receiptExporter, "STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2"],
+    ["public browser core digest domain v2", publicJs, "STRANGE_COMPANY_PUBLIC_LIVE_CORE_V2"],
+    ["public receipt envelope digest domain v4", receiptExporter, "STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V4"],
+    ["public browser envelope digest domain v4", publicJs, "STRANGE_COMPANY_PUBLIC_LIVE_RECEIPT_V4"],
+    ["public browser receipt generation high-water", publicJs, "HIGHEST_PUBLIC_LIVE_RECEIPT_GENERATION"],
+    ["public browser same-generation identity pin", publicJs, "HIGHEST_PUBLIC_LIVE_RECEIPT_IDENTITY"],
+    ["status document-bound closure blocker", statusTool, "humanReviewClosureEvidence"],
+    ["VAU live review closure argument", vauCompany, "--live-review-closure"],
+    ["VAU authoritative review validator", vauCompany, "validate_live_review_closure.js"],
+    ["live review local ignored", gitignore, "LIVE_REVIEW_CLOSURE.local.json"],
+    ["live review template unignored", gitignore, "!LIVE_REVIEW_CLOSURE.template.json"],
+    ["live review draft syntax workflow", validateWorkflow, "node --check tools/draft_live_review_closure.js"],
+    ["live review renderer syntax workflow", validateWorkflow, "node --check tools/render_live_review_public_config_patch.js"],
+    ["live review binder syntax workflow", validateWorkflow, "node --check tools/bind_live_review_closure.js"],
+    ["strict parser syntax workflow", validateWorkflow, "node --check tools/strict_public_data.js"],
+    ["strict parser Pages syntax", pagesWorkflow, "node --check tools/strict_public_data.js"],
+    ["live review binder Pages syntax", pagesWorkflow, "node --check tools/bind_live_review_closure.js"],
+    ["live review validator syntax workflow", validateWorkflow, "node --check tools/validate_live_review_closure.js"],
+    ["live review validator CI template check", validateWorkflow, "node tools/validate_live_review_closure.js --template-ok"],
+    ["live review conformance CI syntax", validateWorkflow, "node --check tools/check_live_review_closure_conformance.js"],
+    ["live review conformance CI execution", validateWorkflow, "node tools/check_live_review_closure_conformance.js"],
+    ["live review pages template check", pagesWorkflow, "node tools/validate_live_review_closure.js --template-ok"],
+    ["live review conformance pages execution", pagesWorkflow, "node tools/check_live_review_closure_conformance.js"],
+    ["live review public bundle copy", builder, "LIVE_REVIEW_CLOSURE.template.json"],
+    ["live review validator public bundle copy", builder, "tools/validate_live_review_closure.js"],
+    ["live review renderer public bundle copy", builder, "tools/render_live_review_public_config_patch.js"],
+    ["live review binder public bundle copy", builder, "tools/bind_live_review_closure.js"],
+    ["strict parser public bundle copy", builder, "tools/strict_public_data.js"],
+    ["Operations conditional closure preparation", read("script.js"), "Only if LIVE_REVIEW_CLOSURE.local.json is absent"],
+    ["gap packet conditional closure preparation", read("tools/generate_external_live_gap_packet.js"), "preparationCondition"],
+    ["gap packet exact binder apply handoff", read("tools/generate_external_live_gap_packet.js"), "exact applyArguments"],
+    ["live review conformance public bundle copy", builder, "tools/check_live_review_closure_conformance.js"],
+    ["VAU public bundle copy", builder, "tools/vau_company_evolution.py"],
+    ["public bundle reviewed-document size parity", builder, "sourceBytes.length !== bundledBytes.length"],
+    ["public bundle reviewed-document byte parity", builder, "sourceBytes.equals(bundledBytes)"],
+    ["public bundle receipt document-root validation", builder, '"--document-root"'],
+    ["public bundle receipt uses root exporter", builder, 'path.join(root, "tools", "export_public_live_receipt.js")'],
+    ["live review local file forbidden from bundle", builder, "LIVE_REVIEW_CLOSURE\\.local\\.json"],
+    ["live review survival check", survival, "Live Review Closure Packet"],
+  ];
+
+  for (const [label, contents, snippet] of required) {
+    assert(contents.includes(snippet), `${label} is missing ${snippet}.`);
+  }
+
+  const executableDataParserPattern = new RegExp(
+    ["runInNew", "Context|runIn", "Context|require\\([\"'](?:node:)?v", "m[\"']\\)|new\\s+v", "m\\.Script"].join("")
+  );
+  for (const toolName of fs.readdirSync(path.join(root, "tools"))) {
+    if (!toolName.endsWith(".js")) continue;
+    const source = read(`tools/${toolName}`);
+    assert(
+      !executableDataParserPattern.test(source),
+      `tools/${toolName} must not execute public data through node:vm.`
+    );
+  }
+
+  for (const documentPath of PUBLIC_REVIEW_DOCUMENT_PATHS) {
+    const quotedPath = JSON.stringify(documentPath);
+    assert(template.includes(quotedPath), `live review template is missing canonical reviewed document ${documentPath}.`);
+    assert(receiptExporter.includes(quotedPath), `public receipt exporter is missing runtime reviewed document ${documentPath}.`);
+    assert(publicJs.includes(quotedPath), `public browser is missing runtime reviewed document ${documentPath}.`);
+    assert(builder.includes(quotedPath), `public bundle contract is missing runtime reviewed document ${documentPath}.`);
+  }
+  assert(!receiptExporter.includes("legalDocuments"), "public receipt exporter must not retain the legacy two-document legalDocuments core.");
+  assert(!publicJs.includes("legalDocuments"), "public browser must not retain the legacy two-document legalDocuments core.");
+  assert(!publicReceipt.includes('"legalDocuments"'), "public receipt placeholder must not retain the legacy two-document legalDocuments core.");
+}
+
 function checkConfig() {
   const config = loadPublicConfig();
   const formUrl = String(config.googleFormUrl || "").trim();
@@ -890,14 +1596,40 @@ function checkConfig() {
 }
 
 compileJavaScript("public-config.js");
+compileJavaScript("public-live-receipt.js");
+compileJavaScript("public-ama-answers.js");
 compileJavaScript("public.js");
 compileJavaScript("script.js");
 compileJavaScript("tools/audit_company_functionality.js");
+compileJavaScript("tools/audit_evolution_log.js");
+compileJavaScript("tools/evolution_goal_status.js");
+compileJavaScript("tools/generate_evolution_next_packet.js");
+compileJavaScript("tools/local_evidence_status.js");
+compileJavaScript("tools/check_live_review_closure_conformance.js");
+compileJavaScript("tools/strict_public_data.js");
+compileJavaScript("tools/draft_live_review_closure.js");
+compileJavaScript("tools/render_live_review_public_config_patch.js");
+compileJavaScript("tools/bind_live_review_closure.js");
+compileJavaScript("tools/render_public_live_shutdown_patch.js");
+compileJavaScript("tools/export_public_live_receipt.js");
+compileJavaScript("tools/build_public_site.js");
 compileJavaScript("tools/draft_external_live_packet.js");
 compileJavaScript("tools/generate_external_live_gap_packet.js");
 compileJavaScript("tools/validate_external_live_packet.js");
+compileJavaScript("tools/validate_live_review_closure.js");
 compileJavaScript("tools/check_external_live_packet_gate.js");
+compileJavaScript("tools/validate_reviewer_candidate_tracker.js");
+compileJavaScript("tools/draft_reviewer_candidate_tracker.js");
+compileJavaScript("tools/draft_revenue_setup_evidence_index.js");
+compileJavaScript("tools/validate_revenue_setup_evidence_index.js");
+compileJavaScript("tools/draft_public_ama_queue.js");
+compileJavaScript("tools/export_public_ama_answers.js");
+compileJavaScript("tools/validate_public_ama_queue.js");
+compileJavaScript("tools/draft_delivery_review_checklist.js");
+compileJavaScript("tools/validate_delivery_review_checklist.js");
 checkExternalLivePacketGate();
+checkLiveReviewClosureConformance();
+checkPublicLiveReceipt();
 checkPublicSurface();
 checkPrivateUrlAllowlists();
 checkOutcomeEvidenceContract();
@@ -910,6 +1642,15 @@ checkOperationalV15Contract();
 checkRevenueStartContract();
 checkMainLegalProcedureContract();
 checkBrazilComplianceContract();
+checkReviewerCandidateContract();
+checkPublicAmaQueueContract();
+checkRevenueSetupEvidenceIndexContract();
+checkDeliveryReviewChecklistContract();
+checkEvolutionLogAuditContract();
+checkEvolutionGoalStatusContract();
+checkEvolutionNextPacketContract();
+checkLocalEvidenceStatusContract();
+checkLiveReviewClosureContract();
 checkConfig();
 
 if (failures.length) {

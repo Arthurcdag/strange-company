@@ -4,6 +4,28 @@ Status: human operator runbook. This is not legal, tax, accounting, payment-prov
 
 Use [REVENUE_SETUP_EVIDENCE_PACKET.md](REVENUE_SETUP_EVIDENCE_PACKET.md), [REVENUE_SETUP_OUTREACH_PACKET.md](REVENUE_SETUP_OUTREACH_PACKET.md), and [REVENUE_SETUP_EVIDENCE_INDEX.template.json](REVENUE_SETUP_EVIDENCE_INDEX.template.json) as the first outside-evidence handoff before asking any customer to pay.
 
+Use `tools/draft_revenue_setup_evidence_index.js` and `tools/validate_revenue_setup_evidence_index.js` for the local evidence index:
+
+```bash
+node tools/draft_revenue_setup_evidence_index.js --write-local
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-payment
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-tax
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-support --public-config public-config.js
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-privacy --public-config public-config.js
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-terms --public-config public-config.js
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-ledger --public-config public-config.js
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
+```
+
+Every `--require-*` command is an actual evidence gate and accepts only
+`mode: "local"`; template, simulation, and local-draft packets remain diagnostic
+inputs only. Support, privacy, terms, and ledger gates also require the current
+`public-config.js` binding shown above so a stale public snapshot cannot pass.
+
+Use [REVIEWER_CANDIDATE_PACKET.md](REVIEWER_CANDIDATE_PACKET.md), [REVIEWER_CANDIDATE_TRACKER.template.json](REVIEWER_CANDIDATE_TRACKER.template.json), [tools/draft_reviewer_candidate_tracker.js](tools/draft_reviewer_candidate_tracker.js), and [tools/validate_reviewer_candidate_tracker.js](tools/validate_reviewer_candidate_tracker.js) when the next blocker is reviewer capacity. The tracker records private outreach evidence; it does not close legal, tax, privacy, payment, or live-mode gates.
+
+Use `REVENUE_SETUP_EVIDENCE_INDEX.local.json` as the local payment/fiscal control file for evidence outside this repo. After completing tax/payment/fiscal fields, run `tools/vau_company_evolution.py --revenue-evidence-index REVENUE_SETUP_EVIDENCE_INDEX.local.json` to reflect that blocker in VAU output.
+
 ## Core Rule
 
 Strange Company does not receive customer money in v0.
@@ -283,7 +305,9 @@ Stop rule: do not rely on intake if the form writes to the wrong Sheet or if the
 
 ## Repo Configuration Before Live Intake
 
-Only edit `public-config.js` after the human gates above have real evidence.
+Only update non-review public fields in `public-config.js` after the human gates
+above have real evidence. The closure binder exclusively owns the four
+reviewed-at fields.
 
 Update these fields:
 
@@ -292,24 +316,39 @@ supportEmail: "reviewed support email",
 googleFormUrl: "reviewed Google Form URL",
 supportInboxVerified: true,
 googleFormVerified: true,
-termsReviewedAt: "YYYY-MM-DD",
-privacyReviewedAt: "YYYY-MM-DD",
-brazilComplianceReviewedAt: "YYYY-MM-DD",
-aiHandoffReviewedAt: "YYYY-MM-DD",
-liveMode: true
+// The closure binder writes the four reviewed-at fields transactionally.
+liveMode: false
 ```
 
 Keep `liveMode: false` if any review date is blank, any outside evidence is missing, or any stop rule is active.
 
+Keep Google Form response collection disabled during this pre-live validation
+and record `google.acceptingResponses: false` in the ignored external-live
+packet. Do not push the responder URL in a pre-flip closed config.
+
 Run:
+
+Keep the binder plan and PLAN_ID local because they commit to private closure
+evidence. Execute only the exact `applyArguments` reported by the unchanged
+plan.
 
 ```powershell
 node --check public-config.js
 node --check public.js
 node --check script.js
+node tools\validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready
+node tools\bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json
+node tools\bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --apply --expect-plan-id <PLAN_ID>
+node tools\validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
+node tools\export_public_live_receipt.js --check-public-js
+node tools\validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
+node tools\validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
+node tools\validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
+node tools\validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+node tools\export_public_live_receipt.js --live-review-closure LIVE_REVIEW_CLOSURE.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools\export_public_live_receipt.js --check-public-js --require-issued
 node tools\preflight_public_launch.js
-node tools\audit_company_functionality.js
-node tools\audit_company_functionality.js --require-live
+node tools\evolution_goal_status.js --json
 node tools\survival_check.js
 python -B -m unittest discover -s tests
 git diff --check
@@ -318,10 +357,34 @@ git diff --check
 Expected result before real launch:
 
 ```text
-All checks pass, including --require-live, only after public-config.js has real reviewed dates and liveMode is true.
+All pre-live checks pass only after `public-config.js` has real reviewed dates and `liveMode: false`, the revenue packet matches that snapshot, and the external-live packet matches every field except its local target `publicConfig.liveMode: true`. The receipt is issued from the still-false tracked config; only the final human decision flips it.
 ```
 
-If `--require-live` fails, do not force the config. Record the blocker and fix the outside evidence first.
+If any command fails, do not force the config. Record the blocker and fix the
+outside evidence first. If all pass and status has no hard, public-route, or
+operational blockers, a human may make the separate `liveMode: true` change and
+must run `node tools/preflight_public_launch.js --deployment` before publication.
+Publish the issued receipt and live config together; enable external Form
+responses only after the live Pages deployment is verified.
+
+If a stop rule or receipt expiry occurs, disable Form responses first. Capture
+the full recovery sequence below and finish it without rerunning status midway:
+
+```powershell
+node tools\render_public_live_shutdown_patch.js
+# Apply only googleFormUrl: "", googleFormVerified: false, and liveMode: false.
+node tools\export_public_live_receipt.js --revoke --public-config public-config.js --output public-live-receipt.js
+node tools\preflight_public_launch.js --deployment
+node tools\build_public_site.js --check --output .public-site-build.local --force
+```
+
+Publish that closed config and placeholder together, verify Pages remains
+closed, and only then rerun status from the closed state before repair or
+reissuance. The revoke path does not require the private packets; a receipt in
+an already open tab is rechecked from the server and fails closed. If revocation
+reports public-config or reviewed-document drift, do not force an overwrite:
+inspect the current closed inputs and rerun revocation from that exact state.
+The concurrent binder or newer receipt bytes remain untouched.
 
 ## First Paid Pilot Procedure
 
@@ -516,6 +579,9 @@ ledger out of sync
 customer submitted sensitive data
 provider payout not reconciled
 ```
+
+When pausing public intake, also follow the fail-closed rollback above; the
+static receipt cannot disable a Google Form reached from an old direct link.
 
 ## Refund Or Cancellation Procedure
 

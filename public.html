@@ -3,10 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; form-action 'none'; object-src 'none'; base-uri 'none'" />
     <title>Strange Works Studio Order Desk</title>
     <link rel="stylesheet" href="styles.css" />
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
     <script src="public-config.js" defer></script>
+    <script src="public-live-receipt.js" defer></script>
+    <script src="public-ama-answers.js" defer></script>
     <script src="public.js" defer></script>
   </head>
   <body class="public-site">
@@ -20,6 +22,8 @@
           </span>
         </a>
         <nav class="public-links" aria-label="Public documents">
+          <a href="#ama">AMA</a>
+          <a href="PUBLIC_AMA.md" target="_blank" rel="noreferrer">AMA rules</a>
           <a href="TERMOS.md" target="_blank" rel="noreferrer">Termos</a>
           <a href="AVISO_DE_PRIVACIDADE.md" target="_blank" rel="noreferrer">Privacidade</a>
           <a href="SUPPORT.md" target="_blank" rel="noreferrer">Support</a>
@@ -28,6 +32,77 @@
       </header>
 
       <section class="public-readiness" id="publicReadiness" aria-live="polite"></section>
+
+      <section class="public-ama-surface" id="ama" aria-labelledby="public-ama-title">
+        <div class="public-ama-copy">
+          <p class="section-kicker">Online AMA</p>
+          <h1 id="public-ama-title">Ask a public-safe question.</h1>
+          <p class="lead">
+            The AMA channel is open for non-sensitive questions about the prototype, launch
+            gates, and operating boundaries. It does not create an order, legal advice,
+            tax advice, payment request, or customer support ticket.
+          </p>
+          <div class="public-status-grid" aria-label="AMA boundaries">
+            <article>
+              <span>Public questions</span>
+            </article>
+            <article>
+              <span>No private data</span>
+            </article>
+            <article>
+              <span>Support inbox</span>
+            </article>
+          </div>
+        </div>
+
+        <form class="public-ama-form" id="publicAmaForm">
+          <div class="field-row">
+            <div class="field">
+              <label for="amaName">Name</label>
+              <input id="amaName" name="name" type="text" autocomplete="name" required />
+            </div>
+            <div class="field">
+              <label for="amaContact">Contact email</label>
+              <input id="amaContact" name="contact" type="text" inputmode="email" autocomplete="email" required />
+            </div>
+          </div>
+          <div class="field">
+            <label for="amaTopic">Topic</label>
+            <select id="amaTopic" name="topic">
+              <option value="launch-gates">Launch gates</option>
+              <option value="strange-works-studio">Strange Works Studio</option>
+              <option value="sealed-company">Sealed Strange Company</option>
+              <option value="brazil-compliance">Brazil compliance boundary</option>
+              <option value="other">Other public question</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="amaQuestion">Question</label>
+            <textarea id="amaQuestion" name="question" rows="5" required></textarea>
+          </div>
+          <label class="order-check">
+            <input name="clean" type="checkbox" required />
+            <span>No credentials, payment data, customer records, private evidence, health data, private keys, CPF, CNPJ documents, or regulated source documents are included.</span>
+          </label>
+          <label class="order-check">
+            <input name="boundary" type="checkbox" required />
+            <span>I understand this AMA question can be handled as a public-safe inquiry and does not request legal, tax, accounting, payment, refund, privacy, or launch approval.</span>
+          </label>
+          <button class="primary-action" type="submit">
+            <span>Create AMA packet</span>
+          </button>
+        </form>
+      </section>
+
+      <section class="public-output" id="publicAmaOutput" aria-live="polite"></section>
+
+      <section class="public-ama-answers" id="publicAmaAnswers" aria-labelledby="public-ama-answers-title">
+        <div class="public-section-heading">
+          <p class="section-kicker">Published answers</p>
+          <h2 id="public-ama-answers-title">Human-approved public AMA answers</h2>
+        </div>
+        <div class="public-ama-answer-list" id="publicAmaAnswerList" aria-live="polite"></div>
+      </section>
 
       <section class="public-order-surface" id="order" aria-labelledby="public-order-title">
         <div class="public-order-copy">
@@ -40,57 +115,69 @@
           </p>
           <div class="public-status-grid" aria-label="Operating boundaries">
             <article>
-              <i data-lucide="file-check-2"></i>
               <span>Manual review</span>
             </article>
             <article>
-              <i data-lucide="shield-alert"></i>
               <span>No regulated data</span>
             </article>
             <article>
-              <i data-lucide="receipt-text"></i>
               <span>Invoice only</span>
             </article>
           </div>
         </div>
 
-        <form class="public-order-form" id="publicOrderForm">
-          <div class="field-row">
-            <div class="field">
-              <label for="publicCustomer">Customer</label>
-              <input id="publicCustomer" name="customer" type="text" autocomplete="organization" required />
-            </div>
-            <div class="field">
-              <label for="publicContact">Contact email</label>
-              <input id="publicContact" name="contact" type="text" inputmode="email" autocomplete="email" required />
-            </div>
+        <div class="public-order-closed" id="publicOrderClosed" role="status" aria-live="polite">
+          <span class="metric-label">Paid intake closed</span>
+          <h2>This site is not accepting paid-intake details.</h2>
+          <p>
+            The public-safe AMA remains available for questions about the prototype, launch
+            gates, and operating boundaries. Do not use any previously shared external intake
+            link while this closed state is shown.
+          </p>
+          <div class="order-output-actions">
+            <a href="#ama">Ask a public-safe question</a>
+            <a href="PUBLIC_AMA.md" target="_blank" rel="noreferrer">Review AMA boundaries</a>
           </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="publicService">Service</label>
-              <select id="publicService" name="service"></select>
+        </div>
+
+        <form class="public-order-form" id="publicOrderForm" hidden aria-hidden="true">
+          <fieldset class="public-order-fields" id="publicOrderFields" hidden disabled>
+            <div class="field-row">
+              <div class="field">
+                <label for="publicCustomer">Customer</label>
+                <input id="publicCustomer" name="customer" type="text" autocomplete="organization" required />
+              </div>
+              <div class="field">
+                <label for="publicContact">Contact email</label>
+                <input id="publicContact" name="contact" type="text" inputmode="email" autocomplete="email" required />
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="publicService">Service</label>
+                <select id="publicService" name="service"></select>
+              </div>
+              <div class="field">
+                <label for="publicAmount">Monthly amount</label>
+                <input id="publicAmount" name="amount" type="text" inputmode="decimal" value="750" required />
+              </div>
             </div>
             <div class="field">
-              <label for="publicAmount">Monthly amount</label>
-              <input id="publicAmount" name="amount" type="text" inputmode="decimal" value="750" required />
+              <label for="publicNeed">Need</label>
+              <textarea id="publicNeed" name="need" rows="5" required></textarea>
             </div>
-          </div>
-          <div class="field">
-            <label for="publicNeed">Need</label>
-            <textarea id="publicNeed" name="need" rows="5" required></textarea>
-          </div>
-          <label class="order-check">
-            <input name="clean" type="checkbox" required />
-            <span>No protected health information, credentials, payment data, private keys, or regulated source documents are included.</span>
-          </label>
-          <label class="order-check">
-            <input name="terms" type="checkbox" required />
-            <span>I read the Portuguese Terms and Privacy Notice and understand this creates a manual invoice request, not an automatic payment or guaranteed acceptance.</span>
-          </label>
-          <button class="primary-action" type="submit">
-            <i data-lucide="send"></i>
-            <span>Create request packet</span>
-          </button>
+            <label class="order-check">
+              <input name="clean" type="checkbox" required />
+              <span>No protected health information, credentials, payment data, private keys, or regulated source documents are included.</span>
+            </label>
+            <label class="order-check">
+              <input name="terms" type="checkbox" required />
+              <span>I read the Portuguese Terms and Privacy Notice and understand this creates a manual invoice request, not an automatic payment or guaranteed acceptance.</span>
+            </label>
+            <button class="primary-action" type="submit">
+              <span>Create request packet</span>
+            </button>
+          </fieldset>
         </form>
       </section>
 

@@ -119,7 +119,10 @@ Use ISO dates: `YYYY-MM-DD`. The date is the actual human review date, not the c
 
 ## Public Config Rule
 
-Only public-safe fields may go into `public-config.js`:
+Only public-safe fields may go into `public-config.js`. The four review dates
+below are binder-owned: record real dates in `LIVE_REVIEW_CLOSURE.local.json`,
+validate its exact reviewed-document digests, inspect the local-only binder
+plan, and apply only that unchanged plan. Never copy these dates manually.
 
 ```js
 googleFormUrl: "https://docs.google.com/forms/...",
@@ -128,10 +131,10 @@ termsReviewedAt: "YYYY-MM-DD",
 privacyReviewedAt: "YYYY-MM-DD",
 brazilComplianceReviewedAt: "YYYY-MM-DD",
 aiHandoffReviewedAt: "YYYY-MM-DD",
-liveMode: true,
+liveMode: false,
 ```
 
-Never put private Sheet URLs, Stripe dashboard URLs, bank details, CNPJ documents, tax IDs, reviewer notes, or credentials in `public-config.js`.
+Never put private Sheet URLs, Stripe dashboard URLs, bank details, CNPJ documents, tax IDs, reviewer notes, or credentials in `public-config.js`. Keep `liveMode` false through the canonical pre-live validation sequence; a human flip is separate.
 
 ## Final Commands Before Any Legal Launch Change
 
@@ -139,13 +142,29 @@ Run all commands from the repo root:
 
 ```bash
 node tools/check_external_live_packet_gate.js
-node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --apply --expect-plan-id <PLAN_ID>
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
+node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
+node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+node tools/export_public_live_receipt.js --live-review-closure LIVE_REVIEW_CLOSURE.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --check-public-js --require-issued
 node tools/preflight_public_launch.js
-node tools/audit_company_functionality.js --require-live
+node tools/evolution_goal_status.js --json
 node tools/survival_check.js
 ```
 
-If any command fails, conka8 must keep `liveMode: false` and report the blockers.
+Run this sequence only with an unpublished local `public-config.js`,
+`liveMode: false`, and external Form responses disabled. The binder plan and
+PLAN_ID remain local because they commit to private closure evidence. If any
+command fails, conka8 must keep `liveMode: false` and report
+the blockers. If all pass, a human may make the separate live-flag change, then
+must run `node tools/preflight_public_launch.js --deployment`, publish the
+issued receipt and live config together, and enable Form responses only after
+the Pages deployment is verified.
 
 ## PR / Commit Rules
 

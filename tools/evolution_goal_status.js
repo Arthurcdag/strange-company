@@ -1,0 +1,711 @@
+const fs = require("fs");
+const path = require("path");
+const { spawnSync } = require("child_process");
+const { parsePublicOrderConfig } = require("./strict_public_data");
+
+const root = path.resolve(__dirname, "..");
+const args = process.argv.slice(2);
+const asJson = args.includes("--json");
+
+function argValue(name, fallback) {
+  const index = args.indexOf(name);
+  return index >= 0 && args[index + 1] ? path.resolve(process.cwd(), args[index + 1]) : fallback;
+}
+
+const publicConfigPath = argValue("--public-config", path.join(root, "public-config.js"));
+const evolutionLogPath = argValue("--evolution-log", path.join(root, "EVOLUTION_LOG.md"));
+const localEvidenceDir = argValue("--local-evidence-dir", root);
+const publicLiveReceiptPath = argValue("--public-live-receipt", path.join(root, "public-live-receipt.js"));
+const termsDocumentPath = argValue("--terms-doc", path.join(root, "TERMOS.md"));
+const privacyDocumentPath = argValue("--privacy-doc", path.join(root, "AVISO_DE_PRIVACIDADE.md"));
+const REVIEW_CLOSURE_FIELDS = ["termsReviewedAt", "privacyReviewedAt", "brazilComplianceReviewedAt", "aiHandoffReviewedAt"];
+const REVIEW_CLOSURE_EVIDENCE_BLOCKER = "humanReviewClosureEvidence";
+const REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND = "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready";
+const REVIEW_CLOSURE_VALIDATOR_COMMAND = "node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js";
+const REVIEW_CLOSURE_BINDER_PLAN_COMMAND = "node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json";
+
+function readText(filePath) {
+  return fs.readFileSync(filePath, "utf8");
+}
+
+function loadPublicConfig(filePath) {
+  return parsePublicOrderConfig(readText(filePath), filePath);
+}
+
+function isIsoDate(value) {
+  const text = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return false;
+  }
+  const date = new Date(`${text}T00:00:00.000Z`);
+  return !Number.isNaN(date.valueOf())
+    && date.toISOString().startsWith(text)
+    && text <= new Date().toISOString().slice(0, 10);
+}
+
+function isGoogleFormUrl(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return false;
+  }
+  try {
+    const url = new URL(text);
+    return url.protocol === "https:" && url.href.startsWith("https://docs.google.com/forms/");
+  } catch (_error) {
+    return false;
+  }
+}
+
+function evolutionPasses(text) {
+  const matches = [...text.matchAll(/^##\s+(\d{4}-\d{2}-\d{2})\s+-\s+(.+)$/gm)];
+  return matches.map((match, index) => {
+    const start = match.index || 0;
+    const next = matches[index + 1];
+    const end = next ? next.index || text.length : text.length;
+    return {
+      date: match[1],
+      title: match[2].trim(),
+      body: text.slice(start, end),
+    };
+  });
+}
+
+function summarizeLatestPass(pass) {
+  if (!pass) {
+    return null;
+  }
+  const resultMatch = pass.body.match(/^Result:\s+(.+(?:\n(?!##\s|\w+:\s).+)*)/m);
+  return {
+    date: pass.date,
+    title: pass.title,
+    result: resultMatch ? resultMatch[1].replace(/\s+/g, " ").trim() : "",
+  };
+}
+
+function loadLocalEvidenceStatus(dir, configPath) {
+  const result = spawnSync(process.execPath, [
+    "tools/local_evidence_status.js",
+    "--json",
+    "--local-dir",
+    dir,
+    "--public-config",
+    configPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) {
+    const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
+    throw new Error(`could not build local evidence status:\n${output}`);
+  }
+  return JSON.parse(result.stdout);
+}
+
+function summarizeLocalEvidence(localEvidence) {
+  return {
+    system: localEvidence.system,
+    publicSafe: localEvidence.publicSafe,
+    allTemplatesValid: localEvidence.allTemplatesValid,
+    laneCount: localEvidence.laneCount,
+    readyLaneCount: localEvidence.readyLaneCount,
+    missingLaneCount: localEvidence.missingLaneCount,
+    invalidLaneCount: localEvidence.invalidLaneCount,
+    lanes: localEvidence.lanes.map((lane) => ({
+      id: lane.id,
+      label: lane.label,
+      localFile: lane.localFile,
+      status: lane.status,
+      phase: lane.phase || null,
+      ready: lane.ready,
+      nextAction: lane.nextAction,
+    })),
+  };
+}
+
+function liveGateRows(config) {
+  return [
+    {
+      id: "supportInboxVerified",
+      label: "support inbox verified",
+      passed: Boolean(String(config.supportEmail || "").trim() && config.supportInboxVerified === true),
+      nextAction: "Keep monitoring the verified support inbox.",
+    },
+    {
+      id: "googleFormVerified",
+      label: "Google Form route verified",
+      passed: Boolean(isGoogleFormUrl(config.googleFormUrl) && config.googleFormVerified === true),
+      nextAction: "Keep the verified Form URL and private Sheet route in local evidence; the tracked closed config stays blank until the final live release.",
+    },
+    {
+      id: "termsReviewedAt",
+      label: "human terms review date",
+      passed: isIsoDate(config.termsReviewedAt),
+      nextAction: "Record the real terms review in LIVE_REVIEW_CLOSURE.local.json; after every closure document is ready, use the plan-token binder rather than editing public-config.js directly.",
+    },
+    {
+      id: "privacyReviewedAt",
+      label: "human privacy review date",
+      passed: isIsoDate(config.privacyReviewedAt),
+      nextAction: "Record the real privacy review in LIVE_REVIEW_CLOSURE.local.json; after every closure document is ready, use the plan-token binder rather than editing public-config.js directly.",
+    },
+    {
+      id: "brazilComplianceReviewedAt",
+      label: "Brazil compliance review date",
+      passed: isIsoDate(config.brazilComplianceReviewedAt),
+      nextAction: "Close CNPJ/fiscal/LGPD/payment support review with a responsible human in LIVE_REVIEW_CLOSURE.local.json, then use the binder only after the full packet validates.",
+    },
+    {
+      id: "aiHandoffReviewedAt",
+      label: "AI handoff review date",
+      passed: isIsoDate(config.aiHandoffReviewedAt),
+      nextAction: "Have a human review what AI prepared, record it in LIVE_REVIEW_CLOSURE.local.json, and let the binder apply the date only after the full packet validates.",
+    },
+    {
+      id: "liveMode",
+      label: "live mode remains closed until evidence is real",
+      passed: config.liveMode !== true,
+      nextAction: "Keep liveMode false until all public and private live gates pass.",
+    },
+  ];
+}
+
+function reviewClosureActions(hardBlockers, phase) {
+  if (!hardBlockers.some((blocker) => (
+    REVIEW_CLOSURE_FIELDS.includes(blocker) || blocker === REVIEW_CLOSURE_EVIDENCE_BLOCKER
+  ))) {
+    return [];
+  }
+  if (phase === "document_ready_unbound") {
+    return [
+      `Render the receipt-first, atomic-per-file binding plan: ${REVIEW_CLOSURE_BINDER_PLAN_COMMAND}.`,
+      "Keep the private-evidence commitment and PLAN_ID local, then execute the exact applyArguments reported by that unchanged plan.",
+      `Confirm the config-bound closure and fail-closed receipt placeholder: ${REVIEW_CLOSURE_VALIDATOR_COMMAND}; node tools/export_public_live_receipt.js --check-public-js.`,
+    ];
+  }
+  if (phase === "invalid") {
+    return [
+      "Inspect and repair the existing LIVE_REVIEW_CLOSURE.local.json with real human-review evidence; do not overwrite or fabricate it.",
+      `Recheck the document-bound packet: ${REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND}.`,
+      `After document validation passes, render the transactional binding plan: ${REVIEW_CLOSURE_BINDER_PLAN_COMMAND}.`,
+      "Keep the private-evidence commitment and PLAN_ID local, then execute the exact applyArguments reported by that unchanged plan.",
+      `Confirm the final config binding: ${REVIEW_CLOSURE_VALIDATOR_COMMAND}.`,
+    ];
+  }
+  return [
+    "Draft LIVE_REVIEW_CLOSURE.local.json: node tools/draft_live_review_closure.js --write-local",
+    `Fill or repair real human review evidence locally, including documentDigests for every canonical reviewed document, then run ${REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND}.`,
+    `After document validation passes, render the transactional binding plan: ${REVIEW_CLOSURE_BINDER_PLAN_COMMAND}.`,
+    "Keep the private-evidence commitment and PLAN_ID local, then execute the exact applyArguments reported by that unchanged plan.",
+    `Confirm the final config binding: ${REVIEW_CLOSURE_VALIDATOR_COMMAND}.`,
+  ];
+}
+
+function evidenceLane(localEvidence, id) {
+  return localEvidence.lanes.find((lane) => lane.id === id) || null;
+}
+
+function blockerFromLane(localEvidence, id, blocker) {
+  const lane = evidenceLane(localEvidence, id);
+  return lane && lane.ready ? [] : [{ ...blocker, laneId: id }];
+}
+
+function issuedPublicLiveReceiptReady(configPath, receiptPath, termsPath, privacyPath) {
+  const result = spawnSync(process.execPath, [
+    "tools/export_public_live_receipt.js",
+    "--check-public-js",
+    "--require-issued",
+    "--public-config",
+    configPath,
+    "--public-js",
+    receiptPath,
+    "--terms-doc",
+    termsPath,
+    "--privacy-doc",
+    privacyPath,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  return result.status === 0;
+}
+
+function laneHandoff(localEvidence, options) {
+  const lane = evidenceLane(localEvidence, options.laneId);
+  const laneStatus = lane ? lane.status : "missing";
+  const lanePhase = lane ? lane.phase : null;
+  let command = options.validatorCommand;
+  if (lanePhase && options.phaseCommands && options.phaseCommands[lanePhase]) {
+    command = options.phaseCommands[lanePhase];
+  } else if (laneStatus === "missing") {
+    command = options.draftCommand;
+  } else if (laneStatus === "ready" && options.readyCommand) {
+    command = options.readyCommand;
+  }
+  const validatorCommand = lanePhase
+    && options.phaseValidatorCommands
+    && options.phaseValidatorCommands[lanePhase]
+    ? options.phaseValidatorCommands[lanePhase]
+    : options.validatorCommand;
+  return {
+    blockerId: options.blockerId,
+    laneId: options.laneId,
+    laneStatus,
+    lanePhase,
+    priority: options.priority,
+    command,
+    validatorCommand,
+    progressAuditCommand: "node tools/evolution_goal_status.js --json",
+    requiresRealEvidence: true,
+    liveModeRemainsFalse: true,
+    whyNow: options.whyNow,
+  };
+}
+
+function selectHandoff({
+  reviewBlockers,
+  reviewClosureEvidenceBlockers,
+  revenueBlockers,
+  externalLiveBlockers,
+  publicRouteBlockers,
+  operationalBlockers,
+  localEvidence,
+  liveMode,
+  publicRuntimeReady,
+}) {
+  if (liveMode) {
+    if (!publicRuntimeReady) {
+      return {
+        blockerId: "liveModeRecoveryRequired",
+        laneId: null,
+        laneStatus: "unsafe_live_state",
+        lanePhase: "fail_closed_recovery",
+        priority: "safety_recovery",
+        command: "node tools/render_public_live_shutdown_patch.js",
+        validatorCommand: "node tools/export_public_live_receipt.js --revoke --public-config public-config.js --output public-live-receipt.js",
+        progressAuditCommand: "node tools/evolution_goal_status.js --json",
+        requiresRealEvidence: true,
+        liveModeRemainsFalse: false,
+        currentLiveMode: true,
+        targetLiveMode: false,
+        whyNow: "liveMode is true while the public runtime config or its issued receipt is invalid; fail closed and deploy the closed config before repairing or reissuing evidence.",
+      };
+    }
+    return {
+      blockerId: "liveOperationsReview",
+      laneId: null,
+      laneStatus: "ready",
+      priority: "live_operations",
+      command: "python tools/vau_company_evolution.py --depth 1",
+      validatorCommand: "node tools/survival_check.js",
+      progressAuditCommand: "node tools/evolution_goal_status.js --json",
+      requiresRealEvidence: true,
+      liveModeRemainsFalse: false,
+      whyNow: "The current public runtime and issued receipt remain valid; review live outcomes while rebuilding any missing local packets before a future receipt reissuance.",
+    };
+  }
+
+  if (reviewBlockers.length || reviewClosureEvidenceBlockers.length) {
+    return laneHandoff(localEvidence, {
+      blockerId: REVIEW_CLOSURE_EVIDENCE_BLOCKER,
+      laneId: "liveReviewClosure",
+      priority: "hard_gate",
+      draftCommand: "node tools/draft_live_review_closure.js --write-local",
+      validatorCommand: REVIEW_CLOSURE_VALIDATOR_COMMAND,
+      readyCommand: REVIEW_CLOSURE_BINDER_PLAN_COMMAND,
+      phaseCommands: {
+        missing: "node tools/draft_live_review_closure.js --write-local",
+        invalid: REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND,
+        document_ready_unbound: REVIEW_CLOSURE_BINDER_PLAN_COMMAND,
+      },
+      phaseValidatorCommands: {
+        missing: REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND,
+        invalid: REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND,
+        document_ready_unbound: REVIEW_CLOSURE_VALIDATOR_COMMAND,
+      },
+      whyNow: "Document-bound human review closure evidence must validate and its four dates must match public-config.js before any other live-readiness handoff.",
+    });
+  }
+
+  const hardLaneCandidates = [];
+  if (revenueBlockers.length) {
+    hardLaneCandidates.push(laneHandoff(localEvidence, {
+      blockerId: "privatePaymentFiscalEvidence",
+      laneId: "revenueSetupEvidence",
+      priority: "hard_gate",
+      draftCommand: "node tools/draft_revenue_setup_evidence_index.js --write-local",
+      validatorCommand: "node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js",
+      whyNow: "Validated payment and fiscal evidence is required before any paid operating decision.",
+    }));
+  }
+  if (externalLiveBlockers.length) {
+    hardLaneCandidates.push(laneHandoff(localEvidence, {
+      blockerId: "privateExternalLiveEvidence",
+      laneId: "externalLivePacket",
+      priority: "hard_gate",
+      draftCommand: "node tools/draft_external_live_packet.js --write-local",
+      validatorCommand: "node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js",
+      whyNow: "The strict Stripe, bank, support, Google, and review packet must validate before a human live decision.",
+    }));
+  }
+
+  const activeHardLane = hardLaneCandidates.find((handoff) => handoff.laneStatus !== "missing")
+    || hardLaneCandidates[0];
+  if (activeHardLane) {
+    return activeHardLane;
+  }
+
+  const immediatePublicRouteBlocker = publicRouteBlockers.find(
+    (blocker) => blocker.id !== "publicLiveReceipt"
+  );
+  if (immediatePublicRouteBlocker) {
+    const blocker = immediatePublicRouteBlocker;
+    return {
+      blockerId: blocker.id,
+      laneId: null,
+      laneStatus: "open",
+      priority: "public_route",
+      command: blocker.command || blocker.nextAction,
+      validatorCommand: blocker.validatorCommand || "node tools/preflight_public_launch.js",
+      progressAuditCommand: "node tools/evolution_goal_status.js --json",
+      requiresRealEvidence: true,
+      liveModeRemainsFalse: true,
+      whyNow: "The public route must be verified before readiness can advance.",
+    };
+  }
+
+  if (operationalBlockers.length) {
+    const blocker = operationalBlockers[0];
+    const config = blocker.id === "humanReviewerCapacity"
+      ? {
+        draftCommand: "node tools/draft_reviewer_candidate_tracker.js --write-local",
+        validatorCommand: "node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready",
+      }
+      : {
+        draftCommand: "node tools/draft_delivery_review_checklist.js --write-local",
+        validatorCommand: "node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready",
+      };
+    return laneHandoff(localEvidence, {
+      blockerId: blocker.id,
+      laneId: blocker.laneId,
+      priority: "operational_gate",
+      ...config,
+      whyNow: `${blocker.label} is the next operating-capacity gate after live evidence is ready.`,
+    });
+  }
+
+  const receiptBlocker = publicRouteBlockers.find((blocker) => blocker.id === "publicLiveReceipt");
+  if (receiptBlocker) {
+    return {
+      blockerId: receiptBlocker.id,
+      laneId: null,
+      laneStatus: "open",
+      priority: "public_route",
+      command: receiptBlocker.command || receiptBlocker.nextAction,
+      validatorCommand: receiptBlocker.validatorCommand || "node tools/preflight_public_launch.js",
+      progressAuditCommand: "node tools/evolution_goal_status.js --json",
+      requiresRealEvidence: true,
+      liveModeRemainsFalse: true,
+      whyNow: "All private readiness and operating-capacity validators are ready; issue the short-lived public receipt before the separate human live decision.",
+    };
+  }
+
+  return {
+    blockerId: "humanLiveModeDecision",
+    laneId: null,
+    laneStatus: "ready",
+    priority: "human_decision",
+    command: "node tools/preflight_public_launch.js",
+    validatorCommand: "node tools/evolution_goal_status.js --json",
+    progressAuditCommand: "node tools/survival_check.js",
+    requiresRealEvidence: true,
+    liveModeRemainsFalse: true,
+    whyNow: "Every tracked gate is ready; a human operator must review the public receipt and make the separate liveMode decision.",
+  };
+}
+
+function evolutionMode(hardBlockers, publicRouteBlockers, operationalBlockers, liveMode, publicRuntimeReady) {
+  if (liveMode) {
+    if (!publicRuntimeReady) {
+      return {
+        mode: "recover_fail_closed",
+        nextLoop: "Disable external responses, return the public config and receipt to a deployed fail-closed state, then rebuild readiness.",
+      };
+    }
+    return {
+      mode: "operate_measure_adapt",
+      nextLoop: "Convert each live outcome into a reviewed receipt, rebuild reissuance evidence as needed, then scale, revise, or stop the lane.",
+    };
+  }
+  if (hardBlockers.length) {
+    return {
+      mode: "burn_down_hard_blockers",
+      nextLoop: "Close one real evidence gate, rerun status, and keep liveMode false.",
+    };
+  }
+  if (publicRouteBlockers.length || operationalBlockers.length) {
+    return {
+      mode: "harden_operations",
+      nextLoop: "Improve public route verification, reviewer capacity, delivery review, or support receipts before scaling.",
+    };
+  }
+  return {
+    mode: "ready_for_human_live_decision",
+    nextLoop: "Run the live audit and require a human operator decision before flipping liveMode.",
+  };
+}
+
+function buildStatus(config, logText, localEvidence, publicLiveReceiptReady) {
+  const localEvidenceSummary = summarizeLocalEvidence(localEvidence);
+  const closureLane = evidenceLane(localEvidenceSummary, "liveReviewClosure");
+  const closurePhase = closureLane ? closureLane.phase : "missing";
+  const closureEvidenceReady = closurePhase === "config_bound_ready";
+  const closureCommandsByPhase = {
+    missing: "node tools/draft_live_review_closure.js --write-local",
+    invalid: REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND,
+    document_ready_unbound: REVIEW_CLOSURE_BINDER_PLAN_COMMAND,
+    config_bound_ready: REVIEW_CLOSURE_VALIDATOR_COMMAND,
+  };
+  const closureValidatorsByPhase = {
+    missing: REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND,
+    invalid: REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND,
+    document_ready_unbound: REVIEW_CLOSURE_VALIDATOR_COMMAND,
+    config_bound_ready: REVIEW_CLOSURE_VALIDATOR_COMMAND,
+  };
+  const publicConfigGateRows = liveGateRows(config).filter((row) => row.id !== "liveMode");
+  const evidenceRows = [
+    ...publicConfigGateRows,
+    {
+      id: REVIEW_CLOSURE_EVIDENCE_BLOCKER,
+      label: "document-bound human review closure evidence matching the public review dates",
+      passed: closureEvidenceReady,
+      command: closureCommandsByPhase[closurePhase] || REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND,
+      validatorCommand: closureValidatorsByPhase[closurePhase] || REVIEW_CLOSURE_DOCUMENT_VALIDATOR_COMMAND,
+      nextAction: "Validate LIVE_REVIEW_CLOSURE.local.json against every canonical reviewed document, then use bind_live_review_closure.js to plan and apply the exact four-date plus fail-closed-placeholder transition while liveMode remains false.",
+    },
+    {
+      id: "publicLiveReceipt",
+      label: "issued public live receipt bound to the current public config and all nine canonical reviewed documents",
+      passed: publicLiveReceiptReady,
+      command: "node tools/export_public_live_receipt.js --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --live-review-closure LIVE_REVIEW_CLOSURE.local.json --public-config public-config.js --output public-live-receipt.js --force",
+      validatorCommand: "node tools/export_public_live_receipt.js --check-public-js --require-issued",
+      nextAction: "Validate document-bound review closure, revenue, external-live, reviewer-capacity, delivery-review, and all nine canonical reviewed documents, then export the seven-day public-only live receipt while liveMode remains false.",
+    },
+  ];
+  const publicRouteBlockers = evidenceRows
+    .filter((row) => !row.passed)
+    .filter((row) => !REVIEW_CLOSURE_FIELDS.includes(row.id))
+    .filter((row) => row.id !== REVIEW_CLOSURE_EVIDENCE_BLOCKER);
+  const reviewBlockers = evidenceRows
+    .filter((row) => !row.passed)
+    .filter((row) => REVIEW_CLOSURE_FIELDS.includes(row.id))
+    .map((row) => row.id);
+  const reviewClosureEvidenceBlockers = closureEvidenceReady
+    ? []
+    : [{
+      id: REVIEW_CLOSURE_EVIDENCE_BLOCKER,
+      label: "document-bound human review closure evidence",
+      laneId: "liveReviewClosure",
+      nextAction: evidenceRows.find((row) => row.id === REVIEW_CLOSURE_EVIDENCE_BLOCKER).nextAction,
+    }];
+  const revenueBlockers = blockerFromLane(localEvidenceSummary, "revenueSetupEvidence", {
+    id: "privatePaymentFiscalEvidence",
+    label: "private payment/fiscal evidence",
+    nextAction: "Complete REVENUE_SETUP_EVIDENCE_INDEX.local.json outside git and run node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js.",
+  });
+  const externalLiveBlockers = blockerFromLane(localEvidenceSummary, "externalLivePacket", {
+    id: "privateExternalLiveEvidence",
+    label: "private external live evidence",
+    nextAction: "Complete EXTERNAL_LIVE_PACKET.local.json outside git and run node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js.",
+  });
+  const operationalBlockers = [
+    ...blockerFromLane(localEvidenceSummary, "reviewerCandidateTracker", {
+      id: "humanReviewerCapacity",
+      label: "four-role human reviewer capacity",
+      nextAction: "Complete REVIEWER_CANDIDATE_TRACKER.local.json outside git and run node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready.",
+    }),
+    ...blockerFromLane(localEvidenceSummary, "deliveryReviewChecklist", {
+      id: "deliveryReviewLoop",
+      label: "repeatable delivery review loop",
+      nextAction: "Complete DELIVERY_REVIEW_CHECKLIST.local.json outside git and run node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready.",
+    }),
+  ];
+  const hardBlockers = [
+    ...reviewBlockers,
+    ...reviewClosureEvidenceBlockers.map((blocker) => blocker.id),
+    ...revenueBlockers.map((blocker) => blocker.id),
+    ...externalLiveBlockers.map((blocker) => blocker.id),
+  ];
+  const closureActions = reviewClosureActions(hardBlockers, closurePhase);
+  const passes = evolutionPasses(logText);
+  const latestPass = summarizeLatestPass(passes[passes.length - 1]);
+  const publicRuntimeReady = publicConfigGateRows.every((row) => row.passed) && publicLiveReceiptReady;
+  const reissuanceReady = !publicRouteBlockers.length && !hardBlockers.length && !operationalBlockers.length;
+  const publicLiveReady = config.liveMode === true ? publicRuntimeReady : reissuanceReady;
+  const modeState = evolutionMode(
+    hardBlockers,
+    publicRouteBlockers,
+    operationalBlockers,
+    config.liveMode === true,
+    publicRuntimeReady,
+  );
+  const liveRecoveryActions = config.liveMode === true && !publicRuntimeReady
+    ? [
+      "Disable external Google Form responses before changing repo state.",
+      "Render the fail-closed patch: node tools/render_public_live_shutdown_patch.js.",
+      "Apply only googleFormUrl: \"\", googleFormVerified: false, and liveMode: false to public-config.js.",
+      "Revoke the receipt: node tools/export_public_live_receipt.js --revoke --public-config public-config.js --output public-live-receipt.js.",
+      "Run node tools/preflight_public_launch.js --deployment and node tools/build_public_site.js --check --output .public-site-build.local --force.",
+      "Publish the closed config and fail-closed receipt together, then verify the Pages deployment remains closed.",
+      "Rerun node tools/evolution_goal_status.js --json from the closed state before repairing evidence or issuing another receipt.",
+    ]
+    : [];
+  const publicGateRows = [
+    ...evidenceRows,
+    {
+      id: "liveMode",
+      label: "live mode is enabled only when verified readiness permits it",
+      passed: config.liveMode !== true || publicRuntimeReady,
+      nextAction: config.liveMode === true && !publicRuntimeReady
+        ? "Disable external responses and deploy a fail-closed config and receipt before rebuilding readiness."
+        : config.liveMode === true
+        ? "Keep monitoring the public runtime and rebuild missing local evidence before the next receipt reissuance."
+        : reissuanceReady
+        ? "Require a human operator decision before changing liveMode."
+        : "Keep liveMode false until all public and private live gates pass.",
+    },
+  ];
+  const localEvidenceActions = localEvidenceSummary.lanes
+    .filter((lane) => !lane.ready)
+    .filter((lane) => !["externalLivePacket", "liveReviewClosure", "revenueSetupEvidence"].includes(lane.id))
+    .map((lane) => `${lane.label}: ${lane.nextAction}`);
+  const selectedHandoff = selectHandoff({
+    reviewBlockers,
+    reviewClosureEvidenceBlockers,
+    revenueBlockers,
+    externalLiveBlockers,
+    publicRouteBlockers,
+    operationalBlockers,
+    localEvidence: localEvidenceSummary,
+    liveMode: config.liveMode === true,
+    publicRuntimeReady,
+  });
+
+  return {
+    system: "STRANGE_COMPANY_EVOLUTION_STATUS",
+    goalStatus: "active",
+    mode: modeState.mode,
+    nextLoop: modeState.nextLoop,
+    publicLiveReady,
+    publicRuntimeReady,
+    reissuanceReady,
+    companyOperationalReady: publicLiveReady,
+    liveMode: config.liveMode === true,
+    publicGateRows,
+    hardBlockers,
+    publicRouteBlockers: publicRouteBlockers.map((blocker) => blocker.id),
+    publicLiveReceiptReady,
+    liveReviewClosurePhase: closurePhase,
+    selectedHandoff,
+    liveRecoveryActions,
+    reviewClosureActions: closureActions,
+    reviewClosureEvidenceBlockers,
+    revenueBlockers,
+    externalLiveBlockers,
+    operationalBlockers,
+    localEvidence: localEvidenceSummary,
+    evolutionPassCount: passes.length,
+    latestPass,
+    nextActions: liveRecoveryActions.length
+      ? [
+        ...liveRecoveryActions,
+        "Run node tools/audit_evolution_log.js after the fail-closed recovery pass.",
+      ]
+      : [
+        ...(closureActions.length
+          ? closureActions
+          : []),
+        ...publicRouteBlockers.map((blocker) => blocker.nextAction),
+        ...revenueBlockers.map((blocker) => blocker.nextAction),
+        ...externalLiveBlockers.map((blocker) => blocker.nextAction),
+        ...localEvidenceActions,
+        "Run node tools/audit_evolution_log.js after every repo evolution pass.",
+      ],
+    guardrails: [
+      "Do not set liveMode true until reissuance readiness passes; once live, fail closed only if public runtime readiness fails.",
+      "Do not commit local evidence packets, credentials, tax IDs, bank data, or customer-private material.",
+      "Do not treat simulations, templates, or AI output as legal, tax, payment, privacy, fiscal, or launch approval.",
+    ],
+  };
+}
+
+function printText(status) {
+  console.log(status.system);
+  console.log(`Goal status: ${status.goalStatus}`);
+  console.log(`Mode: ${status.mode}`);
+  console.log(`Next loop: ${status.nextLoop}`);
+  console.log(`Public live ready: ${status.publicLiveReady}`);
+  console.log(`Public runtime ready: ${status.publicRuntimeReady}`);
+  console.log(`Reissuance ready: ${status.reissuanceReady}`);
+  console.log(`Company operational ready: ${status.companyOperationalReady}`);
+  console.log(`liveMode: ${status.liveMode}`);
+  console.log(`Live review closure phase: ${status.liveReviewClosurePhase}`);
+  console.log(`Evolution passes logged: ${status.evolutionPassCount}`);
+  if (status.latestPass) {
+    console.log(`Latest pass: ${status.latestPass.date} - ${status.latestPass.title}`);
+    console.log(`Latest result: ${status.latestPass.result}`);
+  }
+  console.log("");
+  console.log("Selected handoff:");
+  console.log(`- blocker: ${status.selectedHandoff.blockerId}`);
+  console.log(`- command: ${status.selectedHandoff.command}`);
+  console.log(`- validate: ${status.selectedHandoff.validatorCommand}`);
+  console.log("Hard blockers:");
+  for (const blocker of status.hardBlockers) {
+    console.log(`- ${blocker}`);
+  }
+  console.log("Review closure workflow:");
+  for (const action of status.reviewClosureActions) {
+    console.log(`- ${action}`);
+  }
+  console.log("Revenue blockers:");
+  for (const blocker of status.revenueBlockers) {
+    console.log(`- ${blocker.id}: ${blocker.nextAction}`);
+  }
+  console.log("External live blockers:");
+  for (const blocker of status.externalLiveBlockers) {
+    console.log(`- ${blocker.id}: ${blocker.nextAction}`);
+  }
+  console.log("Operational blockers:");
+  for (const blocker of status.operationalBlockers) {
+    console.log(`- ${blocker.id}: ${blocker.nextAction}`);
+  }
+  console.log("Local evidence:");
+  console.log(`- ready lanes: ${status.localEvidence.readyLaneCount}/${status.localEvidence.laneCount}`);
+  console.log(`- missing lanes: ${status.localEvidence.missingLaneCount}`);
+  console.log(`- invalid lanes: ${status.localEvidence.invalidLaneCount}`);
+  for (const lane of status.localEvidence.lanes) {
+    console.log(`- ${lane.id}: ${lane.status}`);
+  }
+  console.log("Next actions:");
+  for (const action of status.nextActions) {
+    console.log(`- ${action}`);
+  }
+}
+
+const status = buildStatus(
+  loadPublicConfig(publicConfigPath),
+  readText(evolutionLogPath),
+  loadLocalEvidenceStatus(localEvidenceDir, publicConfigPath),
+  issuedPublicLiveReceiptReady(
+    publicConfigPath,
+    publicLiveReceiptPath,
+    termsDocumentPath,
+    privacyDocumentPath,
+  ),
+);
+
+if (asJson) {
+  console.log(JSON.stringify(status, null, 2));
+} else {
+  printText(status);
+}

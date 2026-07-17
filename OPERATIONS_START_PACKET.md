@@ -139,28 +139,42 @@ Edit `public-config.js` only after sections 1-5 are done.
 - [ ] Set `googleFormUrl`.
 - [x] Set `supportInboxVerified: true`.
 - [ ] Set `googleFormVerified: true`.
-- [ ] Set `termsReviewedAt`.
-- [ ] Set `privacyReviewedAt`.
-- [ ] Set `brazilComplianceReviewedAt`.
-- [ ] Set `aiHandoffReviewedAt`.
+- [ ] Validate the document-bound closure, inspect the local-only binder plan, and execute only its unchanged `applyArguments`. The receipt advances first and each file replacement is atomic, so an interruption remains fail-closed and resumable; this is not a two-file atomic commit.
 - [ ] Confirm service titles, descriptions, and prices.
 - [ ] Confirm `jurisdiction: "BR"` remains set.
-- [ ] Set `liveMode: true` last.
+- [ ] Keep `liveMode: false` through evidence validation, receipt export, preflight, and status review.
 
 Required checks:
 
 ```bash
-node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json
+node tools/bind_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --apply --expect-plan-id <PLAN_ID>
+node tools/validate_live_review_closure.js LIVE_REVIEW_CLOSURE.local.json --require-ready --public-config public-config.js
+node tools/export_public_live_receipt.js --check-public-js
+node tools/validate_revenue_setup_evidence_index.js REVENUE_SETUP_EVIDENCE_INDEX.local.json --require-all --public-config public-config.js
+node tools/validate_external_live_packet.js EXTERNAL_LIVE_PACKET.local.json --require-live --public-config public-config.js
+node tools/validate_reviewer_candidate_tracker.js REVIEWER_CANDIDATE_TRACKER.local.json --require-ready
+node tools/validate_delivery_review_checklist.js DELIVERY_REVIEW_CHECKLIST.local.json --require-ready
+node tools/export_public_live_receipt.js --live-review-closure LIVE_REVIEW_CLOSURE.local.json --external-live-packet EXTERNAL_LIVE_PACKET.local.json --revenue-index REVENUE_SETUP_EVIDENCE_INDEX.local.json --reviewer-tracker REVIEWER_CANDIDATE_TRACKER.local.json --delivery-review-checklist DELIVERY_REVIEW_CHECKLIST.local.json --public-config public-config.js --output public-live-receipt.js --force
+node tools/export_public_live_receipt.js --check-public-js --require-issued
 node tools/preflight_public_launch.js
-node tools/audit_company_functionality.js --require-live
+node tools/evolution_goal_status.js --json
 ```
 
-Both must pass before publishing.
+Every command must pass with external Form responses disabled, and status must
+show no hard, public-route, or operational blockers. A human may then make the
+separate `liveMode: true` change and rerun `node tools/preflight_public_launch.js
+--deployment`. Publish the issued receipt and live config together, verify
+Pages, and only then enable Form responses. Keep the binder plan and PLAN_ID
+local because they commit to private closure evidence.
 
 ### 7. Publish And Smoke Test
 
 - [ ] Commit the config and reviewed-document changes.
-- [ ] Push to `main`.
+- [ ] Push a release branch, open a PR, obtain the required non-self approval,
+  and merge only after protected checks pass; never push the release directly
+  to `main`.
 - [ ] Wait for the GitHub Pages deploy to pass.
 - [ ] Open `https://arthurcdag.github.io/strange-company/`.
 - [ ] Confirm the readiness banner says `Live intake configured`.
@@ -191,6 +205,18 @@ Pause intake and set `liveMode: false` if any of these happen:
 
 Record the event as an incident before resuming.
 
+Disable Google Form response collection before the rollback. Clear
+`googleFormUrl`, set `googleFormVerified: false`, and set `liveMode: false` by
+running `node tools/render_public_live_shutdown_patch.js` and applying only its
+three output values. Then run
+`node tools/export_public_live_receipt.js --revoke --public-config
+public-config.js --output public-live-receipt.js`, run
+`node tools/preflight_public_launch.js --deployment`, build the public bundle,
+and publish the closed config plus placeholder together. Verify Pages is closed
+and only then rerun status from the closed state. Finish this captured sequence
+without pausing after the config patch; the static receipt cannot close a direct
+external Form link by itself.
+
 ## Next Action
 
 The next operator action is not a code change. It is to create or verify:
@@ -202,6 +228,8 @@ The next operator action is not a code change. It is to create or verify:
 5. terms and privacy review dates,
 6. AI/human review owner.
 
-Use [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md) for exact field names, Google Form questions, support inbox checks, Stripe evidence, bank evidence boundaries, and the final `public-config.js` patch.
+Use [EXTERNAL_LIVE_CONTROLS.md](EXTERNAL_LIVE_CONTROLS.md) for exact field names, Google Form questions, support inbox checks, Stripe evidence, bank evidence boundaries, and the final public-config binding sequence.
 
-After those are available, update `public-config.js`, run the two required checks, and publish.
+After those are available, bind reviewed dates with the local-only closure plan,
+update only the other documented public-safe fields, run the complete validation
+sequence, and publish through an approved protected PR.

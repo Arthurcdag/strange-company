@@ -15,18 +15,42 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: false
 
       - name: Check JavaScript syntax
         run: |
           node --check public-config.js
+          node --check public-live-receipt.js
+          node --check public-ama-answers.js
           node --check public.js
           node --check script.js
+          node --check tools/build_public_site.js
           node --check tools/preflight_public_launch.js
           node --check tools/audit_company_functionality.js
+          node --check tools/audit_evolution_log.js
+          node --check tools/evolution_goal_status.js
+          node --check tools/generate_evolution_next_packet.js
+          node --check tools/local_evidence_status.js
+          node --check tools/check_live_review_closure_conformance.js
+          node --check tools/strict_public_data.js
+          node --check tools/draft_live_review_closure.js
+          node --check tools/render_live_review_public_config_patch.js
+          node --check tools/bind_live_review_closure.js
+          node --check tools/render_public_live_shutdown_patch.js
+          node --check tools/export_public_live_receipt.js
+          node --check tools/draft_reviewer_candidate_tracker.js
+          node --check tools/draft_revenue_setup_evidence_index.js
+          node --check tools/draft_delivery_review_checklist.js
+          node --check tools/draft_public_ama_queue.js
+          node --check tools/export_public_ama_answers.js
           node --check tools/validate_external_live_packet.js
+          node --check tools/validate_live_review_closure.js
+          node --check tools/validate_public_ama_queue.js
+          node --check tools/validate_reviewer_candidate_tracker.js
+          node --check tools/validate_revenue_setup_evidence_index.js
+          node --check tools/validate_delivery_review_checklist.js
           node --check tools/check_external_live_packet_gate.js
           node --check tools/draft_external_live_packet.js
           node --check tools/generate_external_live_gap_packet.js
@@ -40,7 +64,22 @@ jobs:
       - name: Run public launch preflight
         run: |
           node tools/validate_external_live_packet.js --template-ok
-          node tools/preflight_public_launch.js
+          node tools/validate_live_review_closure.js --template-ok
+          node tools/export_public_ama_answers.js --template-ok
+          node tools/export_public_ama_answers.js --check-public-js
+          node tools/validate_public_ama_queue.js --template-ok
+          node tools/validate_reviewer_candidate_tracker.js --template-ok
+          node tools/validate_revenue_setup_evidence_index.js --template-ok
+          node tools/validate_delivery_review_checklist.js --template-ok
+          node tools/export_public_live_receipt.js --check-public-js
+          node tools/audit_evolution_log.js
+          node tools/evolution_goal_status.js --json
+          node tools/local_evidence_status.js --json
+          node tools/check_live_review_closure_conformance.js
+          node tools/render_public_live_shutdown_patch.js --json
+          node tools/generate_evolution_next_packet.js
+          node tools/build_public_site.js --check --output .public-site-build.local --force
+          node tools/preflight_public_launch.js --deployment
           node tools/audit_company_functionality.js
           node tools/check_external_live_packet_gate.js
           node tools/survival_check.js

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "mode": "template",
+  "source": "public-ama",
+  "allowedTopics": [
+    "launch-gates",
+    "strange-works-studio",
+    "sealed-company",
+    "brazil-compliance",
+    "other"
+  ],
+  "allowedStatuses": [
+    "new",
+    "screened",
+    "needs-human-route",
+    "answer_ready",
+    "published",
+    "rejected"
+  ],
+  "allowedBoundaryDecisions": [
+    "public_safe",
+    "route_to_human",
+    "reject_sensitive"
+  ],
+  "questionRecords": [],
+  "attestation": {
+    "operator": "",
+    "reviewedAt": "",
+    "noSecretsInRepo": true,
+    "privateEvidenceStaysOutOfRepo": true,
+    "aiDidNotApproveLegalTaxPaymentOrPrivacy": true,
+    "noPaymentOrderOrLaunchApprovalCreated": true,
+    "strangeCompanyRemainsSealed": true
+  }
+}

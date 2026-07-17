@@ -15,44 +15,59 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: false
+
+      - name: Run full test suite
+        run: python -m unittest discover -s tests
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
       - name: Run public launch preflight
         run: |
+          node --check tools/strict_public_data.js
+          node --check tools/bind_live_review_closure.js
           node tools/validate_external_live_packet.js --template-ok
-          node tools/preflight_public_launch.js
+          node tools/validate_live_review_closure.js --template-ok
+          node tools/validate_delivery_review_checklist.js --template-ok
+          node tools/export_public_live_receipt.js --check-public-js
+          node tools/audit_evolution_log.js
+          node tools/evolution_goal_status.js --json
+          node tools/local_evidence_status.js --json
+          node tools/check_live_review_closure_conformance.js
+          node tools/generate_evolution_next_packet.js
+          node tools/render_public_live_shutdown_patch.js --json
+          node tools/preflight_public_launch.js --deployment
 
       - name: Build static bundle
-        shell: bash
-        run: |
-          mkdir -p _site/tools
-          cp public.html _site/index.html
-          cp public.js public-config.js styles.css EXTERNAL_LIVE_PACKET.template.json _site/
-          cp *.md _site/
-          cp tools/strange_research_gate.py tools/reactive_research_tools_cors.patch _site/tools/
-          cp tools/google_apps_script_order_intake.gs _site/tools/
-          cp tools/validate_external_live_packet.js _site/tools/
-          touch _site/.nojekyll
+        run: node tools/build_public_site.js --check --output _site --force
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+
+      - name: Verify checkout is still current main
+        shell: bash
+        run: |
+          git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/origin/main)" || {
+            echo "Refusing to deploy a stale main checkout."
+            exit 1
+          }
 
       - name: Deploy to GitHub Pages
         id: deployment
